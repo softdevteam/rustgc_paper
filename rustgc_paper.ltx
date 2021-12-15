@@ -26,25 +26,28 @@ can't implement `Send' because two threads could race when updating the count.
 
 \subsection{Finalisers and Destructors}
 
-\subsection{multi-threaded garbage collection}
+\subsection{Multi-threaded garbage collection}
 
-In a thread-local GC, roots can only exist in three places: the mutator thread's
-call-stack; in registers; and in the static data segment because of static
-variables. In a multi-threaded GC, the location of potential roots must also
-include the call-stack of every live thread in the program. In addition, some
-form of cooperation between mutator threads and the collector is necessary to
-ensure that thread stacks are scanned while execution is paused. Rustgc patches
+In single-threaded GC, roots can only exist in three places: the
+call stack, registers, and in the program's \emph{data segment} (for static
+variables). In a multi-threaded GC, there are multiple call stacks, each
+of which must be scanned for roots. This requires threads to cooperate in order
+to make sure that this scanning can be done in a consistent fashion. The most
+simple form of cooperation is to `stop the world', that is for threads to notice
+when a global condition is set, and for them to voluntarily pause themselves.
+
+\ourgc patches
 Rust's threading implementation to register each new thread with the collector
 on thread creation, and unregister when a thread is destroyed. To facilitate
-pausing threads when the collector needs a consistent memory state, Rustgc uses
-Boehm's signal spin implementation: when the collector thread wishes to stop the
+pausing threads when the collector needs a consistent memory state, \ourgc uses
+\boehm's signal spin implementation: when the collector thread wishes to stop the
 world, it sends a SIGPWR signal to each registered thread and has them spin in a
 signal handler until the collector has finished stopping the the
 world.\jake{cite}
 
-This has two key limitations: first, Rustgc can only stop the world during
+This has two key limitations: first, \ourgc can only stop the world during
 allocation and calls to \lstinline{force_gc} by a mutator thread; second, it
-makes use of unspecified behaviour. The Boehm GC provides implementations for
+makes use of unspecified behaviour. \boehm provides implementations for
 most platforms, but it is not portable. An implementation where Rust inserts
 thread pause safepoints at appropriate locations would largely solve these
 issues, with considerable implementation effort.
@@ -57,17 +60,17 @@ lock will deadlock if ran on the same thread which already holds the lock;
 second, the asynchronous nature of finalisers can cause interleaving
 single-threaded code which races.
 
-For these reasons, Rustgc finalises \lstinline{Gc<T>} values on a dedicated
+For these reasons, \ourgc finalises \lstinline{Gc<T>} values on a dedicated
 finalisation thread, which requires \lstinline{T} to implement the
 \lstinline{Send} marker trait. Figure~\ref{fig:finaliser_race} shows an example
 of how finalising a non-\lstinline{Send} type off-thread is unsound. When
 \lstinline{T} does not implement \lstinline{Send}, a collected \lstinline{Gc<T>}
-will never be finalised. Rustgc will show a compiler warning lint to the user
+will never be finalised. \ourgc will show a compiler warning lint to the user
 explaining this.
 
 Counterintuitively, it is permissable for rustgc to finalise
 non-\lstinline{Sync} values off-thread. The \lstinline{Sync} trait is required
-to reference a type from multiple threads simultaneuosly.  However, Rustgc's
+to reference a type from multiple threads simultaneuosly.  However, \ourgc's
 \textit{dynamic liveness extension} guarantees that \textit{Gc} values are not
 reclaimed early, so a value's finaliser will never run while it is still
 reachable from a mutator thread. This allows finalisers to to access their
@@ -106,11 +109,11 @@ line 10.}
 \label{fig:finaliser_race}
 \end{figure}
 
-Rustgc provides an \textit{escape hatch} to support the finalisation of
+\ourgc provides an \textit{escape hatch} to support the finalisation of
 non-\lstinline{Send} values on the same thread which owns the value. Without
 this, patterns such as \lstinline{Gc<Rc<T>>} would be unusable because the
 \lstinline{Rc} would never be dropped and always leak memory. \footnote{While no garbage collector
-can guarantee that finalisers are run, missed finalisers in Rustgc are rare in
+can guarantee that finalisers are run, missed finalisers in \ourgc are rare in
 practice, which make the mixing of garbage collected and reference counted
 stategies both viable and useful.} The unsafe trait
 \lstinline{FinaliseLocally} can be implemented on types, such as \lstinline{Rc}
