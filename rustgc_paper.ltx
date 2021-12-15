@@ -28,12 +28,6 @@ can't implement `Send` because two threads could race when updating the count.
 
 \subsection{multi-threaded garbage collection}
 
-Implementing a GC in Rust which supports shared ownership of values over
-multiple threads is more difficult to make sound. has additional challenges
-which existing GC implementations we are aware of have not attempted to solve.
-
-Rustgc is able to solve these problems because it is has language support.
-
 In a thread-local GC, roots can only exist in three places: the mutator thread's
 call-stack; in registers; and in the static data segment because of static
 variables. In a multi-threaded GC, the location of potential roots must also
