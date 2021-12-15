@@ -4,7 +4,41 @@
 \begin{document}
 \maketitle
 
+\begin{abstract}
+Rust is a non-garbage collected language and existing attempts to add GC
+support to it are either (subjectively) unergonomic, or (objectively)
+unsound or slow. In this paper we show that it is possible to add a fairly
+ergonomic GC to Rust without compromising soundness \laurie{is this true?}
+and with reasonable performance. This does require us to change the Rust
+compiler and expose new APIs to the user, but we do not change the Rust
+language itself.
+\end{abstract}
+
+
 \section{Introduction}
+
+Amongst the several ways we can divide programming languages are whether they
+are Garbage Collected (GCed) or not. Traditionally non-GCed languages have
+required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
+\lstinline{free} functions). Rust's use of ownership types is a hybrid: most
+memory management is implicit but it is not GCed. For many portions of many
+programs, a Rust program looks identical, from a memory management perspective,
+to a GCed language equivalent. However, some kinds of programs are frustrating
+to write with ownership types, for examples programs with graph structures.
+There are various ways of encoding such structures, and while Rust protects the
+user from traditional mistakes such as dangling pointers, it cannot prevent
+memory leaks.
+
+Despite Rust's relative youth, there have been many attempts to add GC to it.
+Most are user level libraries \laurie{cite the ones we know of, and outline the
+major issues e.g.~can't GC across libraries etc.}. The Bronze
+GC~\cite{coblenz21bronze} in contrast, performs GC at a lower-level (using LLVM
+\lstinline{StackMaps}) but allows the aliasing of mutable values, undermining
+Rust's soundness rules.
+
+In this paper we introduce \ourgc, an ergonomic GC, that goes out of its way
+to preserve soundness, while also not unduly compromising performance.
+\laurie{outline the key techniques}
 
 
 \section{Background}
@@ -35,6 +69,8 @@ of which must be scanned for roots. This requires threads to cooperate in order
 to make sure that this scanning can be done in a consistent fashion. The most
 simple form of cooperation is to `stop the world', that is for threads to notice
 when a global condition is set, and for them to voluntarily pause themselves.
+\boehm uses this strategy, with threads checking whether they should pause
+during memory allocation \laurie{GC\_alloc?} or \lstinline{force_gc}.
 
 \ourgc patches
 Rust's threading implementation to register each new thread with the collector
@@ -42,12 +78,13 @@ on thread creation, and unregister when a thread is destroyed. To facilitate
 pausing threads when the collector needs a consistent memory state, \ourgc uses
 \boehm's signal spin implementation: when the collector thread wishes to stop the
 world, it sends a SIGPWR signal to each registered thread and has them spin in a
-signal handler until the collector has finished stopping the the
-world.\jake{cite}
+signal handler until the collector has finished stopping the
+world.\jake{cite} \laurie{is this something that \ourgc has added, or is this
+spinning what \boehm does without our help?}
 
 This has two key limitations: first, \ourgc can only stop the world during
 allocation and calls to \lstinline{force_gc} by a mutator thread; second, it
-makes use of unspecified behaviour. \boehm provides implementations for
+makes use of unspecified behaviour \laurie{unspecified? and why?}. \boehm provides implementations for
 most platforms, but it is not portable. An implementation where Rust inserts
 thread pause safepoints at appropriate locations would largely solve these
 issues, with considerable implementation effort.
