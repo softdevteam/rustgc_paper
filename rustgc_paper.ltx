@@ -10,17 +10,17 @@
 \section{Background}
 
 \jake{TODO: Not sure where this stuff goes, or if it will ever make the cut}Rust uses two marker traits: `Send`, and `Sync` for handling concurrency. A type
-which implements `Send` is safe to pass between threads, and a type which
-implements `Sync` can be referenced from multiple threads at the same time.
+which implements `Send' is safe to pass between threads, and a type which
+implements `Sync' can be referenced from multiple threads at the same time.
 These marker traits are implemented transitively; in other words, if a type
-`T`'s component types all implement `Send` and `Sync`, then so will `T`.
-Further, if any component type is not `Send` or `Sync`, then neither is `T`.
+`T''s component types all implement `Send' and `Sync', then so will `T'.
+Further, if any component type is not `Send' or `Sync', then neither is `T'.
 These marker traits allow Rust to catch potential concurrency bugs statically
 during type checking.
 
 Rust allows for single-threaded shared ownership using a reference counting
-smart pointer, `Rc<T>`. It updates the reference count non-atomically, it
-can't implement `Send` because two threads could race when updating the count.
+smart pointer, `Rc<T>'. It updates the reference count non-atomically, it
+can't implement `Send' because two threads could race when updating the count.
 
 \section{Implementation}
 
