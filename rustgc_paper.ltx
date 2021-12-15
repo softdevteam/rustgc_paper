@@ -9,6 +9,8 @@ Rust is a non-garbage collected language and existing attempts to add GC
 support to it are either (subjectively) unergonomic, or (objectively)
 unsound or slow. In this paper we show that it is possible to add a fairly
 ergonomic GC to Rust without compromising soundness \laurie{is this true?}
+\jake{no, to be really pedantic, it's not possible to make a completely
+sound conservative GC because you can obfuscate pointers in safe Rust code}
 and with reasonable performance. This does require us to change the Rust
 compiler and expose new APIs to the user, but we do not change the Rust
 language itself.
@@ -71,6 +73,9 @@ simple form of cooperation is to `stop the world', that is for threads to notice
 when a global condition is set, and for them to voluntarily pause themselves.
 \boehm uses this strategy, with threads checking whether they should pause
 during memory allocation \laurie{GC\_alloc?} or \lstinline{force_gc}.
+\jake{subtle difference: the mutator threads themselves don't poll to see if
+they should pause. Instead, the collector forces them to by sending them signals
+to wait on which are never usually used (e.g. SIGPWR / SIGBUS)}
 
 \ourgc patches
 Rust's threading implementation to register each new thread with the collector
@@ -80,14 +85,15 @@ pausing threads when the collector needs a consistent memory state, \ourgc uses
 world, it sends a SIGPWR signal to each registered thread and has them spin in a
 signal handler until the collector has finished stopping the
 world.\jake{cite} \laurie{is this something that \ourgc has added, or is this
-spinning what \boehm does without our help?}
+spinning what \boehm does without our help?} \jake{This is all boehm}
 
 This has two key limitations: first, \ourgc can only stop the world during
 allocation and calls to \lstinline{force_gc} by a mutator thread; second, it
-makes use of unspecified behaviour \laurie{unspecified? and why?}. \boehm provides implementations for
-most platforms, but it is not portable. An implementation where Rust inserts
-thread pause safepoints at appropriate locations would largely solve these
-issues, with considerable implementation effort.
+makes use of implementation-defined behaviour because it relies on the target
+OS's mechanism for pausing threads. \boehm provides implementations for most
+platforms, but it is not portable. An implementation where Rust inserts thread
+pause safepoints at appropriate locations would largely solve these issues, with
+considerable implementation effort.
 
 \subsection{Off-thread Finalisation}
 
