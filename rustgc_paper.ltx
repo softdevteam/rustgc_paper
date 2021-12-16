@@ -17,7 +17,8 @@ use-after-frees when the user goes to deref Gc<T>s. So sure, Gc<T> is
 implemented as an unsafe deref behind the scenes. However, we what we expose to
 the user is a seemingly safe API via the Gc<T> type, and they will have unexpectedly broken preconditions for
 Gc<T>::deref() by obfuscating some random pointer earlier on in safe rust code. This, in my view,
-is unsound, but also impossible to fix/enforce}
+is unsound, but also impossible to fix/enforce}\laurie{how can you deref
+a pointer without using \texttt{unsafe}?}
 and with reasonable performance. This does require us to change the Rust
 compiler and expose new APIs to the user, but we do not change the Rust
 language itself.
