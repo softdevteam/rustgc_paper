@@ -12,6 +12,12 @@ ergonomic GC to Rust without compromising soundness \laurie{is this true?}
 \jake{no, to be really pedantic, it's not possible to make a completely
 sound conservative GC because you can obfuscate pointers in safe Rust code}
 \laurie{devil's advocate: since you can't deref pointers in safe Rust code, is it the case that we don't compromise the safety of \emph{safe} Rust code?}
+\jake{I'm not sure I buy this. obfuscating pointers in safe code can lead to
+use-after-frees when the user goes to deref Gc<T>s. So sure, Gc<T> is
+implemented as an unsafe deref behind the scenes. However, we what we expose to
+the user is a seemingly safe API via the Gc<T> type, and they will have unexpectedly broken preconditions for
+Gc<T>::deref() by obfuscating some random pointer earlier on in safe rust code. This, in my view,
+is unsound, but also impossible to fix/enforce}
 and with reasonable performance. This does require us to change the Rust
 compiler and expose new APIs to the user, but we do not change the Rust
 language itself.
