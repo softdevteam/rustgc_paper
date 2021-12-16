@@ -11,6 +11,7 @@ unsound or slow. In this paper we show that it is possible to add a fairly
 ergonomic GC to Rust without compromising soundness \laurie{is this true?}
 \jake{no, to be really pedantic, it's not possible to make a completely
 sound conservative GC because you can obfuscate pointers in safe Rust code}
+\laurie{devil's advocate: since you can't deref pointers in safe Rust code, is it the case that we don't compromise the safety of \emph{safe} Rust code?}
 and with reasonable performance. This does require us to change the Rust
 compiler and expose new APIs to the user, but we do not change the Rust
 language itself.
@@ -75,10 +76,11 @@ when a global condition is set, and for them to voluntarily pause themselves.
 during memory allocation \laurie{GC\_alloc?} or \lstinline{force_gc}.
 \jake{subtle difference: the mutator threads themselves don't poll to see if
 they should pause. Instead, the collector forces them to by sending them signals
-to wait on which are never usually used (e.g. SIGPWR / SIGBUS)}
+to wait on which are never usually used (e.g. SIGPWR / SIGBUS)} \laurie{ok.
+so why do we say they also wait in GC\_alloc and force\_gc ?}
 
 \ourgc patches
-Rust's threading implementation to register each new thread with the collector
+Rust's threading implementation to register/register threads on creation/destruction with \boehm.
 on thread creation, and unregister when a thread is destroyed. To facilitate
 pausing threads when the collector needs a consistent memory state, \ourgc uses
 \boehm's signal spin implementation: when the collector thread wishes to stop the
