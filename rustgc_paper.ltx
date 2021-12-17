@@ -8,17 +8,7 @@
 Rust is a non-garbage collected language and existing attempts to add GC
 support to it are either (subjectively) unergonomic, or (objectively)
 unsound or slow. In this paper we show that it is possible to add a fairly
-ergonomic GC to Rust without compromising soundness \laurie{is this true?}
-\jake{no, to be really pedantic, it's not possible to make a completely
-sound conservative GC because you can obfuscate pointers in safe Rust code}
-\laurie{devil's advocate: since you can't deref pointers in safe Rust code, is it the case that we don't compromise the safety of \emph{safe} Rust code?}
-\jake{I'm not sure I buy this. obfuscating pointers in safe code can lead to
-use-after-frees when the user goes to deref Gc<T>s. So sure, Gc<T> is
-implemented as an unsafe deref behind the scenes. However, we what we expose to
-the user is a seemingly safe API via the Gc<T> type, and they will have unexpectedly broken preconditions for
-Gc<T>::deref() by obfuscating some random pointer earlier on in safe rust code. This, in my view,
-is unsound, but also impossible to fix/enforce}\laurie{how can you deref
-a pointer without using \texttt{unsafe}?}
+ergonomic GC to Rust, without compromising soundness in safe Rust,
 and with reasonable performance. This does require us to change the Rust
 compiler and expose new APIs to the user, but we do not change the Rust
 language itself.
@@ -27,28 +17,38 @@ language itself.
 
 \section{Introduction}
 
-Amongst the several ways we can divide programming languages are whether they
-are Garbage Collected (GCed) or not. Traditionally non-GCed languages have
+Amongst the several ways one can divide programming languages are whether they
+are Garbage Collected (GCed) or not. Traditionally, non-GCed languages have
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust's use of ownership types is a hybrid: most
 memory management is implicit but it is not GCed. For many portions of many
 programs, a Rust program looks identical, from a memory management perspective,
-to a GCed language equivalent. However, some kinds of programs are frustrating
-to write with ownership types, for examples programs with graph structures.
-There are various ways of encoding such structures, and while Rust protects the
-user from traditional mistakes such as dangling pointers, it cannot prevent
-memory leaks.
+to a GCed language equivalent. However, some kinds of programs, such as
+those operating on cyclic data structures, are frustrating to write with
+ownership types. There are various ways of encoding such structures, but at
+some point the user has to handle some aspects of the problem manually.
+Assuming the user stays in \emph{safe Rust} (i.e.~does not use, directly
+or indirectly, the \lstinline{unsafe} construct) they are protected
+from some traditional mistakes such as dereferencing a dangling machine pointer,
+but Rust cannot help prevent memory leaks or other consequences of the encoding.
 
-Despite Rust's relative youth, there have been many attempts to add GC to it.
-Most are user level libraries \laurie{cite the ones we know of, and outline the
+Because of this, there have already been several attempts to add GC to
+Rust\footnote{`Premodern' Rust had a reference-counted GC which was removed
+gradually from mid 2013 to mid 2014.}. Most are user level libraries
+\laurie{cite the ones we know of, and outline the
 major issues e.g.~can't GC across libraries etc.}. The Bronze
 GC~\cite{coblenz21bronze} in contrast, performs GC at a lower-level (using LLVM
-\lstinline{StackMaps}) but allows the aliasing of mutable values, undermining
-Rust's soundness rules.
+\lstinline{StackMaps}) but allows the aliasing of mutable values, violating
+safe Rust's soundness rules.
 
-In this paper we introduce \ourgc, an ergonomic GC, that goes out of its way
-to preserve soundness, while also not unduly compromising performance.
-\laurie{outline the key techniques}
+In this paper we introduce \ourgc, an ergonomic GC, that preserves soundness
+in safe Rust, while not unduly compromising performance. We show that it is
+possible to provide a fully-featured GC that does not changes the rules of
+safe Rust, though we also show that it is necessary to change the rules of
+unsafe Rust. Crucially, all user-visible aspects of the GC are exposed via
+standard APIs though we make several changes to \lstinline{rustc} (the Rust
+compiler) to make GC work. \laurie{what are the major Rust-specific challenges?
+destruction, clearly, and ... ?}
 
 
 \section{Background}
