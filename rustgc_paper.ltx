@@ -69,6 +69,73 @@ can't implement `Send' because two threads could race when updating the count.
 \section{Implementation}
 
 \subsection{Finalisers and Destructors}
+\subsubsection{Preventing Premature Finalisation}
+
+One of Rust's strengths is that it prevents dangling pointers by ensuring that
+references are never used outside the scope that they are valid for. The
+lifetimes of references are checked statically by a part of \lstinline{rustc}
+known as the \textit{borrow-checker}. If a value needs dropping,
+\lstinline{rustc} will automaticaly insert a call to its \lstinline{Drop::drop}
+method once all other references to it are out of scope. This is to ensure
+\lstinline{Drop::drop} is not called while the value is still in use, as it is a
+destructor, and typically used to clean up a value.
+
+In the same vein, \ourgc must also ensure that \lstinline{Drop::drop} is not
+called as part of a finaliser on a value while it is still in use, as to do so
+would be unsound. However, finalisers in languages which use tracing garbage
+collection may run earlier than expected because of compiler optimisations.
+Figure~\ref{fig:finaliser_premature} shows how this can lead to a use-after-free
+in safe Rust code. This happens because the compiler may end up clobbering the
+stack slot or register containing a garbage-collected reference earlier than
+expected if there are no further uses of it. If a collection happens immediately
+afterwards, the value may be reclaimed -- and thus finalised -- early. Although
+such behaviour is rare in practice, it is possible because like most languages,
+Rust's compiler is free to perform any code transformation as long as it does
+not change the observable behaviour of the program. In C++ parlance, this is
+referred to as the as-if rule.
+
+To prevent early finalisation of GC'd values, \ourgc patches \lstinline{rustc}
+to ensure that stack based GC references remain valid for the entire duration of
+their stack frame. This is sufficient, because a single reference on the stack
+is all that is necessary to keep a GC value alive. \ourgc does this by adding a
+MIR transformation pass named \textit{prevent-early-finalization} which runs
+before any MIR optimisation passes take place. For MIR bodies (i.e. Rust
+functions) which contain GC references, the prevent-early-finalization pass will
+append a MIR statement designed to keep alive any GC references at the end of
+the block. This MIR statement compiles down to a volatile inline assembly block
+designed to inform the optimiser that the values are still being used.
+\jake{TODO: More detail here/ explain MIR / Whats a pass etc}
+
+This approach the disadvantage of pessimising code generation in the many cases
+where short-lived GC references would not cause problems. In these cases, tying
+stack frame is excessive, and future analysis could help eliminate this when it
+can be statically determined it is unnecessary.
+
+\begin{figure}[t]
+\begin{lstlisting}
+fn foo() {
+    let x = Gc::new(String::from("Hello World"));
+    let window = x.as_ref().as_str();
+
+    blast_stack() // inlined into foo
+
+    println!("{}", window); // ERROR: may have been dropped
+}
+
+\end{lstlisting}
+\caption{An example of unsoundness if a finaliser is allowed to run early.
+    Semantically, both \lstinline{x} and \lstinline{window} live until the end
+    of \lstinline{foo}. However, the call to \lstinline{blast_stack} may cause
+    the optimiser to reuse \lstinline{x}'s stack slot for some other value
+    because \lstinline{x} is never used again. If a collection happens during
+    the inlined call to \lstinline{blast_stack}, then \lstinline{x} may be
+    unreachable and finalised before the end of the call to \lstinline{foo}.
+    This would cause \lstinline{Drop::drop} to be called on the
+    \lstinline{String} that it manages, freeing its buffer and causing a
+    use-after-free when it's accessed on line 7.}
+\label{fig:finaliser_premature}
+\end{figure}
+
 
 \subsection{Multi-threaded garbage collection}
 
