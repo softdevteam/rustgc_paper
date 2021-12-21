@@ -117,18 +117,24 @@ conservative GC, this example doesn't show a problem.'' But then I realised
 that the problem is presumably because `String' is a separate heap-allocated
 thingy. Thus having a reference to the `String' alone doesn't force the `Gc' to
 stay alive, so the `Gc' will be collected, the finaliser run, and the `String'
-deallocated, even though the `\&str' is still in use. Correct?}
+deallocated, even though the `\&str' is still in use. Correct?} \jake{Yes.
+That's the bug}
 \laurie{If so, my next question was ``is the `keep alive until the end of the
 block' thing enough?'' At first I wasn't sure about that either, but I think
 the point is that `Gc::as\_ref' must return a reference, so that prevents
 someone in the above example returning a `\&str' to the caller (the borrow
-checker will complain that it's tied to the `Gc's lifetime).}
+checker will complain that it's tied to the `Gc's lifetime).} \jake{Yes. window: \&str
+is tied to the lifetime of x: Gc. We are keeping x alive for the duration of the
+stack frame which is fine because we know that \&str cant outlive it.}
 \laurie{Another thing I then wondered about was `Copy' types: if I can
 `Copy' something out of a `Gc's inner contents then could I do something
 weird that would break in safe Rust? The only example I can come up with
 is a silly variant of `Rc' that would deallocate memory when one of
 the `Copy'd instances is dropped. But that would be unsafe in non-GC
-Rust, so I don't see that as a problem.}
+Rust, so I don't see that as a problem.} \jake{ I'm not sure what you mean here.
+GC is a Copy type, so we can easily copy around new Gc<T>s from our original
+one, but if T is a copy type, then it cant have a Drop method. So if I
+understand the question correctly, Copy types bypass these issues because they are not finalizable.}
 \laurie{My final question is about moves: if I move a GC to another function
 what happens? Something like this:}
 \begin{lstlisting}
@@ -140,6 +146,10 @@ fn foo() -> (Gc, &str) {
 \end{lstlisting}
 \laurie{will there be a `KeepAlive' in `foo`, or will it only be in the functions
 that call foo?}
+\jake{We would add a keepAlive to foo as well as its callers. In this example,
+you're correct that it's not necessary because foo will itself keep the Gc alive
+long enough because it needs to return it at the end of the call. My MIR pass is not yet
+clever enough to detect that though!}
 
 \begin{figure}[t]
 \begin{lstlisting}
