@@ -119,6 +119,10 @@ understand the question correctly, Copy types bypass these issues because they a
 our original one, but if T is a copy type, then it cant have a Drop method" OK,
 so *this* is why we have to have a MIR pass? Devil's advocate: is this a good
 trade-off? If we make Gc non-Copy, we don't need to alter rustc.}
+\jake{I think I'm misunderstanding. Whether or not the GC is Copy makes no
+difference. It will still need the keepAlive stuff. However, the inner type, T
+does make a difference. If T is Copy, then it can't impl Drop, so it won't have
+a finaliser, and thus doesn't need its lifetime extending.}
 \laurie{My final question is about moves: if I move a GC to another function
 what happens? Something like this:}
 \begin{lstlisting}
