@@ -111,6 +111,36 @@ where short-lived GC references would not cause problems. In these cases, tying
 stack frame is excessive, and future analysis could help eliminate this when it
 can be statically determined it is unnecessary.
 
+\laurie{I think there's something unstated in this subsection, and particularly
+the example below, that's worth checking on. My first reaction was ``in a
+conservative GC, this example doesn't show a problem.'' But then I realised
+that the problem is presumably because `String' is a separate heap-allocated
+thingy. Thus having a reference to the `String' alone doesn't force the `Gc' to
+stay alive, so the `Gc' will be collected, the finaliser run, and the `String'
+deallocated, even though the `\&str' is still in use. Correct?}
+\laurie{If so, my next question was ``is the `keep alive until the end of the
+block' thing enough?'' At first I wasn't sure about that either, but I think
+the point is that `Gc::as\_ref' must return a reference, so that prevents
+someone in the above example returning a `\&str' to the caller (the borrow
+checker will complain that it's tied to the `Gc's lifetime).}
+\laurie{Another thing I then wondered about was `Copy' types: if I can
+`Copy' something out of a `Gc's inner contents then could I do something
+weird that would break in safe Rust? The only example I can come up with
+is a silly variant of `Rc' that would deallocate memory when one of
+the `Copy'd instances is dropped. But that would be unsafe in non-GC
+Rust, so I don't see that as a problem.}
+\laurie{My final question is about moves: if I move a GC to another function
+what happens? Something like this:}
+\begin{lstlisting}
+fn foo() -> (Gc, &str) {
+    let x = Gc::new(String::from("Hello World"));
+    let window = x.as_ref().as_str();
+    (x, window)
+}
+\end{lstlisting}
+\laurie{will there be a `KeepAlive' in `foo`, or will it only be in the functions
+that call foo?}
+
 \begin{figure}[t]
 \begin{lstlisting}
 fn foo() {
@@ -132,7 +162,14 @@ fn foo() {
     unreachable and finalised before the end of the call to \lstinline{foo}.
     This would cause \lstinline{Drop::drop} to be called on the
     \lstinline{String} that it manages, freeing its buffer and causing a
-    use-after-free when it's accessed on line 7.}
+    use-after-free when it's accessed on line 7.\laurie{devil's advocate:
+    can this example actually go wrong? rust's semantics are that `Gc' can't
+    be dropped until the end of `foo', and so the idea that it can be
+    dropped earlier seems wrong. For example, the way mutex locks are
+    used requires that they're not dropped early. I think you will need
+    to include an example that you can show really goes wrong in `real
+    life' (i.e. with your pass disabled), possibly involving actual
+    machine code output or similar to prove it.}}
 \label{fig:finaliser_premature}
 \end{figure}
 
