@@ -169,7 +169,10 @@ fn foo() {
     used requires that they're not dropped early. I think you will need
     to include an example that you can show really goes wrong in `real
     life' (i.e. with your pass disabled), possibly involving actual
-    machine code output or similar to prove it.}}
+    machine code output or similar to prove it.}
+    \laurie{another idea: I claim that I can achieve the same effect
+    as the MIR pass by adding a `Drop' to `Gc' that has the opaque
+    `asm' statement in it.}}
 \label{fig:finaliser_premature}
 \end{figure}
 
