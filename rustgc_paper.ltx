@@ -69,6 +69,14 @@ can't implement `Send' because two threads could race when updating the count.
 \section{Implementation}
 
 \subsection{Finalisers and Destructors}
+
+A Rust value can have a destructor, which is implemented with the
+\lstinline{Drop} trait. When a value which implements \lstinline{Drop} goes out
+of scope, the compiler ensures its \lstinline{Drop::drop} method is called to
+perform destruction.
+
+\jake{TODO: How this relates to finalisers in GC}
+
 \subsubsection{Preventing Premature Finalisation}
 
 One of Rust's strengths is that it prevents dangling pointers by ensuring that
@@ -179,6 +187,43 @@ fn foo() {
     `asm' statement in it.}}
 \label{fig:finaliser_premature}
 \end{figure}
+
+\subsubsection{Finaliser elision}
+
+\ourgc will finalise dead \lstinline{Gc<T>} values by calling the
+\lstinline{T::drop} method (if one exists). However, these drop calls can't be
+inserted automatically by the compiler because the lifetime of a \lstinline{Gc}
+is only known dynamically: it is freed when the collector determines it is
+unreachable. Instead, \lstinline{T::drop} is enqueued for finalization
+dynamically. Furthermore, if a Gc value holds a reference to a non-Gc'd value,
+then a finalizer must be used to call the non-Gc'd value's destructor. This is
+expensive because it can lead to a finalisation bottleneck in object graphs with
+edges between different kinds of values.
+
+\ourgc tries to reduce the number of finalisers needed with an optimisation it
+calls \textit{finaliser elision}. The key observation is that \lstinline{Drop}
+methods in Rust are mainly used to free resources. In particular, types such as
+\lstinline{Box} and \lstinline{RawVec} use \lstinline{Drop} to deallocate their
+dynamic memory. When such types are owned by a reference from a \lstinline{Gc},
+the collector can also take responsibility for freeing their memory, instead of
+the much slower approach of using a finaliser to call their \lstinline{Drop}
+method. Of course, this is not always possible: if a type's \lstinline{Drop}
+method does anything more complicated than just freeing memory, it must still be
+called using a finaliser.
+
+\ourgc decides whether values of \lstinline{Gc<T>} need finalising based on the
+type of \lstinline{T}. Such analysis can be decided statically and has no
+run-time cost. It can be understood as an extension of the existing
+\lstinline{needs_drop::<T>} support in Rustc but with some additional rules. It
+introduces two new traits: \lstinline{NoFinalize}, and
+\lstinline{OnlyFinalizeContents}, to hint to the collector that certain types
+won't need finalizing.
+
+A type \lstinline{T} which implements the \lstinline{NoFinalize} trait means
+that any \lstinline{Gc<T>} won't need a finaliser. This is true even if
+\lstinline{T}, or any of \lstinline{T}'s component types implements
+\lstinline{Drop}. However, this does not guarantee that \lstinline{T} will not
+be finalised.
 
 
 \subsection{Multi-threaded garbage collection}
