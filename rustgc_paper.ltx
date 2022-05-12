@@ -193,7 +193,9 @@ fn foo() {
 \ourgc will finalise dead \lstinline{Gc<T>} values by calling the
 \lstinline{T::drop} method (if one exists). However, these drop calls can't be
 inserted automatically by the compiler because the lifetime of a \lstinline{Gc}
-is only known dynamically: it is freed when the collector determines it is
+is only known dynamically \laurie{devil's advocate: they can be inserted
+automatically as, effectively, reference counting}: it is freed when the
+collector determines it is
 unreachable. Instead, \lstinline{T::drop} is enqueued for finalization
 dynamically. Furthermore, if a Gc value holds a reference to a non-Gc'd value,
 then a finalizer must be used to call the non-Gc'd value's destructor. This is
@@ -224,6 +226,8 @@ that any \lstinline{Gc<T>} won't need a finaliser. This is true even if
 \lstinline{T}, or any of \lstinline{T}'s component types implements
 \lstinline{Drop}. However, this does not guarantee that \lstinline{T} will not
 be finalised.
+
+\laurie{need to explain OnlyFinalizeContents}
 
 
 \subsection{Multi-threaded garbage collection}
