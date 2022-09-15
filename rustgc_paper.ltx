@@ -70,12 +70,94 @@ can't implement `Send' because two threads could race when updating the count.
 
 \subsection{Finalisers and Destructors}
 
-A Rust value can have a destructor, which is implemented with the
-\lstinline{Drop} trait. When a value which implements \lstinline{Drop} goes out
-of scope, the compiler ensures its \lstinline{Drop::drop} method is called to
-perform destruction.
+Rust has support for destructors: a way to run cleanup code when a value goes
+out of scope. It does this with a special \lstinline{Drop} trait. A type can
+provide an implementation for \lstinline{Drop}, which the compiler will
+automatically insert for each value of that type which go out of scope. This is
+similar to the RAII (Resource Acquisition is Initialization) idiom in C++, where
+class destructors are used for a similar purpose. In Rust parlance, destruction
+is known as dropping a value.
 
-\jake{TODO: How this relates to finalisers in GC}
+The \lstinline{Drop} trait is used extensively by smart pointers. For example,
+\lstinline{Box<T>} (a heap allocated pointer to a value of type \lstinline{T})
+implements \lstinline{Drop} to free its heap allocation when it goes out
+of scope.
+
+\lstinline{Drop} is also a core part of shared ownership in Rust. For example,
+when a reference counted smart pointer, \lstinline{Rc}, is dropped, the
+reference count of its contents is decremented. If the count hits zero when
+dropping an \lstinline{Rc}, the shared contents is also dropped.
+
+Garbage collection inevitably complicates Rust's drop semantics. Unlike
+\lstinline{Rc}, shared ownership using \ourgc's \lstinline{Gc} smart pointer
+doesn't keep track of how many references there are to its contents. Instead,
+the collector will free the contents when it's no longer reachable. If the
+contents requires dropping, this now becomes the responsibility of the
+collector, because the compiler can't know when this is expected to happen.
+\ourgc uses \textit{finalisers} to drop these unreachable values. There are some
+rules to be aware of:
+
+Finalisation in \ourgc is unordered between \lstinline{Gc}s. If a field in
+\lstinline{Gc<A>} points to \lstinline{Gc<B>}, there is no guarantee that
+\lstinline{Gc<A>} will be finalised first. This is so that \ourgc can be used to
+create strongly connected cycles which do not leak. When an entire cyclic graph
+is unreachable, each node can be finalised independently. This restricts the
+drop implementation for types used in \lstinline{Gc}: they must never
+dereference fields which point to other \lstinline{Gc}s because those objects
+could already be freed at the point of finalisation. In our experiments, we did
+not find this restriction too prohibitive, nevertheless, \ourgc can be built
+with \textit{topological finalisation} instead. In this configuration, values
+are finalised in topological order (\lstinline{Gc<A>} before \lstinline{Gc<B>})
+which permits dereferencing through fields pointing to other \lstinline{Gc}s.
+However, topological finalisation means that cycles will never be finalised,
+which could cause memory leaks.
+
+Within a type, drop is ordered the way it normally is in rust.\jake{Todo: Expand
+on this}.
+
+\ourgc, like most VMs implementations, run finalisers on a separate finalisation
+thread [todo ref]. This is for two main reasons: first, a finaliser which needs
+to acquire a lock will deadlock if ran on the same thread which already holds
+the lock; second, the asynchronous nature of finalisers can cause interleaving
+single-threaded code which races \jake{Ref boehm sync paper}. However, using a
+dedicated thread to finalise values means they must be safe to send between
+threads. In Rust, this means that their type must implement the \lstinline{Send}
+marker trait. Figure~\ref{fig:finaliser_race} shows how finalising a
+non-\lstinline{Send} \lstinline{Rc} value on another thread is unsound. \ourgc's
+\lstinline{Gc} smart pointer enforces in the constructor,
+\lstinline{Gc<T>::new}, where \lstinline{T} must have a \lstinline{Send} bound.
+An additional constructor, \lstinline{Gc<T>::new_unfinalizable}, is available
+for non-send values, but they will never be dropped.
+
+TODO: Talk about sync, but first I need to investigate the soundness.
+
+\begin{figure}[t]
+\begin{lstlisting}
+fn foo() {
+    let rc1 = Rc::new(123);
+    {
+        let gc = Gc::new(Rc::clone(rc1));
+    }
+
+    // Finalises unreachable values off-thread
+    force_gc();
+
+    let rc3 = Rc::clone(rc1);
+}
+\end{lstlisting}
+\caption{An example of unsoundness when finalising values off-thread. An
+\lstinline{Rc} is meant for single-threaded
+shared ownership so it updates its reference count non-atomically. The
+\lstinline{force_gc} call on line 8 could reclaim
+\lstinline{gc} as it's no longer reachable. \lstinline{gc} will be finalised
+    off-thread, which means \lstinline{Rc::drop(x)} will run. This is unsound
+    because it has the potential to race with the incref from the
+    \lstinline{clone} on the main-thread on
+line 10.}
+\label{fig:finaliser_race}
+\end{figure}
+
+
 
 \subsubsection{Preventing Premature Finalisation}
 
@@ -295,31 +377,6 @@ values with interior mutability using the \lstinline{RefCell} pattern. A
 However, \lstinline{RefCell} does not implement \lstinline{Sync} because the
 dynamic borrow checking it performs, which is implemented internally as a form
 of reference counting, is not thread-safe.
-
-\begin{figure}[t]
-\begin{lstlisting}
-fn foo() {
-    let x = Rc::new(123);
-    {
-        let y = Gc::new(Rc::clone(rc));
-    }
-
-    // Finalises unreachable values off-thread
-    force_gc();
-
-    let z = Rc::clone(rc);
-}
-\end{lstlisting}
-\caption{An example of unsoundness when finalising values off-thread. Rust's
-\lstinline{Rc} smart pointer is intended to be used for single-threaded
-shared ownership so it updates its reference count non-atomically. The
-\lstinline{force_gc} call on line 8 will cause the collector to reclaim
-\lstinline{y} which is no longer reachable. \lstinline{y} will be finalised
-off-thread, resulting in a call to \lstinline{Rc::drop(x)}. This is unsound
-because it has the potential to race with the incref on the main-thread on
-line 10.}
-\label{fig:finaliser_race}
-\end{figure}
 
 \ourgc provides an \textit{escape hatch} to support the finalisation of
 non-\lstinline{Send} values on the same thread which owns the value. Without
