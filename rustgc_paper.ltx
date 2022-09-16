@@ -5,12 +5,12 @@
 \maketitle
 
 \begin{abstract}
-Rust is a non-garbage collected language and existing attempts to add GC
+Rust is a non-Garbage Collected (GC) language: existing attempts to add GC
 support to it are either (subjectively) unergonomic, or (objectively)
 unsound or slow. In this paper we show that it is possible to add a fairly
 ergonomic GC to Rust, without compromising soundness in safe Rust,
-and with reasonable performance. This does require us to change the Rust
-compiler and expose new APIs to the user, but we do not change the Rust
+and with reasonable performance. This requires us to expose new APIs
+to the user, and to change the Rust compiler, but we do not change the Rust
 language itself.
 \end{abstract}
 
@@ -20,35 +20,36 @@ language itself.
 Amongst the several ways one can divide programming languages are whether they
 are Garbage Collected (GCed) or not. Traditionally, non-GCed languages have
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
-\lstinline{free} functions). Rust's use of affine types is a hybrid: most
-memory management is implicit but it is not GCed. For many portions of many
+\lstinline{free} functions). Rust's \emph{ownership types} (a specific instance
+of affine types) make it a hybrid: memory management is implicit but Rust does
+not use GC. For many portions of many
 programs, a Rust program looks identical, from a memory management perspective,
-to a GCed language equivalent. However, some kinds of programs, such as
-those operating on cyclic data structures, are frustrating to write with
-ownership types. There are various ways of encoding such structures, but at
-some point the user has to handle some aspects of the problem manually.
-Assuming the user stays in \emph{safe Rust} (i.e.~does not use, directly
-or indirectly, the \lstinline{unsafe} construct) they are protected
-from some traditional mistakes such as dereferencing a dangling machine pointer,
-but Rust cannot help prevent memory leaks or other consequences of the encoding.
+to a GCed language equivalent. However, programs operating on cyclic data
+structures are frustrating to write with ownership types. Encodings such as the
+use of weak references protect the user from dangling machine pointers, but
+cannot prevent memory leaks, or dangling indices.
 
-Because of this, there have already been several attempts to add GC to
+Because of this, there have been several attempts to add GC to
 Rust\footnote{`Premodern' Rust had a reference-counted GC which was removed
 gradually from mid 2013 to mid 2014.}. Most are user level libraries
-\laurie{cite the ones we know of, and outline the
-major issues e.g.~can't GC across libraries etc.}. The Bronze
-GC~\cite{coblenz21bronze} in contrast, performs GC at a lower-level (using LLVM
-\lstinline{StackMaps}) but allows the aliasing of mutable values, violating
-safe Rust's soundness rules.
+\laurie{cite the ones we know of} which suffer from limitations such as
+the inability to apply GC to items defined in external libraries. In contrast,
+the Bronze GC~\cite{coblenz21bronze} allows the aliasing of mutable values,
+violating Rust's soundness rules. GC in Rust thus remains an unsolved problem.
 
-In this paper we introduce \ourgc, an ergonomic GC, that preserves soundness
-in safe Rust, while not unduly compromising performance. We show that it is
-possible to provide a fully-featured GC that does not changes the rules of
-safe Rust, though we also show that it is necessary to change the rules of
-unsafe Rust. Crucially, all user-visible aspects of the GC are exposed via
-standard APIs though we make several changes to \lstinline{rustc} (the Rust
-compiler) to make GC work. \laurie{what are the major Rust-specific challenges?
-destruction, clearly, and ... ?}
+In this paper we introduce \ourgc, a new point in the Rust GC design space.
+\ourgc is fairly ergonomic, does not compromise safe Rust's soundness rules,
+and has reasonable performance. \ourgc introduces new user-visible APIs and
+requires several changes to the Rust compiler \rustc but does not require any
+changes to the Rust language. We show that the major challenge for any Rust GC
+is Rust's extensive use of \emph{destructors} (or \lstinline{drop} methods) --
+simply mapping these to GC finalisers leads to significant performance
+problems. We show how many finalisers can be safely optimised away
+
+We validate \ourgc's performance in several different ways: a SOM (a cutdown
+Smalltalk) interpreter written specifically to understand how GC in Rust might
+work; WLambda, an externally written interpreter to which we have retrofitted
+GC; \laurie{we probably need a third example that isn't an intprereter!}.
 
 
 \section{Background}
