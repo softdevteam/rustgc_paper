@@ -130,6 +130,21 @@ non-\lstinline{Send} \lstinline{Rc} value on another thread is unsound. \ourgc's
 An additional constructor, \lstinline{Gc<T>::new_unfinalizable}, is available
 for non-send values, but they will never be dropped.
 
+The \lstinline{Gc<T>::new} constructor also requires \lstinline{T} to implement
+\lstinline{Sync}. This is because even though it's expected that a finaliser is
+run on a dead value, it may still be able to mutate a field pointing to a shared
+value through a \lstinline{Send} safe smart pointer such as \lstinline{Arc}.
+Figure~\ref{fig:finaliser_race_2} shows how finalising a non-\lstinline{Sync}
+\lstinline{RefCell} value on another thread is unsound. Unfortunately, this
+means that interior mutability in \lstinline{Gc} is limited to the more
+expensive sync-safe mutable containers such as RWLock and Mutex. However, since
+this kind of soundness bug is rare in practice, (because it requires mixing two
+different kinds of shared ownership), we also provide an unsafe constructor
+\lstinline{Gc<T>::new_unsynchronised} which accepts non-sync values and does
+finalisation \jake{bikeshed on the name} where the user guarantees that Sync
+values are not accessed inside the drop method \jake{is this enough?}.
+
+
 TODO: Talk about sync, but first I need to investigate the soundness.
 
 \begin{figure}[t]
@@ -156,6 +171,37 @@ shared ownership so it updates its reference count non-atomically. The
     \lstinline{clone} on the main-thread on
 line 10.}
 \label{fig:finaliser_race}
+\end{figure}
+
+\begin{figure}[t]
+\begin{lstlisting}
+struct Counter(Arc<RefCell<usize>>);
+
+impl Drop for Counter {
+    fn drop(&mut self) {
+        *self.0.borrow_mut() += 1;
+    }
+}
+
+
+fn main() {
+    let arc1 = Counter(Arc::new(RefCell::new(1)));
+    {
+        let gc1 = Gc::new(Arc::clone(arc1));
+    }
+
+    // Finalises 'gc1' off-thread
+    force_gc();
+
+    *arc1.borrow_mut() += 1;
+    assert_eq!(arc1, 3);
+}
+\end{lstlisting}
+\caption{An example of unsoundness when finalising values off-thread.
+    \lstinline{RefCell} is send-safe but not sync safe because dynamic borrow
+    checking is done non-atomically. This can cause a race if the main-thread
+    mutates at the same time as the finalizer.}
+\label{fig:finaliser_race_2}
 \end{figure}
 
 
