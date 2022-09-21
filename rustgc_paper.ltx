@@ -38,7 +38,8 @@ the Bronze GC~\cite{coblenz21bronze} allows the aliasing of mutable values,
 violating Rust's soundness rules. GC in Rust thus remains an unsolved problem.
 
 In this paper we introduce \ourgc, a new point in the Rust GC design space.
-\ourgc is fairly ergonomic, does not compromise safe Rust's soundness rules,
+\ourgc is fairly ergonomic, does not compromise safe Rust's soundness rules
+\jake{not sure how true this is given the Chromium CSS bug},
 and has reasonable performance. \ourgc introduces new user-visible APIs and
 requires several changes to the Rust compiler \rustc but does not require any
 changes to the Rust language. We show that the major challenge for any Rust GC
