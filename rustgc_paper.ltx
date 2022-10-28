@@ -205,30 +205,50 @@ fn main() {
 \end{figure}
 
 
-\subsubsection{Finaliser elision}
+\subsection{Finaliser elision}
 
-\ourgc will finalise dead \lstinline{Gc<T>} values by calling the
-\lstinline{T::drop} method (if one exists). However, these drop calls can't be
-inserted automatically by the compiler because the lifetime of a \lstinline{Gc}
-is only known dynamically \laurie{devil's advocate: they can be inserted
-automatically as, effectively, reference counting}: it is freed when the
-collector determines it is
-unreachable. Instead, \lstinline{T::drop} is enqueued for finalization
-dynamically. Furthermore, if a Gc value holds a reference to a non-Gc'd value,
-then a finalizer must be used to call the non-Gc'd value's destructor. This is
-expensive because it can lead to a finalisation bottleneck in object graphs with
-edges between different kinds of values.
+A \lstinline{Gc<T>} value where \lstinline{T} needs dropping will use a
+finalizer to call \lstinline{T::drop}. In Rust, \lstinline{drop} is very common,
+so \ourgc ends up using many finalizers. This is not ideal. Programmers who are
+familiar with GCed languages know to avoid using finalizers wherever possible.
+One of the reasons for this is that invoking finalizers usually comes at a
+performance cost. This is certainly true for \ourgc, as we implement finalizers
+using the Boehm GC's unordered finalization API, which conservatively marks
+objects reachable from a finalizer. This additional marking adds up when many
+finalizable objects are present.
 
-\ourgc tries to reduce the number of finalisers needed with an optimisation it
-calls \textit{finaliser elision}. The key observation is that \lstinline{Drop}
-methods in Rust are mainly used to free resources. In particular, types such as
-\lstinline{Box} and \lstinline{RawVec} use \lstinline{Drop} to deallocate their
-dynamic memory. When such types are owned by a reference from a \lstinline{Gc},
-the collector can also take responsibility for freeing their memory, instead of
-the much slower approach of using a finaliser to call their \lstinline{Drop}
-method. Of course, this is not always possible: if a type's \lstinline{Drop}
-method does anything more complicated than just freeing memory, it must still be
-called using a finaliser.
+Fortunately, we are able to claw back this perfomance hit with an optimisation
+we call \textit{finalizer elision}. The key idea is to remove calls to drop
+which are used solely to free a value's memory, and instead let the collector
+free it. For example, consider the following \lstinline{Gc} which owns a
+reference to a boxed \lstinline{usize}.
+
+\begin{lstlisting}
+    let a = Box::new(123);
+    let gc = Gc::new(a);
+\end{lstlisting}
+
+The reference to a heap allocated integer is moved into a \lstinline{Gc}. This
+causes a finalizer to drop it when \lstinline{gc} is unreachable. However, the
+boxed type is a \lstinline{usize}, which itself does not need dropping. This
+means a finalizer was needed to drop the box, and all it did was call
+\lstinline{GlobalAlloc:dealloc}. This could be much faster if, instead of using
+a finalizer as in the case above, \ourgc recognised that it now solely owns the
+heap allocation from the box, and frees it as it does with its own allocation.
+This is what finalizer elision does. Of course, it's not possible to remove the
+finalizer for drop methods which do things besides deallocation. However, in
+practice, we found that this pattern is common enough that the optimisation can
+improve performance by at least an order of magnitude \jake{obviously, i'll need
+to cite this}.
+
+Finalizer elision is implemented by using traits to change the collector
+behaviour based on certain types. We implement these traits on the various
+standard library types which allocate (such as Box, RawVec, etc). This means
+that for most users, finalizer optimisation will "just work". However, when
+users provide their own allocating types, they will need to implement these
+traits to make use of finalizer elision.
+
+\subsubsection{Preventing Drop}
 
 \ourgc decides whether values of \lstinline{Gc<T>} need finalising based on the
 type of \lstinline{T}. Such analysis can be decided statically and has no
@@ -246,10 +266,81 @@ be finalised.
 
 \laurie{need to explain OnlyFinalizeContents}
 
+\subsubsection{Using \ourgc to free non-GC'd values}
+
+The second major component of the finalizer elision optimisation is for \ourgc
+to free all heap allocations owned by \lstinline{Gc}. This is non-trivial, as these
+allocations will have not been originally allocated as garbage-collectable
+blocks. Refering back to our original example:
+
+\begin{lstlisting}
+    let a = Box::new(123);
+    let gc = Gc::new(a);
+\end{lstlisting}
+
+\lstinline{a} references a heap allocation created using box. It was allocated
+using Rust's global allocator and is not garbage collected. As we did in step
+one, Without a finalizer to call Box::drop(box), it will leak memory. For
+finalizer elision to work, we need a way to tell the collector that because `gc`
+owns `a`, when it frees `gc`, it must also free the allocation at `box`.
+
+This first requires \ourgc to be able to convert a regular non-garbage-collected
+heap allocation into one that is freed by the collector. In this paper, we will
+refer to a block which is freed by the GC as being managed, and one which is
+freed manually as unmanaged. \ourgc uses the Boehm allocator, which provides
+malloc calls for both managed allocations (\lstinline{GC_malloc}), and unmanaged
+allocations (\lstinline{GC_malloc_uncollectable}). However, it does not allow a
+block to be switched between managed and unmanaged once it has already been
+allocated. This is mainly because Boehm partitions managed and unmanaged
+allocations into distinct pools in memory for implementation reasons.
+
+In \ourgc we modified Boehm to support this. This was done by disabling the
+\lstinline{GC_malloc_uncollectable} function for allocating unmanaged blocks,
+and instead allocate all blocks in the managed heap with \lstinline{GC_malloc}.
+We then make use of a free bit in the object header to denote whether a value is
+managed or not. We modify the collector to not only check the mark bit during
+sweeping, but also whether or not managed bit is set before freeing. We include
+functions, \lstinline{Gc_set_managed} and \lstinline{Gc_set_unmanaged}, for
+un/setting the managed bit, and also provide a new malloc function for blocks
+where the managed bit is unset by default, \lstinline{GC_malloc_unmanaged}. This
+malloc function is used as \ourgc's global allocator, instead of Boehm's
+\lstinline{GC_malloc_uncollectable}.
+
+The final piece of the puzzle is for \ourgc to know which heap allocations are
+owned by a \lstinline{Gc} in order to switch them to be managed. We do this with
+a trait called Collectable, which we implement on all types in the standard
+library which use their drop method to call deallocate. The Collectable trait
+contains a single method, \lstinline{set_collectable}, which describes how to
+switch its value to be managed. For example, the \lstinline{Collectable}
+implementation for \lstinline{Box} would look like this:
+
+\begin{lstlisting}
+unsafe impl<T, A: Allocator> Collectable for Box<T, A> {
+    unsafe fn set_collectable(&self) {
+        unsafe {
+            // FFI call to custom Boehm function to set managed bit
+            set_managed(self.0.as_ptr() as *mut u8);
+        }
+    }
+}
+\end{lstlisting}
+
+In this example, we set the managed bit in the allocation used for Box. Similar
+trait implementations exist for other types which represent allocation such as
+RawVec.
+
+Putting all these pieces together, we use an intrinsic,
+\lstinline{make_collectable<T>}, which is called in a \lstinline{Gc<T>::new}
+constructor. This intrinsic will recurse through \lstinline{T}, searching for
+component types which implement the \lstinline{Collectable} trait. If found,
+code is generated to dereference these fields or enum variants and call their
+\lstinline{Collectable::set_collectable} methods. This leads to all heap
+allocations owned and reachable from the \lstinline{Gc} value being converted to
+managed allocations. This process is dynamic, so it incurs a small runtime cost
+during \lstinline{Gc} construction.
 
 
-
-\subsubsection{Preventing Premature Finalisation}
+\subsection{Preventing Premature Finalisation}
 
 One of Rust's strengths is that it prevents dangling pointers by ensuring that
 references are never used outside the scope that they are valid for. The
