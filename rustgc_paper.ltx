@@ -5,13 +5,17 @@
 \maketitle
 
 \begin{abstract}
-Rust is a non-Garbage Collected (GC) language: existing attempts to add GC
-support to it are either (subjectively) unergonomic, or (objectively)
-unsound or slow. In this paper we show that it is possible to add a fairly
-ergonomic GC to Rust, without compromising soundness in safe Rust,
-and with reasonable performance. This requires us to expose new APIs
-to the user, and to change the Rust compiler, but we do not change the Rust
-language itself.
+\noindent Rust is a non-Garbage Collected (GC) language, but the lack of GC
+makes expressing some programs (e.g.~those with cyclic data structures)
+awkward or inefficient. Unfortunately, previous attempts to add GC to Rust
+have sacrificed at least one of ergonomics, performance, or soundness. In
+this paper we introduce \ourgc, a new GC for Rust. \ourgc shows that
+conservative GC naturally solves most ergonomic and soundness issues.
+However, Rust's pervasive use of destructors causes significant performance
+problems when they are mapped to GC finalisers. We show that the major
+challenge of \ourgc is to reduce this performance penalty to an acceptable
+level. \ourgc adds several user-facing APIs to Rust, and requires many
+changes to the Rust compiler, but does not change the Rust language itself.
 \end{abstract}
 
 
