@@ -346,114 +346,121 @@ during \lstinline{Gc} construction.
 
 \subsection{Preventing Premature Finalisation}
 
-One of Rust's strengths is that it prevents dangling pointers by ensuring that
-references are never used outside the scope that they are valid for. The
-lifetimes of references are checked statically by a part of \lstinline{rustc}
-known as the \textit{borrow-checker}. If a value needs dropping,
-\lstinline{rustc} will automaticaly insert a call to its \lstinline{Drop::drop}
-method once all other references to it are out of scope. This is to ensure
-\lstinline{Drop::drop} is not called while the value is still in use, as it is a
-destructor, and typically used to clean up a value.
-
-In the same vein, \ourgc must also ensure that \lstinline{Drop::drop} is not
-called as part of a finaliser on a value while it is still in use, as to do so
-would be unsound. However, finalisers in languages which use tracing garbage
-collection may run earlier than expected because of compiler optimisations.
+A fundamental assumption in Rust's destructor semantics is that calling
+\lstinline{Drop::drop} on a value is the last thing to happen to it. Using a
+value which has already been dropped is not possible and would cause
+unsoundness. This is no different for garbage-collected values: a finaliser
+calling a value's drop method must be the last thing to happen before its memory
+is reclaimed. One would expect that this is implicitly guaranteed based on the
+nature of GC: a finalizer is only called after a value is already considered
+dead during the mark phase. However, \rustc, like many compilers, is allowed to
+perform any optimisation that does not change the observable behaviour of the
+program. Retrofitting a GC to such a language will introduce assumptions about
+behaviour which the optimiser does not know about. In rare cases, compiler
+optimisations may cause values to be considered unreachable (and thus,
+finalised) earlier than expected~ \cite[p.~7]{boehm03destructors}.
 Figure~\ref{fig:finaliser_premature} shows how this can lead to a use-after-free
-in safe Rust code. This happens because the compiler may end up clobbering the
-stack slot or register containing a garbage-collected reference earlier than
-expected if there are no further uses of it. If a collection happens immediately
-afterwards, the value may be reclaimed -- and thus finalised -- early. Although
-such behaviour is rare in practice, it is possible because like most languages,
-Rust's compiler is free to perform any code transformation as long as it does
-not change the observable behaviour of the program. In C++ parlance, this is
-referred to as the as-if rule.
+in safe Rust code.
 
-To prevent early finalisation of GC'd values, \ourgc patches \lstinline{rustc}
-to ensure that stack based GC references remain valid for the entire duration of
-their stack frame. This is sufficient, because a single reference on the stack
-is all that is necessary to keep a GC value alive. \ourgc does this by adding a
-MIR transformation pass named \textit{prevent-early-finalization} which runs
-before any MIR optimisation passes take place. For MIR bodies (i.e. Rust
-functions) which contain GC references, the prevent-early-finalization pass will
-append a MIR statement designed to keep alive any GC references at the end of
-the block. This MIR statement compiles down to a volatile inline assembly block
-designed to inform the optimiser that the values are still being used.
-\jake{TODO: More detail here/ explain MIR / Whats a pass etc}
+To mitigate this, \ourgc ensures that a \lstinline{Gc} value stays alive for
+long enough that its finaliser is the last time it - or any value it owns - is
+used. Put simply, wherever it may be possible that a \lstinline{Gc} could be
+finalised early, \ourgc will insert a \textit{compiler barrier}, in the form of
+inline assembly to prevent the compiler clobbering a \lstinline{Gc}'s pointer.
+This works by informing the compiler that the pointer, which could exist on the
+call-stack or in a register, is used in a way which it cannot reason about, and
+so it must be more conservative about any optimisations which include it.
 
-This approach the disadvantage of pessimising code generation in the many cases
-where short-lived GC references would not cause problems. In these cases, tying
-stack frame is excessive, and future analysis could help eliminate this when it
-can be statically determined it is unnecessary.
+We place this compiler barrier in the drop method of a \lstinline{Gc} so that, at
+runtime, its pointer is not clobbered while anything it owns may be referenced
+elsewhere. This is sufficient because a value's drop method is only called once
+it goes out of scope, after which point its contents can be safely finalised.
+However, the \lstinline{Gc} type implements the \lstinline{Copy} trait, which
+means that without compiler support, it would not be possible to use a
+\lstinline{Drop} based compiler barrier. \ourgc modifies \rustc to allow these
+simultaneuos implementations on the \lstinline{Gc} type, because simply emitting
+a barrier will not cause memory unsafety.
 
-\jake{ I'm not sure what you mean here.
-GC is a Copy type, so we can easily copy around new Gc<T>s from our original
-one, but if T is a copy type, then it cant have a Drop method. So if I
-understand the question correctly, Copy types bypass these issues because they are not finalizable.}
-\laurie{Aha! "GC is a Copy type, so we can easily copy around new Gc<T>s from
-our original one, but if T is a copy type, then it cant have a Drop method" OK,
-so *this* is why we have to have a MIR pass? Devil's advocate: is this a good
-trade-off? If we make Gc non-Copy, we don't need to alter rustc.}
-\jake{I think I'm misunderstanding. Whether or not the GC is Copy makes no
-difference. It will still need the keepAlive stuff. However, the inner type, T
-does make a difference. If T is Copy, then it can't impl Drop, so it won't have
-a finaliser, and thus doesn't need its lifetime extending.}
-\laurie{my claim is that if Gc (not T) is not-Copy, then we can add a Drop
-method to Gc where its `drop' function contains an `asm' statement that
-prevents it being moved i.e. is equivalent to your MIR pass. [The obvious
-difference is that if Gc is not-Copy, then you have to manually call Gc::clone
-everywhere).] I'm not saying this is a good or a bad thing, but I'm trying to
-accurately place the MIR pass into context.}
-\laurie{My final question is about moves: if I move a GC to another function
-what happens? Something like this:}
-\begin{lstlisting}
-fn foo() -> (Gc, &str) {
-    let x = Gc::new(String::from("Hello World"));
-    let window = x.as_ref().as_str();
-    (x, window)
-}
-\end{lstlisting}
-\laurie{will there be a `KeepAlive' in `foo`, or will it only be in the functions
-that call foo?}
-\jake{We would add a keepAlive to foo as well as its callers. In this example,
-you're correct that it's not necessary because foo will itself keep the Gc alive
-long enough because it needs to return it at the end of the call. My MIR pass is not yet
-clever enough to detect that though!}
+On its own, this approach will vastly overapproximate the potential places where
+early finalisation can happen, which can have a significant impact on
+performance. While compiler barriers will not place any constraints on the CPU,
+they will still prevent unrelated useful optimisations. This presents a
+correctness / performance trade-off, so where possible, \ourgc will not insert a
+barrier when it can guarantee that an untimely collection will not lead to a
+finaliser being called early.
+
+All \lstinline{Gc} values have barriers by default. However, when compiling a
+program, we remove barriers which we can prove are unnecessary. We do this once
+\rustc has generated an intermediate representation known as mid-level IR (MIR):
+a control-flow graph of the program which it uses for analysis and
+optimisations. We perform an in-order traversal on the MIR for each function
+which contain arguments or local variables of type \lstinline{Gc}. If the
+contents of a \lstinline{Gc} does not require finalizing, its drop method can be
+removed as there is no need for a barrier. Temporary values of \lstinline{Gc}
+also have their drop methods removed because they are derived from user
+variables which will already be dropped if necessary. We do this before any of
+\rustc's optimisation MIR passes to minimise the impact that extreaneous drops
+may have on other optimisations.
+
+\subsubsection{Limitations}
+
+Although theoretically possible, we consider early finalisation to be extremely
+rare in practice. While testing \ourgc, we were unable to trigger this using
+safe Rust code only. This is because it requires a combination of unlikely
+things to go wrong: the only traceable reference to a GC value must be
+clobbered, followed by a unfortunately timed signal interruption triggering a
+collection. Recreating this is challenging: artificially forcing a collection
+requires an opaque FFI call which tends preserve the pointer across the call.
+
+Worse still, the mitigation for this highly unlikely bug can incur a steep
+performance penalty (sometimes up to \jake{TODO: value}) - even with the barrier
+removal pass described above. While any mitigation which guarantees
+correctness will always overapproximate in some way, there are places where
+\ourgc's approach can be clearly improved upon. As shown in
+figure~\ref{fig:finaliser_premature}, early finalisation requires the
+simultaneuos existence of a \lstinline{Gc}, and an inner reference to something
+it owns. This is something that can be checked at compile-time. A future
+improvement could use this knowledge to insert barriers only when such an
+occurance takes place.
+
+The compiler barrier in \ourgc uses non-portable assembly. We have tested that
+this is correct using \rustc's LLVM backend for x86/64. However, this is likely
+not sufficient for architectures such as MIPs and PowerPC. To address this, the
+drop implementation for \lstinline{Gc} would need to be conditionally compiled
+for the intended target.
 
 \begin{figure}[t]
 \begin{lstlisting}
+
 fn foo() {
-    let x = Gc::new(String::from("Hello World"));
-    let window = x.as_ref().as_str();
+    let a = Gc::new(Box::new(123));
+    let ref box_ptr = &*a.0;
 
-    blast_stack() // inlined into foo
+    bar();
 
-    println!("{}", window); // ERROR: may have been dropped
+    // Gc happens here causing
+    // a's finaliser to drop the box.
+
+
+    println!("{`box_ptr`}"); // Potential use-after-free!
+
 }
 
 \end{lstlisting}
 \caption{An example of unsoundness if a finaliser is allowed to run early.
-    Semantically, both \lstinline{x} and \lstinline{window} live until the end
-    of \lstinline{foo}. However, the call to \lstinline{blast_stack} may cause
-    the optimiser to reuse \lstinline{x}'s stack slot for some other value
-    because \lstinline{x} is never used again. If a collection happens during
-    the inlined call to \lstinline{blast_stack}, then \lstinline{x} may be
-    unreachable and finalised before the end of the call to \lstinline{foo}.
-    This would cause \lstinline{Drop::drop} to be called on the
-    \lstinline{String} that it manages, freeing its buffer and causing a
-    use-after-free when it's accessed on line 7.\laurie{devil's advocate:
-    can this example actually go wrong? rust's semantics are that `Gc' can't
-    be dropped until the end of `foo', and so the idea that it can be
-    dropped earlier seems wrong. For example, the way mutex locks are
-    used requires that they're not dropped early. I think you will need
-    to include an example that you can show really goes wrong in `real
-    life' (i.e. with your pass disabled), possibly involving actual
-    machine code output or similar to prove it.}
-    \laurie{another idea: I claim that I can achieve the same effect
-    as the MIR pass by adding a `Drop' to `Gc' that has the opaque
-    `asm' statement in it.}}
-\label{fig:finaliser_premature}
+    Both \lstinline{a} and \lstinline{box_ptr} live until the end
+    of \lstinline{foo}. However, if the computation-heavy \lstinline{bar} is
+    inlined into \lstinline{foo}, the compiler may clobber the register
+    containing \lstinline{a} because it is no longer used.
+    An unfortunately timed garbage collection before the \lstinline{println} may
+    then determine that \lstinline{a}'s allocation is unreachable, calling its
+    finaliser before \lstinline{foo} is finished. This would drop the box that
+    it owns, and cause \lstinline{box_ptr} to become a dangling reference.}
+    \label{fig:finaliser_premature}
 \end{figure}
+
+\jake{TODO: Add example of early finalizer causing race due to interleaving
+finalizer thread}
 
 
 \subsection{Multi-threaded garbage collection}
