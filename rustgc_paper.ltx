@@ -159,7 +159,7 @@ to explain how they map to finalisers.}
 don't have to order things this way, but we need to impose some sort of order
 or we'll overload the reader :)}
 Contrary to our initial expectations, Rust's destructors (`drop methods')
-have been the major source of challenges for \alloy: naively mapping them
+have been the major source of challenges for \ourgc: naively mapping them
 to finalisers introduces soundness and performance problems. In this section we
 first introduce the general concepts before explaining how we made destructors
 
