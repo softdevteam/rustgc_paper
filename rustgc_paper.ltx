@@ -64,6 +64,71 @@ GC; \laurie{we probably need a third example that isn't an interpreter!}.
 
 \section{Memory management in Rust}
 
+Rust is a general-purpose programming language which guarantees memory safety
+without the use of a garbage collector. Instead, Rust's type system ensures that
+programs are written in a memory-safe way which can be checked statically. This
+can be very powerful, and allows Rust to prevent common memory bugs such as data
+races and iterator invalidation at compile-time. To understand the remainder of
+this chapter, some knowledge of these rules is necessary, so this section will
+introduce the most important concepts: ownership, borrowing, and lifetimes.
+
+The foundation of memory safety in Rust is ownership based on affine types
+\jake{cite}. Each value in Rust has a single owner, and rebinding a value to a
+new variable will use move semantics: the ownership of the value is transferred,
+and the old variable is invalidated. Ownership of a variable expires once it
+goes out of scope, and the value's destructor (if it has one) is run
+automatically. This is similar to how \lstinline{std::unique_ptr} works in
+C++11.
+
+The corollory to ownership is borrowing (Figure \jake{enter}). Programs which
+only consist of ownership transfer are cumbersome to write and can be
+inefficient, so values can be accessed by using borrowed references. Rust
+permits an unlimited number of \textit{immutable} (or shared) references to a
+value simultaneuosly, or a single \textit{mutable} (or unique) reference. In
+addition, while a value is borrowed, the owner may not move or mutate it. A
+references must not live longer than the value being borrowed. These rules are
+enforced at compile-time by Rust's borrow checker. Occasionally, the borrow
+checker is unable to infer the lifetimes of references, and the programmer must
+provide annotations to where lifetimes could be ambiguous (Figure \jake{enter}).
+These borrow rules are a key component of Rust's memory safety because they
+prevent common bugs based on aliasing and invalid references.
+
+In some cases, a single value may require multiple owners: for example, in
+graph-like data structures a node is conceptually jointly owned by any other
+node with incoming edges to it. Since shared ownership is not possible using the
+affine types described above, Rust provides opt-in \textit{reference
+counting}\footnote{Reference counting in Rust is available in two flavours:
+\lstinline{Rc}, for single-threaded use; and \lstinline{Arc}, for multi-threaded
+use, where the count is updated atomically.} for when its needed (Figure
+\jake{enter}). Reference counting is a form of automatic memory management,
+where the value is stored along with a \textit{count}: the number of active
+references to it. The count is incremented / decremented when references are
+created / destroyed respectively. Once the count reaches zero, the value is
+immediately dropped.
+
+TODO: Interior mutability.
+
+The major disadvantage of reference counting is that it is unable free cycles
+without some additional mechanism. A reference cycle will cause a memory leak as
+each value will always appear to have at least one reference to it. Though
+preventing memory leaks is not a requirement for memory safety, it is an
+important consideration when writing programs with good performance. In Rust,
+weak references can be used to break up cyclic data structures, allowing them to
+be freed.
+
+As shown in \jake{Figure}, this kind of reference counting with weak references
+is verbose and can be awkward to use for non-trivial data structures.
+
+In fact, arenas with indices are often used when cyclic data is needed. TODO
+Problems: type punning, not able to take advantage of the safety guarantees
+given by references; All memory must be freed at once.
+
+Both weak references and indexed arenas are a memory safe approach to the
+problem of cyclic data structures in Rust. However, they have clear ergonomic
+disadvantages.
+
+Mention DOM trees in browsers.
+
 \laurie{i would make this a `background' section of sorts: introduce rust
 (briefly) and ownership types, including a simple example of where not having
 GC is a pain. point out that the choices are either a) weakrefs b) manual
