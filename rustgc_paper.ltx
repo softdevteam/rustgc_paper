@@ -62,195 +62,133 @@ work; WLambda, an externally written interpreter to which we have retrofitted
 GC; \laurie{we probably need a third example that isn't an interpreter!}.
 
 
-\section{Memory management in Rust}
+\section{Rust Background}
 
-Rust is a general-purpose programming language which guarantees memory safety
-without the use of a garbage collector. Instead, Rust's type system ensures that
-programs are written in a memory-safe way which can be checked statically. This
-can be very powerful, and allows Rust to prevent common memory bugs such as data
-races and iterator invalidation at compile-time. To understand the remainder of
-this chapter, some knowledge of these rules is necessary, so this section will
-introduce the most important concepts: ownership, borrowing, and lifetimes.
+This section gives a brief overview of the Rust programming
+language~\citep{rustlang}, with a particular focus on Rust's approach to memory
+management, as this is necessary to understand \ourgc.
 
-The foundation of memory safety in Rust is ownership based on affine types
-\jake{cite}. Each value in Rust has a single owner, and rebinding a value to a
-new variable will use move semantics: the ownership of the value is transferred,
-and the old variable is invalidated. Ownership of a variable expires once it
-goes out of scope, and the value's destructor (if it has one) is run
-automatically. This is similar to how \lstinline{std::unique_ptr} works in
-C++11.
+Arguably Rust's most interesting feature is that it can guarantee memory safety
+without using tracing garbage collection or reference counting\footnote{Though,
+as we will see in \autoref{rust:shared_ownership}, Rust does provide optional
+reference counting}. Instead, Rust's type system ensures that \emph{references}
+(as distinct from pointers) are guaranteed to point to valid memory, which can
+be checked at compile-time. These rules are the focus of this section, as they
+are key to understanding the memory management story in Rust, and why one may
+wish to extend it with a garbage collector such as \ourgc.
 
-The corollory to ownership is borrowing (Figure \jake{enter}). Programs which
-only consist of ownership transfer are cumbersome to write and can be
-inefficient, so values can be accessed by using borrowed references. Rust
-permits an unlimited number of \textit{immutable} (or shared) references to a
-value simultaneuosly, or a single \textit{mutable} (or unique) reference. In
-addition, while a value is borrowed, the owner may not move or mutate it. A
-references must not live longer than the value being borrowed. These rules are
-enforced at compile-time by Rust's borrow checker. Occasionally, the borrow
-checker is unable to infer the lifetimes of references, and the programmer must
-provide annotations to where lifetimes could be ambiguous (Figure \jake{enter}).
-These borrow rules are a key component of Rust's memory safety because they
-prevent common bugs based on aliasing and invalid references.
+\subsection{Rust memory management basics}
 
-In some cases, a single value may require multiple owners: for example, in
-graph-like data structures a node is conceptually jointly owned by any other
-node with incoming edges to it. Since shared ownership is not possible using the
-affine types described above, Rust provides opt-in \textit{reference
-counting}\footnote{Reference counting in Rust is available in two flavours:
-\lstinline{Rc}, for single-threaded use; and \lstinline{Arc}, for multi-threaded
-use, where the count is updated atomically.} for when its needed (Figure
-\jake{enter}). Reference counting is a form of automatic memory management,
-where the value is stored along with a \textit{count}: the number of active
-references to it. The count is incremented / decremented when references are
-created / destroyed respectively. Once the count reaches zero, the value is
-immediately dropped.
+% Rust is a statically-typed, general-purpose programming
+% language~\citep{klabnik18rust}. Rust has high-level functional programming
+% constructs as well as low-level features such as support for inline assembly and
+% a foreign function interface (FFI) allowing it to call (and be called from) C.
+% This makes Rust popular for both low-level systems programming and complex
+% programs where performance is important, such as parts of Mozilla's Firefox web
+% browser~\citep{servo}.
 
-TODO: Interior mutability.
+Arguably Rust's most interesting feature is that it can guarantee memory safety
+without using tracing garbage collection or reference counting\footnote{Though,
+as we will see in \autoref{rust:shared_ownership}, Rust does provide optional
+reference counting}. Instead, Rust's type system ensures that \emph{references}
+(as distinct from pointers) are guaranteed to point to valid memory, which can
+be checked at compile-time. These rules are the focus of this section, as they
+are key to understanding the memory management story in Rust, and why one may
+wish to extend it with a garbage collector such as \ourgc.
 
-The major disadvantage of reference counting is that it is unable free cycles
-without some additional mechanism. A reference cycle will cause a memory leak as
-each value will always appear to have at least one reference to it. Though
-preventing memory leaks is not a requirement for memory safety, it is an
-important consideration when writing programs with good performance. In Rust,
-weak references can be used to break up cyclic data structures, allowing them to
-be freed.
+\subsubsection{Ownership}
 
-As shown in \jake{Figure}, this kind of reference counting with weak references
-is verbose and can be awkward to use for non-trivial data structures.
+The foundation for memory safety in Rust is its concept of ownership based on
+affine types~\citep{pierce04advanced}. Each value in Rust has a single owner,
+and rebinding a value to a new variable will use \textit{move semantics}, where
+the ownership of the value is transferred, and the old variable is invalidated.
+When a value goes out of scope, its ownership expires and Rust will
+automatically call its \emph{destructor}.\jake{mention that not all
+values will have destructors? or is this too much detail too quickly?}
 
-In fact, arenas with indices are often used when cyclic data is needed. TODO
-Problems: type punning, not able to take advantage of the safety guarantees
-given by references; All memory must be freed at once.
+\subsubsection{References}
 
-Both weak references and indexed arenas are a memory safe approach to the
-problem of cyclic data structures in Rust. However, they have clear ergonomic
-disadvantages.
+\begin{figure}
+% Hack to get the listing in the figure
+\newsavebox{\lifetimealisting}
+\begin{lrbox}{\lifetimealisting}
+\begin{lstrustsmall}
+fn main() {
+    let mut v = vec![1,2,3,4];
 
-Mention DOM trees in browsers.
+    for i in v.iter_mut() {
+        v.push(*i);
+    }
+}
+\end{lstrustsmall}
+\end{lrbox}
 
-\laurie{i would make this a `background' section of sorts: introduce rust
-(briefly) and ownership types, including a simple example of where not having
-GC is a pain. point out that the choices are either a) weakrefs b) manual
-indexes into an array (or similar). be clear that both choices are safe, but
-have unpleasant ergonomics and at least some performance overhead.}
+\newsavebox{\lifetimeblisting}
+\begin{lrbox}{\lifetimeblisting}
+\begin{lstrustsmallnonums}
+error[E0499]: cannot borrow `v` as
+mutable more than once at a time
+ --> src/main.rs:5:5
+  |
+4 | for i in v.iter_mut() {
+  |          ------------
+  |          |
+  |          first mutable borrow
+  |          occurs here
+5 |     v.push(*i);
+  |     ^^^^^^^^^^
+  |            second mutable
+  |            borrow occurs here
 
+\end{lstrustsmallnonums}
+\end{lrbox}
+    \centering
+    \subfloat[\centering An invalid Rust program]{\usebox{\lifetimealisting}}
+    \subfloat[\centering Rust compiler error]{\usebox{\lifetimeblisting}}
+    \caption{An Rust program which fails to compile because two mutable borrows
+    overlap: the variable \lstinline{v} which owns the vector; and the borrow
+    from the iterator to the vector element \lstinline{i}. This is potentially
+    memory unsafe because the call to \lstinline{push} might resize the vector,
+    which could cause it to be reallocated in the heap. The iterator reference
+    \lstinline{i} would then be invalid, pointing to the old location in
+    memory.}
+    \label{fig:iterator_invalidation}
+\end{figure}
 
-\section{\ourgc}
+Rust's exclusive ownership rules allow it to avoid garbage
+collection.\footnote{However, as we will see, they make it impossible to write
+certain data structures in Rust (such as doubly-linked-lists) without using some
+form of garbage collection.} However, it would be cumbersome and inefficient to
+write programs which can only use values by transferring ownership back and
+forth each time. Instead, values can be \emph{borrowed} using references to
+their data.
 
-\laurie{introduce \ourgc at a high-level. doesn't need to be super long, but
-give enough of a hint that readers can understand what's going on.}
+There are two kinds of references in Rust: `\lstinline{&}' immutable (or shared)
+references; and `\lstinline{&mut}' mutable (or unique) references. Rust programs
+which use borrowing must adhere to two rules.
 
+\begin{enumerate}
+    \item A value may have an unlimited number of simultaneous immutable
+        references or a single mutable reference.
+    \item A reference must never outlive its \textit{referent} (the value it
+        points to).
+\end{enumerate}
 
-\subsection{Running example}
+These rules are checked at compile-time by Rust's \textit{borrow checker},
+meaning that a Rust program which successfully compiles is guaranteed to be
+memory safe. In order to check that references never outlive their referent, the borrow
+checker assigns a \emph{lifetime} to each reference, which begins when it is
+created and ends when it is destroyed. For many references, their lifetimes can be
+automatically inferred, however, where this could be ambiguous, the Rust
+programmer must explicitly annotate references with lifetimes.
 
-\laurie{ideally we would introduce a running example that we can gradually
-expand upon as the paper progresses. that can sometimes be impossible, but
-it's something that's worth striving for if possible.}
+It's easy to see how these borrow rules guarantee data-race freedom: a mutating
+thread can never access aliased data. What is less obvious is that these rules
+also prevent a class of memory safety bugs which would occur if single-threaded
+shared mutability were permitted. \autoref{fig:iterator_invalidation} shows
+how Rust's borrow rules can prevent \emph{iterator invalidation}, a common cause
+of memory safety errors in other systems languages.
 
-
-\section{Destructors and Finalisers}
-
-\laurie{imho this section (notice i changed the order of terms in the section
-heading!) is very important. it first needs to define destructors, then needs
-to explain how they map to finalisers.}
-
-\laurie{this paragraph gives an example of how we could order this section. we
-don't have to order things this way, but we need to impose some sort of order
-or we'll overload the reader :)}
-Contrary to our initial expectations, Rust's destructors (`drop methods')
-have been the major source of challenges for \ourgc: naively mapping them
-to finalisers introduces soundness and performance problems. In this section we
-first introduce the general concepts before explaining how we made destructors
-
-
-\subsection{General concepts}
-
-Destructors allow cleanup code to be run when a value is no longer used, and
-are used extensively in Rust, where they are referred to as `drop methods'. If
-a type \texttt{T} implements the \lstinline{Drop} trait, \rustc will
-insert the appropriate drop method whenever instances of \texttt{T} go
-out of scope. \laurie{now comes the tricky bit! What does ``go out of scope
-mean'' in Rust? It's trickier than C++ because of the borrow checker. I might
-be tempted to say something like ``Variables go out of scope when the
-curly bracket block they are defined in terminates; values go out of scope
-unless they are returned from a block.'' which I think is accurate and not
-too verbose.} This is similar \laurie{`similar' is a wishy-washy word :) in
-what way is it similar and in what way is it different?} to the RAII (Resource
-Acquisition is Initialization) idiom in C++, where
-class destructors are used for a similar \laurie{`similar' again} purpose.
-
-\laurie{is this paragraph relevant? i don't think i care about smart pointers at this point in the text.}
-The \lstinline{Drop} trait is used extensively by smart pointers. For example,
-\lstinline{Box<T>} (a heap allocated pointer to a value of type \lstinline{T})
-implements \lstinline{Drop} to free its heap allocation when it goes out
-of scope.
-
-\laurie{ditto this paragraph}
-\lstinline{Drop} is also a core part of shared ownership in Rust. For example,
-when a reference counted smart pointer, \lstinline{Rc}, is dropped, the
-reference count of its contents is decremented. If the count hits zero when
-dropping an \lstinline{Rc}, the shared contents is also dropped.
-
-\laurie{this paragraph is important}
-Garbage collection inevitably complicates Rust's drop semantics. Unlike
-\lstinline{Rc}, shared ownership using \ourgc's \lstinline{Gc} smart pointer
-doesn't keep track of how many references there are to its contents. Instead,
-the collector will free the contents when it's no longer reachable. If the
-contents requires dropping, this now becomes the responsibility of the
-collector, because the compiler can't know when this is expected to happen.
-\ourgc uses \textit{finalisers} to drop these unreachable values.
-
-Finalisation in \ourgc is unordered between \lstinline{Gc}s. If a field in
-\lstinline{Gc<A>} points to \lstinline{Gc<B>}, there is no guarantee that
-\lstinline{Gc<A>} will be finalised first. This is so that \ourgc can be used to
-create strongly connected cycles which do not leak. When an entire cyclic graph
-is unreachable, each node can be finalised independently. This restricts the
-drop implementation for types used in \lstinline{Gc}: they must never
-dereference fields which point to other \lstinline{Gc}s because those objects
-could already be freed at the point of finalisation. In our experiments, we did
-not find this restriction too prohibitive, nevertheless, \ourgc can be built
-with \textit{topological finalisation} instead. In this configuration, values
-are finalised in topological order (\lstinline{Gc<A>} before \lstinline{Gc<B>})
-which permits dereferencing through fields pointing to other \lstinline{Gc}s.
-However, topological finalisation means that cycles will never be finalised,
-which could cause memory leaks. When a finaliser drops a value, its fields are
-dropped recursively according to Rust's drop order. Gc itself does not implement
-drop, so a finalised value cannot recursively drop any other Gcs that it points
-to.
-
-\ourgc, like most VMs implementations, run finalisers on a separate finalisation
-thread [todo ref]. This is for two main reasons: first, a finaliser which needs
-to acquire a lock will deadlock if ran on the same thread which already holds
-the lock; second, the asynchronous nature of finalisers can cause interleaving
-single-threaded code which races \jake{Ref boehm sync paper}. However, using a
-dedicated thread to finalise values means they must be safe to send between
-threads. In Rust, this means that their type must implement the \lstinline{Send}
-marker trait. Figure~\ref{fig:finaliser_race} shows how finalising a
-non-\lstinline{Send} \lstinline{Rc} value on another thread is unsound. \ourgc's
-\lstinline{Gc} smart pointer enforces in the constructor,
-\lstinline{Gc<T>::new}, where \lstinline{T} must have a \lstinline{Send} bound.
-An additional constructor, \lstinline{Gc<T>::new_unfinalizable}, is available
-for non-send values, but they will never be dropped.
-
-The \lstinline{Gc<T>::new} constructor also requires \lstinline{T} to implement
-\lstinline{Sync}. This is because even though it's expected that a finaliser is
-run on a dead value, it may still be able to mutate a field pointing to a shared
-value through a \lstinline{Send} safe smart pointer such as \lstinline{Arc}.
-Figure~\ref{fig:finaliser_race_2} shows how finalising a non-\lstinline{Sync}
-\lstinline{RefCell} value on another thread is unsound. Unfortunately, this
-means that interior mutability in \lstinline{Gc} is limited to the more
-expensive sync-safe mutable containers such as RWLock and Mutex. However, since
-this kind of soundness bug is rare in practice, (because it requires mixing two
-different kinds of shared ownership), we also provide an unsafe constructor
-\lstinline{Gc<T>::new_unsynchronised} which accepts non-sync values and does
-finalisation \jake{bikeshed on the name} where the user guarantees that Sync
-values are not accessed inside the drop method \jake{is this enough?}.
-
-
-TODO: Talk about sync, but first I need to investigate the soundness.
-
-\begin{figure}[t]
 \begin{lstlisting}
 fn foo() {
     let rc1 = Rc::new(123);
