@@ -25,23 +25,18 @@ by \laurie{quantify}.
 Amongst the several ways one can divide programming languages are whether they
 are Garbage Collected (GCed) or not. Traditionally, non-GCed\jake{The literature
 tends to refer to the difference in such languages as managed / unmanaged, I
-wonder if we should do the same?} languages have
+wonder if we should do the same?}\laurie{`managed'/`unmanaged' are used
+a bit vaguely, IMHO, and tend to refer more to than just GC, so i'd probably
+prefer to avoid those terms} languages have
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
-\lstinline{free} functions). Rust's ownership types make it a hybrid: memory
-management is implicit but Rust does not use GC.\jake{I don't think I agree with
-this. Yes RAII / scope-based destruction makes this implicit, but I don't think
-this makes Rust a hybrid of a GC'd / non-GC'd language because `GC'd' implies some
-dynamic property (unless I've
-misinterpreted the statement you're making!). Having said that, I
-do think it could be argued that Rust is a hybrid in the sense that it provides
-optional RC. I'm not sure that making such a statement is
-helpful though, because you'd then have to apply the same logic to C++, and I
-think you'd be going against the grain to suggest C++ is a managed language.}For many portions of many
+\lstinline{free} functions). Rust's ownership types allow memory management
+to be implicit but Rust does not use GC. For many portions of many
 programs, a Rust program looks identical, from a memory management perspective,
 to a GCed language equivalent. However, programs operating on cyclic data
-structures are frustrating to write with ownership types. Encodings such as the
-use of \jake{insert "reference counting with"?} weak references protect the user from dangling machine pointers, but
-cannot prevent memory leaks, or dangling indices.
+structures are frustrating to write with ownership types. Encodings
+such as referencing counting or indices into vectors protect the user from
+dangling machine pointers, but cannot prevent memory leaks, or dangling
+indices.
 
 Because of this, there have been a number of attempts to add GC to Rust. Most
 introduce a user-visible type \lstinline{Gc<T>} and a user-invisible type
@@ -63,10 +58,9 @@ that conservative GC is necessary, but soundness and
 performance are harder issues.
 
 The thesis underlying this paper is that the chief challenge for a sound,
-performant, GC for Rust are \emph{finalisers} (i.e.~code which is run when
-\jake{just before} an
+performant, GC for Rust are \emph{finalisers} (i.e.~code which is run just before an
 object is reclaimed by the GC). Rust uses \emph{destructors} (i.e.~code which
-is run when an object is freed by Rust's implicit memory management)
+is run just before an object is freed by Rust's implicit memory management)
 pervasively in the form of ``\lstinline{drop} methods''. When a type
 \lstinline{T} with a destructor is placed in a \lstinline{Gc<T>} it is natural
 to map its destructor to a finaliser. However, this introduces two classes of
