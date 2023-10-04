@@ -25,42 +25,71 @@ by \laurie{quantify}.
 Amongst the several ways one can divide programming languages are whether they
 are Garbage Collected (GCed) or not. Traditionally, non-GCed languages have
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
-\lstinline{free} functions). Rust's \emph{ownership types} (a specific instance
-of affine types) make it a hybrid: memory management is implicit but Rust does
-not use GC. For many portions of many
+\lstinline{free} functions). Rust's ownership types make it a hybrid: memory
+management is implicit but Rust does not use GC. For many portions of many
 programs, a Rust program looks identical, from a memory management perspective,
 to a GCed language equivalent. However, programs operating on cyclic data
 structures are frustrating to write with ownership types. Encodings such as the
 use of weak references protect the user from dangling machine pointers, but
 cannot prevent memory leaks, or dangling indices.
 
-Because of this, there have been several attempts to add GC to
-Rust\footnote{`Premodern' Rust had a reference-counted GC which was removed
-gradually from mid 2013 to mid 2014.}. Most are user level libraries
-\laurie{cite the ones we know of} which suffer from limitations such as
-the inability to apply GC to items defined in external libraries. In contrast,
-the Bronze GC~\cite{coblenz21bronze} allows the aliasing of mutable values,
-violating Rust's soundness rules. GC in Rust thus remains an unsolved problem.
+Because of this, there have been a number of attempts to add GC to Rust. Most
+introduce a user-visible type \lstinline{Gc<T>} and a user-invisible type
+\lstinline{GcBox<T>}. When users create a new \lstinline{Gc<T>} a
+\lstinline{GcBox<T>} is allocated on the GC heap and a \lstinline{Gc<T>}
+containing a pointer to the \lstinline{GcBox<T>} is returned. \lstinline{Gc<T>}
+can be \emph{cloned} at will by the user. When no references to a
+\lstinline{GcBox<T>} are reachable from the program's \emph{roots} (e.g.~global
+variables, variables on the stack, etc.) then the GC reclaims its memory.
 
-In this paper we introduce \ourgc, a new point in the Rust GC design space,
-based on an underlying conservative GC. \ourgc is fairly ergonomic, sound
-from a Rust language perspective (though dependent on the compiler
-tool-chain to respect conservative GCs limitations),
-and has reasonable performance. \ourgc introduces new user-visible APIs and
-requires several changes to the Rust compiler \rustc but does not require any
-changes to the Rust language. We show that the major challenge for \ourgc
-is Rust's extensive use of \emph{destructors} (or \lstinline{drop} methods) ---
-simply mapping these to GC finalisers leads to significant performance
-problems. We show how many finalisers can be safely optimised away.
+Unfortunately, the existing GCs for Rust we are aware of require sacrificing at
+least one of ergonomics (e.g.~user-level libraries cannot GC types defined in
+external libraries), soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} does
+not track indirect references, so seemingly safe programs can
+\lstinline{SEGFAULT}, or performance (\laurie{use a sensible figure from the
+perf section}). Ergonomic issues can be solved relatively easily by adding
+support for GC directly to \rustc (the Rust compiler), and recognising
+that conservative GC is necessary, but soundness and
+performance are harder issues.
+
+The thesis underlying this paper is that the chief challenge for a sound,
+performant, GC for Rust are \emph{finalisers} (i.e.~code which is run when an
+object is reclaimed by the GC). Rust uses \emph{destructors} (i.e.~code which
+is run when an object is freed by Rust's implicit memory management)
+pervasively in the form of ``\lstinline{drop} methods''. When a type
+\lstinline{T} with a destructor is placed in a \lstinline{Gc<T>} it is natural
+to map its destructor to a finaliser. However, this introduces two classes of
+problems. First, finalisers have soundness issues that do not affect
+destructors, in large part because finalisers are run
+asynchronously~\cite{boehm03destructors}: not all destructors can be safely run
+as finalisers. Second, finalisers are much slower to execute than destructors,
+in large part because the GC must dynamically check for the existence of a
+destructor, add it to a queue, and later run it.
+
+We validate this thesis by introducing \ourgc, a new GC for Rust. \ourgc
+introduces \emph{finaliser safety analysis}, which extends Rust's type
+system so that a destructor for a type \lstinline{T} that is not safe for use
+as a finaliser causes an error when (and only when) it is placed in the
+\lstinline{Gc} type. Not only does FSA solve issues specific to
+destructors-as-finalisers in Rust, but it shows that problems that affect most
+other GCed languages (e.g.~object resurrection) can be statically detected.
+\ourgc also introduces \emph{finaliser elision} which statically optimises away
+many finalisers by noticing that common Rust types (e.g.~\lstinline{Vec}) only
+have a destructor to free their backing memory on the heap: \ourgc allocates
+this backing memory on the GC heap so that it is freed without the need for a
+destructor. By recursively tracking elided finalisers, many types that need
+a destructor do not need a finaliser: finaliser elision thus significantly
+reduces the performance overhead of finalisers in Rust. \laurie{give
+a performance figure or two}
+
+We do not pretend that \ourgc is a production-ready GC for Rust, but it is
+sufficiently polished to be usable for real programs: it has high-quality error
+messages and reasonable performance. We believe that finaliser safety analysis
+and finaliser elision will prove useful concepts for any future GC for Rust.
 
 \laurie{a brief introduction of the Gc type, preferably with a simple code
 listing (with a nice long caption!) that allows readers to quickly develope an
 intuition about what's going on would be great.}
-
-We validate \ourgc's performance in several different ways: a SOM (a cutdown
-Smalltalk) interpreter written specifically to understand how GC in Rust might
-work; WLambda, an externally written interpreter to which we have retrofitted
-GC; \laurie{we probably need a third example that isn't an interpreter!}.
 
 
 \section{Rust Background}
@@ -2467,8 +2496,13 @@ which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
 
 
+\section{Related work}
 
-\bibliographystyle{plain}
+`Premodern' Rust had a reference-counted GC which was removed gradually from
+mid 2013 to mid 2014 \laurie{cite the last commit which removes it}.
+
+
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
 \end{document}
