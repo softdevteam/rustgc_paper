@@ -7,4 +7,4 @@ rustgc_paper.out
 rustgc_paper.pdf
 rustgc_paper_preamble.fmt
 rustgc_paper_preamble.log
-
+images/*.pdf
