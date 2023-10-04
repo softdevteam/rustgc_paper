@@ -5,7 +5,15 @@
 
 LATEX_FILES = rustgc_paper.ltx
 
-DIAGRAMS =
+
+DIAGRAMS = images/finaliser_cycle1.pdf images/finaliser_cycle2.pdf \
+		   images/ordered_finalisation.pdf images/alloy_finaliser_memory.pdf \
+		   images/alloy_inner_gc.pdf images/early_finalisation.pdf \
+		   images/finaliser_elision_1.pdf images/finaliser_elision_2.pdf \
+		   images/finaliser_elision_3.pdf images/finaliser_elision_4.pdf \
+		   images/finaliser_elision_5.pdf images/finaliser_elision_6.pdf \
+		   images/finaliser_elision_7.pdf images/finaliser_elision_8.pdf \
+		   images/partial_finaliser_elision_1.pdf
 
 all: rustgc_paper.pdf
 

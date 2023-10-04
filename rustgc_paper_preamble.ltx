@@ -3,29 +3,65 @@
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
 \usepackage{booktabs}
 \usepackage{courier}
+\usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{listings}
+\usepackage{listings-rust}
 \usepackage{microtype}
 \usepackage[numbers]{natbib}
 \usepackage{softdev}
+\usepackage{subcaption}
 \usepackage{tikz}
 \usepackage{xspace}
 
 \usetikzlibrary{automata, positioning, arrows}
 
 \lstset{
-    basicstyle=\ttfamily,
-    xleftmargin=\parindent,
-    numbers=left,
+    xleftmargin=0pt,
     numbersep=.8em,
-    numberstyle=\tiny\tt\color{gray},
+    numberstyle=\scriptsize\tiny,
+    basicstyle=\ttfamily\small,
     captionpos=b,
     escapeinside={{<!}{!>}},
-    commentstyle=\color{gray}\itshape,
-    keywordstyle=\textbf,
+    numbers=left,
+    xleftmargin=15pt,
 }
+
+\lstnewenvironment{lstrustsmall}[1][]
+  {
+      \lstset{
+          language=Rust,
+          style=colouredRust,
+          xleftmargin=0pt,
+          numbersep=.8em,
+          numberstyle=\scriptsize\tiny,
+          basicstyle=\ttfamily\small,
+          captionpos=b,
+          escapeinside={{<!}{!>}},
+          numbers=left,
+          xleftmargin=15pt,
+          }
+}{}
+
+\lstnewenvironment{lstrustsmallnonums}[1][]
+  {
+      \lstset{
+          language=Rust,
+          style=colouredRust,
+          xleftmargin=0pt,
+          numbersep=.8em,
+          numberstyle=\scriptsize\tiny,
+          basicstyle=\ttfamily\small,
+          captionpos=b,
+          escapeinside={{<!}{!>}},
+          numbers=none,
+          xleftmargin=15pt,
+          }
+}{}
 
 % from https://tex.stackexchange.com/questions/264361/skipping-line-numbers-in-lstlisting#264373
 \let\origthelstnumber\thelstnumber
@@ -36,10 +72,25 @@
      \advance\c@lstnumber-\@ne\relax%
     }%
 }
+\newtheorem{definition}{Definition}
+
+% Algorithm macros
+\algnewcommand\algorithmicforeach{\textbf{for each}}
+\algdef{S}[FOR]{ForEach}[1]{\algorithmicforeach\ #1\ \algorithmicdo}
+\algnewcommand{\algorithmicand}{\textbf{and }}
+\algnewcommand{\algorithmicor}{\textbf{or }}
+\algnewcommand{\algorithmicnot}{\textbf{not }}
+\algnewcommand{\NOT}{\algorithmicnot}
+\algnewcommand{\OR}{\algorithmicor}
+\algnewcommand{\AND}{\algorithmicand}
+
 
 \newcommand\boehm{\textsc{BDWGC}\xspace}
 \newcommand\rustc{\lstinline{rustc}\xspace}
+\newcommand\rustgc{\textsc{Rust-GC}\xspace}
+\newcommand\bronze{\textsc{Bronze}\xspace}
 \newcommand\ourgc{\textsc{Alloy}\xspace}
+\newcommand\bor{borrow-or-finalise rule\xspace}
 
 \title{\ourgc: Conservative Garbage Collection for Rust}
 \author{Jacob Hughes, Laurence Tratt}
