@@ -109,132 +109,33 @@ listing (with a nice long caption!) that allows readers to quickly develope an
 intuition about what's going on would be great.}
 
 
-\section{Rust Background}
+\section{Background}
 
-This section gives a brief overview of the Rust programming
-language~\citep{rustlang}, with a particular focus on Rust's approach to memory
-management, as this is necessary to understand \ourgc.
+In this section we briefly show why some data structures that are easy to
+write in GCed languages are challenging in Rust.
 
-Arguably Rust's most interesting feature is that it can guarantee memory safety
-without using tracing garbage collection or reference counting\footnote{Though,
-as we will see in \autoref{rust:shared_ownership}, Rust does provide optional
-reference counting}. Instead, Rust's type system ensures that \emph{references}
-(as distinct from pointers) are guaranteed to point to valid memory, which can
-be checked at compile-time. These rules are the focus of this section, as they
-are key to understanding the memory management story in Rust, and why one may
-wish to extend it with a garbage collector such as \ourgc.
+Rust's ownership types (in essence affine types \laurie{cite whatever paper
+introduced affine types} with some extensions and relaxations) statically
+guarantee that a \emph{value} has a single owner: an owner can \emph{move}
+that value to another owner; if the owner \emph{forgets} the value (either
+explicitly or because the owner goes out of scope), the value's destructor
+is run and its memory can be reused. An owner can give references
+to that value to other code, subject to the following static restrictions:
+there can be multiple read-only \emph{references} (`\lstinline{\&}') to an
+object or a single read-write reference (`\lstinline{\&mut}').
 
-\subsection{Rust memory management basics}
+These basic rules allow many Rust programs to be written in a style that makes
+them indistinguishable from their equivalents in GCed languages. However, some
+data structures cannot be expressed in a \emph{safe} (i.e.~fully statically
+checked by the compiler) manner, most notably cyclic data structures.
 
-% Rust is a statically-typed, general-purpose programming
-% language~\citep{klabnik18rust}. Rust has high-level functional programming
-% constructs as well as low-level features such as support for inline assembly and
-% a foreign function interface (FFI) allowing it to call (and be called from) C.
-% This makes Rust popular for both low-level systems programming and complex
-% programs where performance is important, such as parts of Mozilla's Firefox web
-% browser~\citep{servo}.
+\laurie{is a doubly linked example something we can use as a running example?}
 
-Arguably Rust's most interesting feature is that it can guarantee memory safety
-without using tracing garbage collection or reference counting\footnote{Though,
-as we will see in \autoref{rust:shared_ownership}, Rust does provide optional
-reference counting}. Instead, Rust's type system ensures that \emph{references}
-(as distinct from pointers) are guaranteed to point to valid memory, which can
-be checked at compile-time. These rules are the focus of this section, as they
-are key to understanding the memory management story in Rust, and why one may
-wish to extend it with a garbage collector such as \ourgc.
 
-\subsubsection{Ownership}
+\section{\ourgc}
 
-The foundation for memory safety in Rust is its concept of ownership based on
-affine types~\citep{pierce04advanced}. Each value in Rust has a single owner,
-and rebinding a value to a new variable will use \textit{move semantics}, where
-the ownership of the value is transferred, and the old variable is invalidated.
-When a value goes out of scope, its ownership expires and Rust will
-automatically call its \emph{destructor}.\jake{mention that not all
-values will have destructors? or is this too much detail too quickly?}
+\laurie{introduce the basics}
 
-\subsubsection{References}
-
-\begin{figure}
-% Hack to get the listing in the figure
-\newsavebox{\lifetimealisting}
-\begin{lrbox}{\lifetimealisting}
-\begin{lstrustsmall}
-fn main() {
-    let mut v = vec![1,2,3,4];
-
-    for i in v.iter_mut() {
-        v.push(*i);
-    }
-}
-\end{lstrustsmall}
-\end{lrbox}
-
-\newsavebox{\lifetimeblisting}
-\begin{lrbox}{\lifetimeblisting}
-\begin{lstrustsmallnonums}
-error[E0499]: cannot borrow `v` as
-mutable more than once at a time
- --> src/main.rs:5:5
-  |
-4 | for i in v.iter_mut() {
-  |          ------------
-  |          |
-  |          first mutable borrow
-  |          occurs here
-5 |     v.push(*i);
-  |     ^^^^^^^^^^
-  |            second mutable
-  |            borrow occurs here
-
-\end{lstrustsmallnonums}
-\end{lrbox}
-    \centering
-    \subfloat[\centering An invalid Rust program]{\usebox{\lifetimealisting}}
-    \subfloat[\centering Rust compiler error]{\usebox{\lifetimeblisting}}
-    \caption{An Rust program which fails to compile because two mutable borrows
-    overlap: the variable \lstinline{v} which owns the vector; and the borrow
-    from the iterator to the vector element \lstinline{i}. This is potentially
-    memory unsafe because the call to \lstinline{push} might resize the vector,
-    which could cause it to be reallocated in the heap. The iterator reference
-    \lstinline{i} would then be invalid, pointing to the old location in
-    memory.}
-    \label{fig:iterator_invalidation}
-\end{figure}
-
-Rust's exclusive ownership rules allow it to avoid garbage
-collection.\footnote{However, as we will see, they make it impossible to write
-certain data structures in Rust (such as doubly-linked-lists) without using some
-form of garbage collection.} However, it would be cumbersome and inefficient to
-write programs which can only use values by transferring ownership back and
-forth each time. Instead, values can be \emph{borrowed} using references to
-their data.
-
-There are two kinds of references in Rust: `\lstinline{&}' immutable (or shared)
-references; and `\lstinline{&mut}' mutable (or unique) references. Rust programs
-which use borrowing must adhere to two rules.
-
-\begin{enumerate}
-    \item A value may have an unlimited number of simultaneous immutable
-        references or a single mutable reference.
-    \item A reference must never outlive its \textit{referent} (the value it
-        points to).
-\end{enumerate}
-
-These rules are checked at compile-time by Rust's \textit{borrow checker},
-meaning that a Rust program which successfully compiles is guaranteed to be
-memory safe. In order to check that references never outlive their referent, the borrow
-checker assigns a \emph{lifetime} to each reference, which begins when it is
-created and ends when it is destroyed. For many references, their lifetimes can be
-automatically inferred, however, where this could be ambiguous, the Rust
-programmer must explicitly annotate references with lifetimes.
-
-It's easy to see how these borrow rules guarantee data-race freedom: a mutating
-thread can never access aliased data. What is less obvious is that these rules
-also prevent a class of memory safety bugs which would occur if single-threaded
-shared mutability were permitted. \autoref{fig:iterator_invalidation} shows
-how Rust's borrow rules can prevent \emph{iterator invalidation}, a common cause
-of memory safety errors in other systems languages.
 
 \section{Finalisation in \ourgc}
 \label{ch:finalisers}
