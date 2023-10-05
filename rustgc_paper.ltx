@@ -79,10 +79,16 @@ the destructor, and only then consider the object for reclamation.
 We validate this thesis by introducing \ourgc, a new GC for Rust. At a
 basic level, \ourgc extends \rustc, the Rust compiler, with GC specific support,
 using the well-known BWDGC library~\laurie{what's the best citation?} as
-the run-time conservative GC. \ourgc then introduces two novel features
+the run-time conservative GC. \ourgc then introduces three features
 to deal with finaliser soundness and performance:
 
 \begin{itemize}
+    \item \emph{Early finaliser prevention} guarantees that finalisers will not
+        be run before all parts of an object are provably not used. This occurs
+        because compiler optimisations such as scalar replacement can extract
+        part of an object, making the object seem unused, even though its
+        finaliser may refer to the extracted parts.
+
     \item \emph{Finaliser safety analysis} is an extension to Rust's type
         system that statically rejects destructors that are unsafe to use as
         finalisers when, and only when, a type is placed into a
