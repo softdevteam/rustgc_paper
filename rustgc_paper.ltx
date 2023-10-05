@@ -64,46 +64,26 @@ external libraries inside a \lstinline{Gc<T>}.
 However, soundness and performance are harder issues, and the core of this
 paper. Our main thesis is that the chief challenge for a sound,
 performant, GC for Rust are \emph{finalisers} (i.e.~code which is run just before an
-object is reclaimed by the GC). Rust uses \emph{destructors} (i.e.~code which
+object is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
 is run just before an object is freed by Rust's implicit memory management)
 pervasively in the form of ``\lstinline{drop} methods''. When a type
 \lstinline{T} with a destructor is placed in a \lstinline{Gc<T>} it is natural
-to map its destructor to a finaliser. However, this introduces two classes of
-problems. First, in large part because finalisers are run
-asynchronously, some safe destructors are not safe finalisers~\cite{boehm03destructors}.
-Second, finalisers are much slower to execute than destructors,
-in large part because the GC must dynamically check for the existence of a
-destructor for a given object, add the destructor and object to a queue, later run
-the destructor, and only then consider the object for reclamation.
+to map its destructor to a finaliser. However, this introduces three
+problems: (1) finalisers can be run too early; (2) some safe destructors are not safe
+finalisers; and (3) finalisers are much slower than destructors.
 
 We validate this thesis by introducing \ourgc, a new GC for Rust. At a
 basic level, \ourgc extends \rustc, the Rust compiler, with GC specific support,
 using the well-known BWDGC library~\laurie{what's the best citation?} as
-the run-time conservative GC. \ourgc then introduces three features
-to deal with finaliser soundness and performance:
-
-\begin{itemize}
-    \item \emph{Early finaliser prevention} guarantees that finalisers will not
-        be run before all parts of an object are provably not used. This occurs
-        because compiler optimisations such as scalar replacement can extract
-        part of an object, making the object seem unused, even though its
-        finaliser may refer to the extracted parts.
-
-    \item \emph{Finaliser safety analysis} is an extension to Rust's type
-        system that statically rejects destructors that are unsafe to use as
-        finalisers when, and only when, a type is placed into a
-        \lstinline{Gc<T>}. Finaliser safety analysis not only solves issues
-        specific to destructors-as-finalisers in Rust, but also issues that
-        affect most other GCed languages (e.g.~object resurrection).
-
-    \item \emph{Finaliser Elision} statically optimises away many finalisers,
-        significantly reducing performance overhead. The basic observation is
-        that common Rust types (e.g.~\lstinline{Vec}) only have a destructor to
-        free their backing memory on the heap: \ourgc allocates this backing
-        memory on the GC heap so that it is freed without the need for a
-        destructor. By recursively tracking elided finalisers, many types that
-        need a destructor do not need a finaliser.
-\end{itemize}
+the run-time conservative GC. \ourgc then introduces solutions to
+each of the problems noted above: (1) \emph{early finaliser prevention} inserts
+barriers that prevent optimisations such as scalar replacement from `tricking'
+the GC into collecting objects early; (2) \emph{finaliser safety analysis}
+extends Rust's type system to reject destructors that are unsafe to use as
+finalisers when, and only when, a type is placed into a
+\lstinline{Gc<T>}; and (3) \emph{finaliser elision} statically optimises away many finalisers,
+by recognising that many destructors only free heap memory, and do not need
+to be run in a GC context. We validate \ourgc's performance with \laurie{...}.
 
 We do not pretend that \ourgc is a production-ready GC for Rust, but it is
 sufficiently polished to be usable for real programs: it has high-quality error
@@ -606,6 +586,33 @@ Rust also supports C-like union types, which in contrast to enums do not use
 runtime tags to denote the active variant. Union types are not automatically
 dropped because there is no way for Rust to know which variant to insert a drop
 method for.
+
+
+\section{Soundness in \ourgc}
+
+\begin{itemize}
+    \item \emph{Early finaliser prevention} guarantees that finalisers will not
+        be run if any part an object may still be in use.
+        before all parts of an object are provably not used. This occurs
+        because compiler optimisations such as scalar replacement can extract
+        part of an object, making the object seem unused, even though its
+        finaliser may refer to the extracted parts.
+
+    \item \emph{Finaliser safety analysis} is an extension to Rust's type
+        system that statically rejects destructors that are unsafe to use as
+        finalisers when, and only when, a type is placed into a
+        \lstinline{Gc<T>}. Finaliser safety analysis not only solves issues
+        specific to destructors-as-finalisers in Rust, but also issues that
+        affect most other GCed languages (e.g.~object resurrection).
+
+    \item \emph{Finaliser Elision} statically optimises away many finalisers,
+        significantly reducing performance overhead. The basic observation is
+        that common Rust types (e.g.~\lstinline{Vec}) only have a destructor to
+        free their backing memory on the heap: \ourgc allocates this backing
+        memory on the GC heap so that it is freed without the need for a
+        destructor. By recursively tracking elided finalisers, many types that
+        need a destructor do not need a finaliser.
+\end{itemize}
 
 \section{Design choices for finalisers in Rust}
 
