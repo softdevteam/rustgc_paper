@@ -1,4 +1,5 @@
 \documentclass[acmsmall,screen,review]{acmart}
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
 
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -16,6 +17,9 @@
 \usepackage{subcaption}
 \usepackage{tikz}
 \usepackage{xspace}
+
+% Must be loaded last
+\usepackage[capitalise]{cleveref}
 
 \usetikzlibrary{automata, positioning, arrows}
 

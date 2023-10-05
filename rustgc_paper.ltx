@@ -90,8 +90,23 @@ sufficiently polished to be usable for real programs: it has high-quality error
 messages and reasonable performance. We believe that finaliser safety analysis
 and finaliser elision will prove useful concepts for any future GC for Rust.
 
+\begin{figure}
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of GC in Rust. \laurie{we need a good example here,
+    ideally one that we can build upon later in the paper}},
+  label={fig:first_example}]
+struct S { x: u64, other: Option<Gc<S>> }
+fn main() {
+  let e1 = Gc::new(S { x: 1, other: None });
+  let e2 = Gc::new(S { x: 2, other: e1 });
+  println!("{}", e2.other.unwrap().x);
+}
+\end{lstlisting}
+\end{figure}
+
 \laurie{a brief introduction of the Gc type, preferably with a simple code
-listing (with a nice long caption!) that allows readers to quickly develope an
+listing (with a nice long caption!) that allows readers to quickly develop an
 intuition about what's going on would be great.}
 
 
@@ -112,19 +127,67 @@ object or a single read-write reference (`\lstinline{\&mut}').
 
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However, some
-data structures cannot be expressed in a \emph{safe} (i.e.~fully statically
-checked by the compiler) manner, most notably cyclic data structures.
+useful data structures cannot be expressed in a \emph{safe} (i.e.~fully statically
+checked by the compiler) manner, most notably cyclic data structures,
+because, by definition, they require values to have more than one owner.
 
-\laurie{is a doubly linked example something we can use as a running example?}
+\laurie{jake: can we find a minimal example here? linked lists are an obvious
+one, but they're too complicated i think: we can at least reference
+\lstinline{https://rust-unofficial.github.io/too-many-lists/} as proof of that.
+maybe the bronze GC paper has some good examples. otherwise, maybe we just
+introduce a type `S' which can reference other `S`s and show the problems with
+rc and rc/refcell?}
 
 
 \section{\ourgc}
 
-\laurie{introduce the basics}
+This section describes the basic design of \ourgc: \cref{sec:finaliser_issues}
+details the soundness issues with the basic design and \ourgc's solutions; and
+\cref{sec:finaliser_elision} details the performance issues and \ourgc's
+solution.
+
+As with most other GCs for Rust, \ourgc introduces a user-visible type
+\texttt{Gc<T>} which is the type of an instance of \lstinline{T} on the GC
+heap. \cref{fig:first_example} shows an example of a program that compiles and
+runs successfully under \ourgc. Behind the scenes the value passed to
+\lstinline{Gc::new} is placed on the GC heap, and \lstinline{Gc<T>} is a simple
+wrapper around a pointer to the value on the GC heap. \ourgc differentiates
+memory allocated on the `normal' heap from memory allocated on the GC heap,
+though both are managed by the conservative GC BWDGC.
+
+\lstinline{Gc<T>} exposes an API which is deliberately similar to the standard
+Rust type \lstinline{Rc<T>}, which has a positive and a negative consequence.
+
+The positive consequence is that, where \lstinline{Rc<T>}
+is, in Rust terminology, merely \emph{clonable} (i.e.~duplication requires
+executing arbitrary user code), \lstinline{Gc<T>} is also \emph{copyable}
+(i.e.~duplication requires only the copying of bytes, without executing
+arbitrary user code). This seemingly minor difference is reflected in Rust's
+syntax. There is no syntax for cloning, so to duplicate an \lstinline{Rc<T>} in
+\lstinline{x} one must write \lstinline{y = Gc::clone(&x)}. In contract,
+copying is implied by assignment so to duplicate a \lstinline{Gc<T>} in
+\lstinline{x} one need only write \lstinline{y = x}\footnote{The lengthier
+syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
+also clonable.}. Across large code bases, this seemingly minor syntactic
+convenience can be a real boon: more importantly, it reflects an underlying
+semantic difference: duplicating an \lstinline{Gc<T>} is a cheap operation.
+
+The negative consequence is that \lstinline{Gc<T>} exposes
+\lstinline{fn Gc<T>::into_raw(self) -> *const T} and
+\lstinline{Gc<T>::from_raw(*const T) -> Gc<T>} methods.
+Just as their \lstinline{Rc<T>} namesakes, these allow a \lstinline{Gc<T>} to
+be turned into a \emph{raw pointer} and back again. There several use cases for
+this, including the need to pass pointers to C code which may later pass those
+pointers back to Rust. However, raw pointers in Rust can be arbitrarily
+converted to the integer type \lstinline{usize} (Rust's approximate equivalent
+of C's \lstinline{intptr_t} type) and back again. The need to support this is
+the major reason for \ourgc requiring conservative GC, since we cannot
+otherwise track references to GCed objects if they are stored in raw pointers
+or \lstinline{usize}s.
 
 
 \section{Finalisation in \ourgc}
-\label{ch:finalisers}
+\label{sec:finaliser_issues}
 
 A major challenge for \ourgc is to ensure that finalisers are both sound and
 perform well. This chapter first explains some of the implementation problems
@@ -2135,8 +2198,7 @@ unnecessary.
 \label{opt_fin}
 
 \subsection{Finaliser elision}
-
-\label{finaliser_elision}
+\label{sec:finaliser_elision}
 
 For performance reasons, many GC'd languages discourage programmers from using finalisers.
 In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
