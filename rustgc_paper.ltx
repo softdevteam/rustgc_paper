@@ -4,17 +4,15 @@
 \begin{document}
 
 \begin{abstract}
-\noindent Rust is a non-Garbage Collected (GC) language, but the lack of GC
-makes expressing some programs, particularly those with cyclic data structures,
-awkward or inefficient. Adding GC to Rust has previously required sacrificing
-at least one of ergonomics, performance, or soundness. Our thesis is that
-the major challenge preventing practical GC for Rust is destructors, which are used
-pervasively in Rust in the form of ``drop methods'': mapping destructors
-to GC finalisers introduces subtle soundness issues and significant
-performance overheads. We validate this thesis by introducing \ourgc, a new GC for Rust. \ourgc
-extends Rust's type system to statically rule out soundness issues. \ourgc
-is able to elide most finalisers \laurie{quantify?}, reducing performance overheads
-by \laurie{quantify}.
+\noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
+makes expressing programs with cyclic data structures awkward or inefficient.
+Adding GC to Rust has previously required sacrificing
+at least one of ergonomics, performance, or soundness. We identify the
+the major challenge for practical GC for Rust as destructors, which are used
+pervasively in Rust in the form of \lstinline{drop} methods. Mapping destructors
+to GC finalisers seems natural but introduces subtle soundness, and significant
+performance, issues. In this paper we introduce \ourgc, a new GC for Rust,
+which provides solutions for the these soundness and performance issue.
 \end{abstract}
 
 \maketitle
@@ -23,60 +21,62 @@ by \laurie{quantify}.
 \section{Introduction}
 
 Amongst the several ways one can divide programming languages are whether they
-are Garbage Collected (GCed) or not. Traditionally, non-GCed\jake{The literature
+are Garbage Collected (GCed) or not. GCed languages enable implicit memory management,
+whereas non-GCed\jake{The literature
 tends to refer to the difference in such languages as managed / unmanaged, I
 wonder if we should do the same?}\laurie{`managed'/`unmanaged' are used
 a bit vaguely, IMHO, and tend to refer more to than just GC, so i'd probably
-prefer to avoid those terms} languages have
+prefer to avoid those terms} languages have traditionally
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
-\lstinline{free} functions). In contrast, Rust's ownership types enable
-implicit memory management without the use of GC. From a memory management
-perspective, many portions of many Rust programs look identical to a GCed
-language equivalent. However, some data structures, notably cyclic data
-structures, are frustrating to write with ownership types. Programmers are forced
-to use encodings such as referencing counting, or indices into vectors
---- these protect the user from dangling machine pointers, but cannot
-prevent memory leaks, or dangling indices.
+\lstinline{free} functions). Rust, while not GCed, uses ownership types to make
+memory management implicit, making many portions of many Rust programs look
+identical to a GCed language equivalent. However, ownership types are too
+inflexible to express cyclic data-structures. Workarounds are cumbersome
+and come with downsides, typically memory leaks (e.g.~reference
+counting) or dangling indices (e.g.~vectors of indices).
 
-There have thus been a number of attempts to add GC to Rust. Most
-introduce a user-visible type \lstinline{Gc<T>} and a user-invisible type
-\lstinline{GcBox<T>}. When users create a new \lstinline{Gc<T>} a
-\lstinline{GcBox<T>} is allocated on the GC heap and a \lstinline{Gc<T>}
-containing a pointer to the \lstinline{GcBox<T>} is returned. Since \lstinline{Gc<T>}
-is really just a pointer, it can be \emph{cloned} at will by the user. When no pointers to a
+There have thus been a number of attempts to add GC to Rust. Typically these
+introduce a user-visible type \lstinline{Gc<T>}. When instantiated, this type
+puts a value of \lstinline{T} on the GC heap, with the \lstinline{Gc<T>}
+itself wrapping a pointer to that value. Since \lstinline{Gc<T>} is really
+just a pointer, it can be \emph{cloned} (i.e.~duplicated) at will by the user.
+When no pointers to a
 \lstinline{GcBox<T>} can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
 variables, variables on the stack, etc.) then the GC can reclaim its memory.
 
 Unfortunately, the existing GCs for Rust we are aware of require sacrificing at
 least one of ergonomics (e.g.~user-level GC libraries cannot allow types
 defined in external libraries to be put in the \lstinline{Gc<T>} type),
-soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} does
-not track indirect references, so seemingly safe programs can
+soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
+track indirect references, so seemingly safe programs can
 \lstinline{SEGFAULT}), or performance (\laurie{use a sensible figure from the
 perf section}).
 
-Ergonomic issues can be solved relatively easily with two observations. First,
-since Rust's semantics allow pointers to be punned with integers at will,
-conservative GC is an inevitable part of a general GC for Rust. Second,
-altering the Rust compiler is the only way that programmers can use types from
-external libraries inside a \lstinline{Gc<T>}.
+In this paper we introduce \ourgc, a new GC for Rust. \ourgc's starting point
+is that its \lstinline{Gc<T>} type must expose an idiomatic Rust API (roughly
+similar to the \lstinline{Rc<T>} type), which requires being able to transform
+\lstinline{Gc<T>} values to raw pointers and back. Since Rust allows
+raw pointers to be converted to integers and back, this implicitly requires
+that \ourgc is \emph{conservative} (i.e.~considers all words in memory as
+potential pointers to the GC heap): we use the well-known BWDGC
+library~\laurie{what's the best citation?} as the run-time conservative GC.
+Supporting this requires some alterations to the Rust compiler, at which point
+most of the ergonomic issues affecting previous GCs
+for Rust can be avoided.
 
 However, soundness and performance are harder issues, and the core of this
-paper. Our main thesis is that the chief challenge for a sound,
-performant, GC for Rust are \emph{finalisers} (i.e.~code which is run just before an
-object is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
-is run just before an object is freed by Rust's implicit memory management)
-pervasively in the form of ``\lstinline{drop} methods''. When a type
+paper. We identify the chief challenge for a sound,
+performant, GC for Rust as \emph{finalisers} (i.e.~code which is run just before a
+value is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
+is run just before a value is freed by Rust's implicit memory management)
+pervasively in the form of \lstinline{drop} methods. When a type
 \lstinline{T} with a destructor is placed in a \lstinline{Gc<T>} it is natural
 to map its destructor to a finaliser. However, this introduces three
 problems: (1) finalisers can be run too early; (2) some safe destructors are not safe
 finalisers; and (3) finalisers are much slower than destructors.
 
-We validate this thesis by introducing \ourgc, a new GC for Rust. At a
-basic level, \ourgc extends \rustc, the Rust compiler, with GC specific support,
-using the well-known BWDGC library~\laurie{what's the best citation?} as
-the run-time conservative GC. \ourgc then introduces solutions to
-each of the problems noted above: (1) \emph{early finaliser prevention} inserts
+We introduce solutions for each of these problems, validating them in
+\ourgc: (1) \emph{early finaliser prevention} inserts
 barriers that prevent optimisations such as scalar replacement from `tricking'
 the GC into collecting objects early; (2) \emph{finaliser safety analysis}
 extends Rust's type system to reject destructors that are unsafe to use as
