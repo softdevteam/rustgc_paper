@@ -29,20 +29,19 @@ a bit vaguely, IMHO, and tend to refer more to than just GC, so i'd probably
 prefer to avoid those terms} languages have traditionally
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust, while not GCed, uses ownership types to make
-memory management implicit, making many portions of many Rust programs look
-identical to a GCed language equivalent. However, ownership types are too
+memory management implicit, making many portions of many Rust programs as
+succinct as a GCed equivalent. However, ownership types are too
 inflexible to express cyclic data-structures. Workarounds are cumbersome
 and come with downsides, typically memory leaks (e.g.~reference
 counting) or dangling indices (e.g.~vectors of indices).
 
 There have thus been a number of attempts to add GC to Rust. Typically these
-introduce a user-visible type \lstinline{Gc<T>}. When instantiated, this type
-puts a value of \lstinline{T} on the GC heap, with the \lstinline{Gc<T>}
-itself wrapping a pointer to that value. Since \lstinline{Gc<T>} is really
-just a pointer, it can be \emph{cloned} (i.e.~duplicated) at will by the user.
-When no pointers to a
-\lstinline{GcBox<T>} can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
-variables, variables on the stack, etc.) then the GC can reclaim its memory.
+introduce a user-visible type \lstinline{Gc<T>} which puts a value of
+type \lstinline{T} on the GC heap and then wraps a pointer to it. \lstinline{Gc<T>}
+can be \emph{cloned} (i.e.~duplicated) at will by the user. When no
+\lstinline{Gc<T>} values can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
+variables, variables on the stack, etc.) then the GC can reclaim the
+underlying memory.
 
 Unfortunately, the existing GCs for Rust we are aware of require sacrificing at
 least one of ergonomics (e.g.~user-level GC libraries cannot allow types
@@ -52,11 +51,13 @@ track indirect references, so seemingly safe programs can
 \lstinline{SEGFAULT}), or performance (\laurie{use a sensible figure from the
 perf section}).
 
-In this paper we introduce \ourgc, a new GC for Rust. \ourgc's starting point
-is that its \lstinline{Gc<T>} type must expose an idiomatic Rust API (roughly
-similar to the \lstinline{Rc<T>} type), which requires being able to transform
+In this paper we introduce \ourgc, a new GC for Rust. Unlike many other GCs for
+Rust, our starting assumption is that \ourgc's \lstinline{Gc<T>} type must
+expose an API roughly similar to the Rust's standard reference counting type
+\lstinline{Rc<T>}. Crucially, this requires being able to transform
 \lstinline{Gc<T>} values to raw pointers and back. Since Rust allows
-raw pointers to be converted to integers and back, this implicitly requires
+raw pointers to be converted to integers and back, our initial API requirement
+thus implicitly requires
 that \ourgc is \emph{conservative} (i.e.~considers all words in memory as
 potential pointers to the GC heap): we use the well-known BWDGC
 library~\laurie{what's the best citation?} as the run-time conservative GC.
