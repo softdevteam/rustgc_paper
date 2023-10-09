@@ -194,22 +194,38 @@ the perspective of this section, there is relatively little need to fork
 \rustc, but we will soon see in the following sections why this is necessary.
 
 
-\section{Finalisation in \ourgc}
+\section{Destructors and Finalisers: Similarities and Differences}
 \label{sec:finaliser_issues}
 
-A major challenge for \ourgc is to ensure that finalisers are both sound and
-perform well. This chapter first explains some of the implementation problems
-that any GC with finalisers must consider, before explaining considerations that
-are unique to Rust. I then explore the different ways that finalisers could be
-implemented in \ourgc, and why I decided on the approach that was used.
+Rust uses destructors pervasively in the form of \lstinline{Drop} methods.
+For example, simplified somewhat, the \lstinline{Rc<T>} type has the following
+\lstinline{Drop} method:
 
-This chapter is structured as follows. \autoref{bg:advanced_finalisers} explains
-some of the common pitfalls and of implementing finalisers. In
-\autoref{destructors_detailed} I explain in detail how Rust's existing
-destructors work. \autoref{alloy_fins} introduces \ourgc's approach to finalisation.
-Finally, \autoref{ourgc:threadsafe_finalisation} to \autoref{opt_fin} are part of the
-main contributions in this thesis. They explain how \ourgc deals with the
-various soundness and performance problems caused by finalisers in a Rust GC.
+\begin{lstlisting}[language=Rust,numbers=left]
+impl<T> Drop for Rc<T> {
+  fn drop(&must self) {
+    self.inner.count -= 1;
+    if self.inner.count == 0 {
+      // deallocate inner object
+    }
+  }
+}
+\end{lstlisting}
+
+When a value of type \lstinline{Rc<T>} goes out of scope or is explicitly
+`forgotten' (with the \lstinline{std::mem::forget} function), it is said to be
+\emph{dropped} and the \lstinline{drop} method above called (conceptually). In this case,
+\lstinline{Rc<T>} points to a value on the heap with a reference count:
+the drop method decrements the reference count; if that count goes to zero
+then it also deallocates the heap memory for the underlying value.
+
+GC finalisers are a very similar concept to destructors, and it seems natural to
+map Rust's drop methods to \ourgc's finalisers. However, this introduces subtle
+soundness, and significant, performance issues. In this section we explain
+the three soundness issues relevant to \ourgc (each directly inspired by
+\cref{boehm03destructors}) and give an overview of the performance problems
+of running all destructors as finalisers. In subsequent sections, we introduce
+\ourgc's solutions to each problem.
 
 
 \section{Finalisers background}
