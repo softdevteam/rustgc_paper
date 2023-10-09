@@ -119,12 +119,12 @@ write in GCed languages are challenging in Rust.
 Rust's ownership types (in essence affine types \laurie{cite whatever paper
 introduced affine types} with some extensions and relaxations) statically
 guarantee that a \emph{value} has a single owner: an owner can \emph{move}
-that value to another owner; if the owner \emph{forgets} the value (either
-explicitly or because the owner goes out of scope), the value's destructor
-is run and its memory can be reused. An owner can give references
+that value to another owner; if an owner \emph{forgets} a value (either
+explicitly or because the owner's lexical scope ends), then the value's \lstinline{drop}
+method (its destructor) is run and its memory can be reused. An owner can give references
 to that value to other code, subject to the following static restrictions:
-there can be multiple read-only \emph{references} (`\lstinline{\&}') to an
-object or a single read-write reference (`\lstinline{\&mut}').
+there can be multiple read-only \emph{references} (`\lstinline{&}') to an
+object or a single read-write reference (`\lstinline{&mut}').
 
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However, some
@@ -140,51 +140,66 @@ introduce a type `S' which can reference other `S`s and show the problems with
 rc and rc/refcell?}
 
 
-\section{\ourgc}
+\section{\ourgc: Basic Design Choices}
 
-This section describes the basic design of \ourgc: \cref{sec:finaliser_issues}
-details the soundness issues with the basic design and \ourgc's solutions; and
-\cref{sec:finaliser_elision} details the performance issues and \ourgc's
-solution.
+This section describes the basic design of \ourgc. As with most other GCs for
+Rust, \ourgc introduces a user-visible type \texttt{Gc<T>} which is the type of
+an instance of \lstinline{T} on the GC heap. As a good first approximation,
+users can consider the \lstinline{Gc<T>} type to be the GC equivalent of
+\lstinline{Rc<T>}, the reference-counting type included in Rust's standard
+library. \cref{fig:first_example} shows an example of a program that compiles
+and runs successfully under \ourgc.
 
-As with most other GCs for Rust, \ourgc introduces a user-visible type
-\texttt{Gc<T>} which is the type of an instance of \lstinline{T} on the GC
-heap. \cref{fig:first_example} shows an example of a program that compiles and
-runs successfully under \ourgc. Behind the scenes the value passed to
-\lstinline{Gc::new} is placed on the GC heap, and \lstinline{Gc<T>} is a simple
-wrapper around a pointer to the value on the GC heap. \ourgc differentiates
-memory allocated on the `normal' heap from memory allocated on the GC heap,
-though both are managed by the conservative GC BWDGC.
+A fundamental goal of \ourgc is for the features it exposes to be as idiomatic
+as possible To that end, \lstinline{Gc<T>} exposes an API which is as similar
+to \lstinline{Rc<T>} as possible, for two reasons:
+\lstinline{Rc<T>} is widely used in Rust code and thus its API is familiar;
+\lstinline{Rc<T>}'s API reflects long-term experience about how Rust
+programmers want and need to use such a type.
 
-\lstinline{Gc<T>} exposes an API which is deliberately similar to the standard
-Rust type \lstinline{Rc<T>}, which has a positive and a negative consequence.
+\ourgc mirror more of \lstinline{Rc<T>}'s API than many other GCs for Rust. One
+seemingly minor aspect of this mirroring has profound consequences because (1)
+it requires allowing users to turn \lstinline{Gc<T>} values into raw pointers
+(\lstinline{fn Gc<T>::into_raw(self) -> *const T}) and back
+(\lstinline{fn Gc<T>::from_raw(*const T) -> Gc<T>}) (2) Rust allows raw pointers to
+be converted to the integer type \lstinline{usize} and back. In other words, if
+\ourgc wants \lstinline{Gc<T>} to be usable in the same places that
+\lstinline{Rc<T>} is then it must be able to track pointers to GC values stored
+in Rust \lstinline{usize} values. This inevitably means that \ourgc must be
+a \emph{conservative} GC, which, conceptually, scans all words in memory
+for pointers to the GC heap. Since the major challenges we tackle on this paper
+remain the same no matter what conservative GC \ourgc uses, the choice is
+somewhat arbitrary --- currently, \ourgc uses the well-known BWDGC conservative
+GC \laurie{jake: what's a good reference?} at run-time.
 
-The positive consequence is that, where \lstinline{Rc<T>}
-is, in Rust terminology, merely \emph{clonable} (i.e.~duplication requires
-executing arbitrary user code), \lstinline{Gc<T>} is also \emph{copyable}
-(i.e.~duplication requires only the copying of bytes, without executing
-arbitrary user code). This seemingly minor difference is reflected in Rust's
-syntax. There is no syntax for cloning, so to duplicate an \lstinline{Rc<T>} in
-\lstinline{x} one must write \lstinline{y = Gc::clone(&x)}. In contract,
+When a user calls \lstinline{Gc::new(v)} to create a new GCed objecvalue,
+\lstinline{v} is placed on the GC heap: \lstinline{Gc<T>} is a simple
+wrapper around a pointer to where \lstinline{v} is stored on the GC heap.
+\laurie{jake: how to talk about the GC heap storing things that the user won't
+have realised were stored on the GC heap? i'm not sure i've understood this
+part fully.} Because it is just a pointer, \lstinline{Gc<T>} can be cloned
+at will by the user without duplicating the underlying GC allocated value.
+
+\ourgc makes one meaningful ergonomic improvement over \lstinline{Rc<T>}. In
+Rust terminology, \lstinline{Rc<T>} is merely \emph{clonable} (i.e.~duplication
+requires executing arbitrary user code, in this case to increment / decrement
+reference counts). \lstinline{Gc<T>} is also \emph{copyable} (i.e.~duplication
+requires only the copying of bytes, without executing arbitrary user code). The
+clonable/copyable divide is reflected in Rust's syntax. There is no syntax for
+cloning: to duplicate an \lstinline{Rc<T>} in \lstinline{x} one must write
+\lstinline{y = Rc::clone(&x)}. In contrast,
 copying is implied by assignment so to duplicate a \lstinline{Gc<T>} in
 \lstinline{x} one need only write \lstinline{y = x}\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
 also clonable.}. Across large code bases, this seemingly minor syntactic
 convenience can be a real boon: more importantly, it reflects an underlying
-semantic difference: duplicating an \lstinline{Gc<T>} is a cheap operation.
+semantic difference: duplicating an \lstinline{Gc<T>} is a cheap operation
+than duplicating an \lstinline{Rc<T>}.
 
-The negative consequence is that \lstinline{Gc<T>} exposes
-\lstinline{fn Gc<T>::into_raw(self) -> *const T} and
-\lstinline{Gc<T>::from_raw(*const T) -> Gc<T>} methods.
-Just as their \lstinline{Rc<T>} namesakes, these allow a \lstinline{Gc<T>} to
-be turned into a \emph{raw pointer} and back again. There several use cases for
-this, including the need to pass pointers to C code which may later pass those
-pointers back to Rust. However, raw pointers in Rust can be arbitrarily
-converted to the integer type \lstinline{usize} (Rust's approximate equivalent
-of C's \lstinline{intptr_t} type) and back again. The need to support this is
-the major reason for \ourgc requiring conservative GC, since we cannot
-otherwise track references to GCed objects if they are stored in raw pointers
-or \lstinline{usize}s.
+In terms of the implementation, \ourgc is a fork of \rustc: programmers must
+use our fork if they want to gain access to the \lstinline{Gc<T>} type. From
+the perspective of this section, there is relatively little need to fork
+\rustc, but we will soon see in the following sections why this is necessary.
 
 
 \section{Finalisation in \ourgc}
@@ -2491,6 +2506,7 @@ created as a result of drop removal.
 
 
 \section{Related work}
+\label{sec:related_work}
 
 `Premodern' Rust had a reference-counted GC which was removed gradually from
 mid 2013 to mid 2014 \laurie{cite the last commit which removes it}.
