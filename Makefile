@@ -15,6 +15,24 @@ DIAGRAMS = images/finaliser_cycle1.pdf images/finaliser_cycle2.pdf \
 		   images/finaliser_elision_7.pdf images/finaliser_elision_8.pdf \
 		   images/partial_finaliser_elision_1.pdf
 
+GRAPHS = graphs/bounce_memory.pdf graphs/bubblesort_memory.pdf \
+		 graphs/deltablue_memory.pdf graphs/dispatch_memory.pdf \
+		 graphs/fannkuch_memory.pdf graphs/fibonacci_memory.pdf \
+		 graphs/fieldloop_memory.pdf graphs/graphsearch_memory.pdf \
+		 graphs/integerloop_memory.pdf graphs/jsonsmall_memory.pdf \
+		 graphs/list_memory.pdf graphs/loop_memory.pdf \
+		 graphs/mandelbrot_memory.pdf graphs/nbody_memory.pdf \
+		 graphs/nbody_memory.pdf graphs/pagerank_memory.pdf \
+		 graphs/permute_memory.pdf graphs/queens_memory.pdf \
+		 graphs/quicksort_memory.pdf graphs/recurse_memory.pdf \
+		 graphs/richards_memory.pdf graphs/sieve_memory.pdf \
+		 graphs/storage_memory.pdf graphs/sum_memory.pdf \
+		 graphs/towers_memory.pdf graphs/treesort_memory.pdf \
+		 graphs/whileloop_memory.pdf graphs/som_bar.pdf \
+		 graphs/box_vs_rs_memory.pdf graphs/call_performance_memory.pdf \
+		 graphs/jmptbl_memory.pdf graphs/nvec_memory.pdf \
+		 graphs/wlambda_bar.pdf
+
 all: rustgc_paper.pdf
 
 clean:

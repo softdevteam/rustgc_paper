@@ -13,6 +13,9 @@
 \usepackage{listings}
 \usepackage{listings-rust}
 \usepackage{microtype}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{pdflscape}
 \usepackage{softdev}
 \usepackage{subcaption}
 \usepackage{tikz}
@@ -93,6 +96,21 @@
 \newcommand\bronze{\textsc{Bronze}\xspace}
 \newcommand\ourgc{\textsc{Alloy}\xspace}
 \newcommand\bor{borrow-or-finalise rule\xspace}
+
+\newcommand\somrs{\textsc{som-rs}\xspace}
+\newcommand\somrsrc{\textsc{somrs-rc}\xspace}
+\newcommand\somrsgc{\textsc{somrs-gc}\xspace}
+\newcommand\wlambda{\textsc{WLambda}\xspace}
+\newcommand\wlambdaarc{\textsc{WLambda-arc}\xspace}
+\newcommand\wlambdaalloy{\textsc{WLambda-alloy}\xspace}
+\newcommand\yksom{\textsc{yksom}\xspace}
+\newcommand\yksomnaive{\textsc{YKSOM$_{\textrm{Naive}}$}\xspace}
+\newcommand\yksomelision{\textsc{YKSOM$_{\textrm{FinaliserElision}}$}\xspace}
+\newcommand\yksomnobarriers{\textsc{BarriersNone}\xspace}
+\newcommand\yksomallbarriers{\textsc{BarriersAll}\xspace}
+\newcommand\yksomoptbarriers{\textsc{BarriersOpt}\xspace}
+\newcommand\perf{\textsc{perf}\xspace}
+\newcommand\mem{\textsc{mem}\xspace}
 
 \title{Garbage Collection for Rust: The Finaliser Frontier}
 
