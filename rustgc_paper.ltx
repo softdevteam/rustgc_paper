@@ -51,19 +51,11 @@ track indirect references, so seemingly safe programs can
 \lstinline{SEGFAULT}), or performance (\laurie{use a sensible figure from the
 perf section}).
 
-In this paper we introduce \ourgc, a new GC for Rust. Unlike many other GCs for
-Rust, our starting assumption is that \ourgc's \lstinline{Gc<T>} type must
-expose an API roughly similar to the Rust's standard reference counting type
-\lstinline{Rc<T>}. Crucially, this requires being able to transform
-\lstinline{Gc<T>} values to raw pointers and back. Since Rust allows
-raw pointers to be converted to integers and back, our initial API requirement
-thus implicitly requires
-that \ourgc is \emph{conservative} (i.e.~considers all words in memory as
-potential pointers to the GC heap): we use the well-known BWDGC
-library~\laurie{what's the best citation?} as the run-time conservative GC.
-Supporting this requires some alterations to the Rust compiler, at which point
-most of the ergonomic issues affecting previous GCs
-for Rust can be avoided.
+In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
+similar to many other GCs for Rust, with some extensions to improve ergonomics.
+For example, \ourgc's \lstinline{Gc<T>} type can be converted into a raw
+pointer and back without issue, since \ourgc is a \emph{conservative} GC
+(i.e.~it scans all words in memory for possible pointers to the GC heap).
 
 However, soundness and performance are harder issues, and the core of this
 paper. We identify the chief challenge for a sound,
@@ -166,7 +158,7 @@ be converted to the integer type \lstinline{usize} and back. In other words, if
 \ourgc wants \lstinline{Gc<T>} to be usable in the same places that
 \lstinline{Rc<T>} is then it must be able to track pointers to GC values stored
 in Rust \lstinline{usize} values. This inevitably means that \ourgc must be
-a \emph{conservative} GC, which, conceptually, scans all words in memory
+a conservative GC, which, conceptually, scans all words in memory
 for pointers to the GC heap. Since the major challenges we tackle on this paper
 remain the same no matter what conservative GC \ourgc uses, the choice is
 somewhat arbitrary --- currently, \ourgc uses the well-known BWDGC conservative
