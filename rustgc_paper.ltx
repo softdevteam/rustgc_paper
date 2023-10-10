@@ -22,11 +22,7 @@ which provides solutions for the these soundness and performance issue.
 
 Amongst the several ways one can divide programming languages are whether they
 are Garbage Collected (GCed) or not. GCed languages enable implicit memory management,
-whereas non-GCed\jake{The literature
-tends to refer to the difference in such languages as managed / unmanaged, I
-wonder if we should do the same?}\laurie{`managed'/`unmanaged' are used
-a bit vaguely, IMHO, and tend to refer more to than just GC, so i'd probably
-prefer to avoid those terms} languages have traditionally
+whereas non-GCed languages have traditionally
 required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust, while not GCed, uses ownership types to make
 memory management implicit, making many portions of many Rust programs as
@@ -47,15 +43,8 @@ Unfortunately, the existing GCs for Rust we are aware of require sacrificing at
 least one of ergonomics (e.g.~user-level GC libraries cannot allow types
 defined in external libraries to be put in the \lstinline{Gc<T>} type),
 soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
-track indirect references, so seemingly safe programs can
-\lstinline{SEGFAULT}\jake{how about \emph{use-after-free} or \emph{reclaim
-memory too early}? \lstinline{SEGFAULT} is just one particular platform-specific
-consequence}),\jake{It's true that Bronze doesn't trace through intermediate
-references, but IMO this is the less interesting example of how it is unsound
-because it can be handwaved away as not-yet-implemented. More fundamentally,
-Bronze allows multiple mutable references to the underlying data, which can
-cause pointer invalidation because of things like iterator invalidation via
-\lstinline{realloc}}. or performance (\laurie{use a sensible figure from the
+track indirect references, so seemingly safe programs can fail due to
+use-after-frees etc.), or performance (\laurie{use a sensible figure from the
 perf section}).
 
 In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
@@ -118,7 +107,7 @@ write in GCed languages are challenging in Rust.
 Rust's ownership types (in essence affine types \laurie{cite whatever paper
 introduced affine types}\jake{affine types are part of substructural type
 systems, and in my thesis, I cited that section from "Types and programming
-languages" by B. Pierce} with some extensions and relaxations) statically
+languages" by B. Pierce}\laurie{let's do that} with some extensions and relaxations) statically
 guarantee that a \emph{value} has a single owner: an owner can \emph{move}
 that value to another owner; if an owner \emph{forgets} a value (either
 explicitly or because the owner's lexical scope ends), then the value's \lstinline{drop}
@@ -143,62 +132,50 @@ rc and rc/refcell?}
 
 \section{\ourgc: Basic Design Choices}
 
-This section describes the basic design of \ourgc. As with most other GCs for
-Rust, \ourgc introduces a user-visible type \texttt{Gc<T>} which is the type of
-an instance of \lstinline{T} on the GC heap. As a good first approximation,
-users can consider the \lstinline{Gc<T>} type to be the GC equivalent of
-\lstinline{Rc<T>}, the reference-counting type included in Rust's standard
-library. \cref{fig:first_example} shows an example of a program that compiles
-and runs successfully under \ourgc.
+A fundamental goal of \ourgc is to use familiar Rust
+idioms whenever possible. To that end, the user-visible type \lstinline{Gc<T>}
+that \ourgc exposes is deliberately similar in design to the reference counting
+type \lstinline{Rc<T>} found in the standard library because: \lstinline{Rc<T>}
+is widely used in Rust code, and so its API is familiar; \lstinline{Rc<T>} is
+conceptually similar to \lstinline{Gc<T>}; and \lstinline{Rc<T>}'s API reflects
+long-term experience about how Rust programmers want and need to use such a
+type. When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
+moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
+simple wrapper around a pointer to where \lstinline{v} is stored on the GC
+heap. \lstinline{Gc<T>} can be duplicated at will by the user without duplicating the
+underlying value on the GC heap. \cref{fig:first_example} shows an example of a
+program that compiles and runs successfully under \ourgc.
 
-A fundamental goal of \ourgc is for the features it exposes to be as idiomatic
-as possible To that end, \lstinline{Gc<T>} exposes an API which is as similar
-to \lstinline{Rc<T>} as possible, for two reasons:
-\lstinline{Rc<T>} is widely used in Rust code and thus its API is familiar;
-\lstinline{Rc<T>}'s API reflects long-term experience about how Rust
-programmers want and need to use such a type.
-
-\ourgc mirror more of \lstinline{Rc<T>}'s API than many other GCs for Rust. One
-seemingly minor aspect of this mirroring has profound consequences because (1)
-it requires allowing users to turn \lstinline{Gc<T>} values into raw pointers
-(\lstinline{fn Gc<T>::into_raw(self) -> *const T}) and back
-(\lstinline{fn Gc<T>::from_raw(*const T) -> Gc<T>}) (2) Rust allows raw pointers to
-be converted to the integer type \lstinline{usize} and back. In other words, if
-\ourgc wants \lstinline{Gc<T>} to be usable in the same places that
-\lstinline{Rc<T>} is then it must be able to track pointers to GC values stored
-in Rust \lstinline{usize} values. This inevitably means that \ourgc must be
-a conservative GC, which, conceptually, scans all words in memory
-for pointers to the GC heap. Since the major challenges we tackle on this paper
-remain the same no matter what conservative GC \ourgc uses, the choice is
-somewhat arbitrary --- currently, \ourgc uses the well-known Boehm-Demers-Weiser
-conservative GC (\boehm)~\citep{boehm88garbage} for its collector implementation.
-
-When a user calls \lstinline{Gc::new(v)} to create a new GCed value,
-\lstinline{v} is placed on the GC heap: \lstinline{Gc<T>} is a simple
-wrapper around a pointer to where \lstinline{v} is stored on the GC heap.
-\laurie{jake: how to talk about the GC heap storing things that the user won't
-have realised were stored on the GC heap? i'm not sure i've understood this
-part fully.} Because it is just a pointer, \lstinline{Gc<T>} can be cloned
-at will by the user without duplicating the underlying GC allocated value.
-
-\ourgc makes one meaningful ergonomic improvement over
-\lstinline{Rc<T>}.\jake{There are two meaningful improvements really. The other
-is that we don't need ot use \lstinline{Weak} to break cycles, but I guess this
-comes later?} In
-Rust terminology, \lstinline{Rc<T>} is merely \emph{clonable}\jake{clon(e)able?}(i.e.~duplication
+Because it just a pointer, \lstinline{Gc<T>} is able to remove syntactic
+verbosity familiar to users of \lstinline{Rc<T>}. In
+Rust terminology, \lstinline{Rc<T>} is merely \emph{cloneable} (i.e.~duplication
 requires executing arbitrary user code, in this case to increment / decrement
 reference counts). \lstinline{Gc<T>} is also \emph{copyable} (i.e.~duplication
-requires only the copying of bytes, without executing arbitrary user code). The
-clonable/copyable divide is reflected in Rust's syntax. There is no syntax for
-cloning: to duplicate an \lstinline{Rc<T>} in \lstinline{x} one must write
-\lstinline{y = Rc::clone(&x)}. In contrast,
-copying is implied by assignment so to duplicate a \lstinline{Gc<T>} in
-\lstinline{x} one need only write \lstinline{y = x}\footnote{The lengthier
+requires only the copying of bytes, without executing arbitrary user code).
+There is no syntax for cloning: to duplicate an \lstinline{Rc<T>} one must write
+\lstinline{Rc::clone(&x)}. In contrast, copying is implied by assignment,
+reducing the need for a function call entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
 also clonable.}. Across large code bases, this seemingly minor syntactic
 convenience can be a real boon: more importantly, it reflects an underlying
-semantic difference: duplicating an \lstinline{Gc<T>} is a cheaper operation
+semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper operation
 than duplicating an \lstinline{Rc<T>}.
+
+\lstinline{Gc<T>} mirrors more of \lstinline{Rc<T>}'s API than many other GCs for Rust.
+One seemingly minor aspect of this mirroring has profound consequences
+because (1) it requires allowing users to turn \lstinline{Gc<T>} values
+into raw pointers (\lstinline{fn Gc<T>::into_raw(self) -> *const T}) and
+back (\lstinline{fn Gc<T>::from_raw(*const T) -> Gc<T>}) (2) Rust allows
+raw pointers to be converted to the integer type \lstinline{usize} and
+back. In other words, if \ourgc wants \lstinline{Gc<T>} to be usable in the
+same places that \lstinline{Rc<T>} is then it must be able to track
+pointers to GC values stored in Rust \lstinline{usize} values. This
+inevitably means that \ourgc must be a conservative GC, which,
+conceptually, scans all words in memory for pointers to the GC heap. Since
+the major challenges we tackle on this paper remain the same no matter what
+conservative GC \ourgc uses, the choice is somewhat arbitrary ---
+currently, \ourgc uses the well-known Boehm-Demers-Weiser conservative GC
+(\boehm)~\citep{boehm88garbage} for its collector implementation.
 
 In terms of the implementation, \ourgc is a fork of \rustc: programmers must
 use our fork if they want to gain access to the \lstinline{Gc<T>} type. From
@@ -224,13 +201,10 @@ impl<T> Drop for Rc<T> {
 }
 \end{lstlisting}
 
-When a value of type \lstinline{Rc<T>} goes out of scope or is explicitly
-`forgotten' (with the \lstinline{std::mem::forget} function)\jake{This won't
-drop the RC, do you mean explicitly dropped? \lstinline{std::mem::drop<T>}}, it is said to be
-\emph{dropped} and the \lstinline{drop} method above called
-(conceptually)\jake{What do you mean by conceptually? Is this because in reality
-it's not a call but a terminator in the MIR? I think it makes it easier to
-understand if we just remove this word}. In this case,
+When a value of type \lstinline{Rc<T>} goes out of scope or is
+passed to the \lstinline{std::mem::drop} function), it is said to be
+\emph{dropped} and the \lstinline{drop} method above called.
+In the example above,
 \lstinline{Rc<T>} points to a value on the heap with a reference count:
 the drop method decrements the reference count; if that count goes to zero
 then it also deallocates the heap memory for the underlying value.
