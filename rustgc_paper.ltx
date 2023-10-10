@@ -7,12 +7,12 @@
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
 makes expressing programs with cyclic data structures awkward or inefficient.
 Adding GC to Rust has previously required sacrificing
-at least one of ergonomics, performance, or soundness. We identify the
+at least one of ergonomics, performance, or soundness. We identify
 the major challenge for practical GC for Rust as destructors, which are used
 pervasively in Rust in the form of \lstinline{drop} methods. Mapping destructors
 to GC finalisers seems natural but introduces subtle soundness, and significant
 performance, issues. In this paper we introduce \ourgc, a new GC for Rust,
-which provides solutions for the these soundness and performance issue.
+which provides solutions for these soundness and performance issues.
 \end{abstract}
 
 \maketitle
@@ -29,7 +29,9 @@ memory management implicit, making many portions of many Rust programs as
 succinct as a GCed equivalent. However, ownership types are too
 inflexible to express cyclic data-structures. Workarounds are cumbersome
 and come with downsides, typically memory leaks (e.g.~reference
-counting) or dangling indices (e.g.~vectors of indices).
+counting) or dangling indices (e.g.~vectors of indices).\jake{I don't think this
+second example is that clear. How about something like: ..or requires type punning by
+using indices as references (e.g.~arenas)?}
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which puts a value of
@@ -109,7 +111,7 @@ introduced affine types}\jake{affine types are part of substructural type
 systems, and in my thesis, I cited that section from "Types and programming
 languages" by B. Pierce}\laurie{let's do that} with some extensions and relaxations) statically
 guarantee that a \emph{value} has a single owner: an owner can \emph{move}
-that value to another owner; if an owner \emph{forgets} a value (either
+that value to another owner; once a value's ownership \emph{expires} (either
 explicitly or because the owner's lexical scope ends), then the value's \lstinline{drop}
 method (its destructor) is run and its memory can be reused. An owner can give references
 to that value to other code, subject to the following static restrictions:
