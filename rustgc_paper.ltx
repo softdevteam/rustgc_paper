@@ -106,17 +106,17 @@ intuition about what's going on would be great.}
 In this section we briefly show why some data structures that are easy to
 write in GCed languages are challenging in Rust.
 
-Rust's ownership types (in essence affine types \laurie{cite whatever paper
-introduced affine types}\jake{affine types are part of substructural type
-systems, and in my thesis, I cited that section from "Types and programming
-languages" by B. Pierce}\laurie{let's do that} with some extensions and relaxations) statically
-guarantee that a \emph{value} has a single owner: an owner can \emph{move}
-that value to another owner; once a value's ownership \emph{expires} (either
-explicitly or because the owner's lexical scope ends), then the value's \lstinline{drop}
-method (its destructor) is run and its memory can be reused. An owner can give references
-to that value to other code, subject to the following static restrictions:
-there can be multiple read-only \emph{references} (`\lstinline{&}') to an
-object or a single read-write reference (`\lstinline{&mut}').
+Rust's ownership types\jake{Rust doesn't use ownership types. It uses the
+umbrella term "Ownership" to refer to the affine type / RAII stuff but ownership
+types as introduced by James Noble are unrelated} (in essence affine types with
+some extensions and relaxations~\jake{cite TAPL}) statically guarantee that a \emph{value} has a
+single owner: an owner can \emph{move} that value to another owner; once a
+value's ownership \emph{expires} (either explicitly or because the owner's
+lexical scope ends), then the value's \lstinline{drop} method (its destructor)
+is run and its memory can be reused. An owner can give references to that value
+to other code, subject to the following static restrictions: there can be
+multiple read-only \emph{references} (`\lstinline{&}') to an object or a single
+read-write reference (`\lstinline{&mut}').
 
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However, some
