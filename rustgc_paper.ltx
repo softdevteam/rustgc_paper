@@ -87,11 +87,12 @@ and finaliser elision will prove useful concepts for any future GC for Rust.
   caption={An example of GC in Rust. \laurie{we need a good example here,
     ideally one that we can build upon later in the paper}},
   label={fig:first_example}]
-struct S { x: u64, other: Option<Gc<S>> }
+struct Node {data: i32, next: Option<Gc<RefCell<Node>>>}
+
 fn main() {
-  let e1 = Gc::new(S { x: 1, other: None });
-  let e2 = Gc::new(S { x: 2, other: e1 });
-  println!("{}", e2.other.unwrap().x);
+    let b = Gc::new(RefCell::new(Node {data: 1, next: None}));
+    let a = Gc::new(RefCell::new(Node {data: 2, next: Some(b)}));
+    b.borrow_mut().next = Some(a);
 }
 \end{lstlisting}
 \end{figure}
