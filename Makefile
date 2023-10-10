@@ -40,7 +40,7 @@ clean:
 	rm -f rustgc_paper.aux rustgc_paper.bbl rustgc_paper.blg rustgc_paper.dvi rustgc_paper.log rustgc_paper.pdf rustgc_paper.toc rustgc_paper.out rustgc_paper.snm rustgc_paper.nav rustgc_paper.vrb texput.log
 	rm -f rustgc_paper_preamble.fmt rustgc_paper_preamble.log
 
-rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${DIAGRAMS} rustgc_paper_preamble.fmt
+rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${DIAGRAMS} ${GRAPHS} rustgc_paper_preamble.fmt
 	pdflatex rustgc_paper.ltx
 	bibtex rustgc_paper
 	pdflatex rustgc_paper.ltx
