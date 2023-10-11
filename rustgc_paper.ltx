@@ -152,7 +152,7 @@ Rust has no dedicated syntax for cloning: to duplicate an \lstinline{Rc<T>} one 
 \lstinline{Rc::clone(&x)}. In contrast, copying is implied by assignment,
 reducing the need for a function call entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
-also clonable.}. Across large code bases, this seemingly minor syntactic
+also cloneable.}. Across large code bases, this seemingly minor syntactic
 convenience can be a real boon: more importantly, it reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper operation
 than duplicating an \lstinline{Rc<T>}.
@@ -172,10 +172,9 @@ conceptually, scans all words in memory for pointers to the GC heap.
 Although conservative GC is sometimes looked down upon, there remains no
 cross-platform, or cross-compiler, mechanism for precise GC. Conservative GC is
 now used in systemically vital real-world systems (e.g.~the GC in Chrome's
-rendering engine~\citep{ager13oilpan} and JavaScriptCore~\laurie{jake: can we
-find a good JSC citation?}). Thus, despite conservative GC being theoretically unsound
+rendering engine~\citep{ager13oilpan} and WebKit~\citep{pizlo17riptide}). Thus, despite conservative GC being theoretically unsound
 in many programming languages and compilers, it is hard to imagine any system
-leaving it broken it for very long \laurie{cite the chrome bug}. We thus take
+leaving it broken it for very long~\citep{chromium20cssbug}. We thus take
 the practical soundness of conservative GC as a given. Currently, \ourgc uses
 the well-known Boehm-Demers-Weiser conservative collector
 (\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
