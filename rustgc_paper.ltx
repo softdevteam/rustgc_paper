@@ -69,7 +69,7 @@ finalisers when, and only when, a type is placed into a
 \lstinline{Gc<T>};
 (2) \emph{early finaliser prevention} inserts
 barriers that prevent optimisations such as scalar replacement from `tricking'
-the GC into collecting objects early;
+the GC into collecting values early;
 and (3) \emph{finaliser elision} statically optimises away many finalisers,
 by recognising that many destructors only free heap memory, and do not need
 to be run in a GC context. We validate \ourgc's performance with \laurie{...}.
@@ -101,14 +101,14 @@ fn main() {
 In this section we briefly show why some data structures that are easy to
 write in GCed languages are challenging in Rust.
 
-Rust uses affine types~\jake{cite TAPL}, with some extensions and relaxations,
-to statically guarantee that a \emph{value} has a
-single owner: an owner can \emph{move} that value to another owner; once
+Rust uses affine types~\jake{cite TAPL} and \emph{ownership}
+to statically guarantee that: a \emph{value} has a
+single owner (e.g.~a variable): an owner can \emph{move} that value to another owner; once
 the owner goes out of scope, then the value's \lstinline{drop} method (its destructor)
 is run and its memory can be reused. An owner can give references to a value
 to other code, subject to the following static restrictions: there can be
-multiple read-only \emph{references} (`\lstinline{&}') to an object or a single
-read-write reference (`\lstinline{&mut}').
+multiple read-only \emph{references} (`\lstinline{&}') to a value, or a single
+read-write reference (`\lstinline{&mut}'); references cannot outlast the owner.
 
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However, some
@@ -197,7 +197,7 @@ impl<T> Drop for Rc<T> {
   fn drop(&must self) {
     self.inner.count -= 1;
     if self.inner.count == 0 {
-      // deallocate inner object
+      // deallocate inner value
     }
   }
 }
