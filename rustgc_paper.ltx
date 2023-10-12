@@ -163,9 +163,7 @@ sadly the case that there remains no cross-platform, or cross-compiler,
 mechanism for precise GC.}, it is used in the
 two most widely used web browsers: Chrome uses it in its rendering
 engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
-VM~\citep{pizlo17riptide}. Thus, although conservative GC is theoretically unsound
-in many programming languages and compiler internal representations, it is hard to imagine any system
-leaving it broken it for very long~\citep{chromium20cssbug}. We thus take
+VM~\citep{pizlo17riptide}. We thus take
 the practical soundness of conservative GC as a given. Currently, \ourgc uses
 the well-known Boehm-Demers-Weiser conservative collector
 (\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
