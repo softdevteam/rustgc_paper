@@ -20,28 +20,26 @@ which provides solutions for these soundness and performance issues.
 
 \section{Introduction}
 
-Amongst the several ways one can divide programming languages are whether they
-are Garbage Collected (GCed) or not. GCed languages enable implicit memory management,
-whereas non-GCed languages have traditionally
-required explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
-\lstinline{free} functions). Rust, while not GCed, uses ownership to make
-memory management implicit, making many portions of many Rust programs as
-succinct as a GCed equivalent. However, ownership is too
-inflexible to express cyclic data-structures. Workarounds are cumbersome
-and have clear downsides, such as: reference counting either leaks
+Amongst the traditional ways one can classify programming languages are whether they
+are Garbage Collected (GCed) or not: GCed languages enable implicit memory management;
+non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
+\lstinline{free} functions). Rust's use of affine types and ownership does not
+fit within this classification: it is not GCed but it has implicit memory management.
+Many portions of many Rust programs are as
+succinct as a GCed equivalent but ownership is too
+inflexible to express cyclic data-structures. Workarounds have downsides such as:
+reference counting either leaks
 memory or requires juggling weak references; vectors-of-indices
 require manually encoding GC algorithms and cannot prevent dangling
 indices.
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
-type \lstinline{T} to the GC heap and then wrap a pointer to it. \lstinline{Gc<T>}
+type \lstinline{T} to the GC heap and then wraps a pointer to it. \lstinline{Gc<T>}
 can be \emph{cloned} (i.e.~duplicated) at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
 variables, variables on the stack, etc.) then the GC can reclaim the
-underlying memory.
-
-Unfortunately, the existing GCs for Rust we are aware of require sacrificing at
+underlying memory. Unfortunately, existing GCs for Rust require sacrificing at
 least one of ergonomics (e.g.~user-level GC libraries cannot allow types
 defined in external libraries to be put in the \lstinline{Gc<T>} type),
 soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
