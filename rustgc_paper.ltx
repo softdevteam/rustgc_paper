@@ -137,7 +137,8 @@ moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
 simple wrapper around a pointer to where \lstinline{v} is stored on the GC
 heap.
 
-Unlike most other GCs for Rust, however, \ourgc's \lstinline{Gc<T>} exposes a
+Unlike most other GCs for Rust\jake{I think this might too strong. Other GCs
+provide a Gc<T> so I'm not sure what you mean}, however, \ourgc's \lstinline{Gc<T>} exposes a
 deliberately similar API to to the reference counting type \lstinline{Rc<T>}
 found in the standard library because \lstinline{Rc<T>}: is conceptually
 similar to \lstinline{Gc<T>}; is widely used in Rust code, and so its API is
@@ -183,7 +184,9 @@ syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
 also cloneable.}. Across large code bases, this seemingly minor syntactic
 convenience can be a real boon: more importantly, it reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
-than duplicating an \lstinline{Rc<T>}.
+than duplicating an \lstinline{Rc<T>}\jake{Maybe here we should be clear that as
+a copyable type, its easier to use in Rust because it can bypass ownership/move
+semantics?}.
 
 
 \section{Destructors and Finalisers: Similarities and Differences}
