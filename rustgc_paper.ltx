@@ -160,7 +160,7 @@ inevitable that \ourgc must be a conservative GC (i.e.~scans all words in
 memory, irrespective of their compile-time type, for pointers to the GC heap).
 Although conservative GC is sometimes looked down upon\footnote{It is also
 sadly the case that there remains no cross-platform, or cross-compiler,
-mechanism for precise GC.}, it is used in the
+mechanism for precise GC.\jake{Unless we count handles as precise?}}, it is used in the
 two most widely used web browsers: Chrome uses it in its rendering
 engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
 VM~\citep{pizlo17riptide}. We thus take
@@ -193,9 +193,13 @@ than duplicating an \lstinline{Rc<T>}.
 Rust uses destructors pervasively in the form of \lstinline{Drop} methods.
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value is said to be
-\emph{dropped} and its \lstinline{drop} method called. Once the
+\emph{dropped} and its \lstinline{drop} method called\jake{not sure on the
+phrasing, the "and" implies calling drop is just one component of dropping. Can we say
+the value is said to be dropped "once" its drop method is called?}. Once the
 \lstinline{drop} method has completed, the value's underlying memory can be
-reused. For example, suitably simplified, the \lstinline{Rc<T>} type has the
+reused.\jake{This is true only for types whose drop methods call free on their heap
+allocations, but I think this sentence is confusing if we're explaining drop
+for the general case}For example, suitably simplified, the \lstinline{Rc<T>} type has the
 following \lstinline{Drop} method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
@@ -212,7 +216,12 @@ impl<T> Drop for Rc<T> {
 In this example, \lstinline{Rc<T>} contains a reference count and a pointer to
 a block of memory on the heap resulting from
 \lstinline{Box::into_raw(Box::new(...))} (which allocates heap memory with a
-\lstinline{Box} and then turns the \lstinline{Box} into a pointer to that heap memory).
+\lstinline{Box} and then turns the \lstinline{Box} into a pointer to that heap
+memory).\jake{I understand this, but i'm not sure a non-Rust programmer will.
+IMO it's an irrelevant detail, can we say:
+"from \lstinline{Rc::new} which allocates...". The \lstinline{into_raw} dance is
+just an unimportant (to us) design decision because rust wants to bottleneck all
+libstd allocations through box}
 The \lstinline{drop} method first decrements the reference count. If that count
 goes to zero then it also deallocates the heap memory for the underlying value
 (using the unsafe \lstinline{drop_in_place} function to drop the underlying
@@ -230,10 +239,14 @@ comfortable with.
 However, the details of finalisation reveal more troubles (our treatment and
 explanation is heavily influenced by~\citet{boehm03destructors}). For example,
 where are finalisers run? If we run them on the same thread as normal code we
-can create deadlocks. If we, as do BDWGC and \ourgc, run them on a separate
+can create deadlocks. If we, as do \boehm and \ourgc, run them on a separate
 thread we now have to think about the thread safety of both the value itself
 and the code it runs. This seemingly simple point makes clear that not
-all Rust types, or all Rust destructors, could be safe finalisers.
+all Rust types, or all Rust destructors, could be safe finalisers. \jake{There
+is also: Should we impose an order on finalisers? If we do, so that we can
+finalise cyclic objects, then drop methods cannot deref through fields of other
+GC types because they might have already been finalised. I don't know if this is
+worth mentioning here too.}
 
 
 \section{Finalisers background}
