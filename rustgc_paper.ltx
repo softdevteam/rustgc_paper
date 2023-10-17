@@ -124,72 +124,10 @@ introduce a type `S' which can reference other `S`s and show the problems with
 rc and rc/refcell?}
 
 
-\section{\ourgc: Basic Design Choices}
-
-The fundamental aim of \ourgc is to add GC for Rust in a way that is ergonomic,
-sound, and performant. In this section we briefly explain the basic design
-choices we made in \ourgc: later sections will tackle soundness and performance
-issues.
-
-At first glance, \ourgc seems similar to most other GCs for Rust, as it
-provides a \lstinline{Gc<T>} type. When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
-moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to where \lstinline{v} is stored on the GC
-heap.
-
-Most GCs for Rust expose a relatively small API for \lstinline{Gc<T>}. \ourgc
-deliberately exposes a fuller API modelled on the reference counting type \lstinline{Rc<T>}
-from Rust's standard library because \lstinline{Rc<T>}: is conceptually
-similar to \lstinline{Gc<T>}; is widely used in Rust code, and so its API is
-familiar; and its API reflects long-term experience about what Rust programmers
-need from such a type.
-
-One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
-ability to be transformed into a raw pointer (\lstinline{into_raw}) and
-back (\lstinline{from_raw}). These functions have a number of uses, ranging
-from pointer tagging (frequently used in GCing language VMs \laurie{find a citation})
-to passing values to foreign code. However, these features have
-a profound impact because Rust allows
-raw pointers to be converted to the integer type \lstinline{usize} and
-back. In other words, if \ourgc wants to allow GCed values to be converted
-into pointers and back again, it must be able to track
-pointers to GC values that are stored in Rust \lstinline{usize} values.
-
-Having acknowledged that pointers may end up disguised as integers, it is then
-inevitable that \ourgc must be a conservative GC (i.e.~scans all words in
-memory, irrespective of their compile-time type, for pointers to the GC heap).
-Although conservative GC is sometimes looked down upon\footnote{It is also
-sadly the case that there remains no cross-platform, or cross-compiler,
-mechanism for automated, precise GC.}, it is used in the
-two most widely used web browsers: Chrome uses it in its rendering
-engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
-VM~\citep{pizlo17riptide}. We thus take
-the practical soundness of conservative GC as a given. Currently, \ourgc uses
-the well-known Boehm-Demers-Weiser conservative collector
-(\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
-this paper will remain the same no matter what underlying conservative GC is
-used.
-
-Conservative GC enables \ourgc to make a useful ergonomic improvement over
-most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
-so requires executing arbitrary user code (in this case to increment / decrement
-reference counts). To make the possible run-time cost of this clear, Rust has
-no direct syntax for cloning: users must explicitly call \lstinline{Rc::clone(&x)}
-to duplicate a value \lstinline{x}. In contrast, since \lstinline{Gc<T>} is just a wrapper around a pointer it
-is not just cloneable but also \emph{copyable}: duplication only requires copying
-bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
-reducing the need for a function call entirely\footnote{The lengthier
-syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
-also cloneable.}. Across large code bases, this seemingly minor syntactic
-convenience can be a real boon because copying frees the programmer from Rust's normal
-restrictions on ownership and moving. It also reflects an underlying
-semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
-than duplicating an \lstinline{Rc<T>}.
-
-
 \section{Destructors vs.~Finalisers}
 \label{sec:finaliser_issues}
 
+In this section we look at the challenge of destructors for a GC for Rust.
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value's drop
@@ -252,18 +190,83 @@ prevents problems such as object resurrection~\cite{goetz21deprecated}.
 \laurie{jake, obvious question: do other GCs for Rust universally map destructors to finalisers? can we give an example of this causing a problem?}
 
 
-\section{\ourgc: GC for Rust}
+\section{\ourgc: Design Choices}
 
-At this point, we have one settled and one unsettled design decision for
-\ourgc: we want to support converting \lstinline{Gc<T>} instances into
-pointers, and thus \lstinline{usize}s, which means we must utilise conservative
-GC; but what should we do with drop methods? There are, broadly speaking, three
-possible design choices one could make.
+The fundamental aim of \ourgc is to add GC for Rust in a way that is ergonomic,
+sound, and performant. In this section we start with the basic design choices
+we made in \ourgc. We then outline the overall design choice we made for finalisers
+in \ourgc: the rest of the paper then fleshes out how to realise that design
+choice in a way that preserves soundness and ensures good performance.
+
+
+\subsection{Basic Design Choices}
+
+Like most GCs for Rust, \ourgc provides a \lstinline{Gc<T>} type.
+When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
+moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
+simple wrapper around a pointer to where \lstinline{v} is stored on the GC
+heap.
+
+Most GCs for Rust expose a relatively small API for \lstinline{Gc<T>}. \ourgc
+deliberately exposes a fuller API modelled on the reference counting type \lstinline{Rc<T>}
+from Rust's standard library because \lstinline{Rc<T>}: is conceptually
+similar to \lstinline{Gc<T>}; is widely used in Rust code, and so its API is
+familiar; and its API reflects long-term experience about what Rust programmers
+need from such a type.
+
+One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
+ability to be transformed into a raw pointer (\lstinline{into_raw}) and
+back (\lstinline{from_raw}). These functions have a number of uses, ranging
+from pointer tagging (frequently used in GCing language VMs \laurie{find a citation})
+to passing values to foreign code. However, these features have
+a profound impact because Rust allows
+raw pointers to be converted to the integer type \lstinline{usize} and
+back. In other words, if \ourgc wants to allow GCed values to be converted
+into pointers and back again, it must be able to track
+pointers to GC values that are stored in Rust \lstinline{usize} values.
+
+Having acknowledged that pointers may end up disguised as integers, it is then
+inevitable that \ourgc must be a conservative GC (i.e.~scans all words in
+memory, irrespective of their compile-time type, for pointers to the GC heap).
+Although conservative GC is sometimes looked down upon\footnote{It is also
+sadly the case that there remains no cross-platform, or cross-compiler,
+mechanism for automated, precise GC.}, it is used in the
+two most widely used web browsers: Chrome uses it in its rendering
+engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
+VM~\citep{pizlo17riptide}. We thus take
+the practical soundness of conservative GC as a given. Currently, \ourgc uses
+the well-known Boehm-Demers-Weiser conservative collector
+(\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
+this paper will remain the same no matter what underlying conservative GC is
+used.
+
+Conservative GC enables \ourgc to make a useful ergonomic improvement over
+most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
+so requires executing arbitrary user code (in this case to increment / decrement
+reference counts). To make the possible run-time cost of this clear, Rust has
+no direct syntax for cloning: users must explicitly call \lstinline{Rc::clone(&x)}
+to duplicate a value \lstinline{x}. In contrast, since \lstinline{Gc<T>} is just a wrapper around a pointer it
+is not just cloneable but also \emph{copyable}: duplication only requires copying
+bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
+reducing the need for a function call entirely\footnote{The lengthier
+syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
+also cloneable.}. Across large code bases, this seemingly minor syntactic
+convenience can be a real boon because copying frees the programmer from Rust's normal
+restrictions on ownership and moving. It also reflects an underlying
+semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
+than duplicating an \lstinline{Rc<T>}.
+
+
+\subsection{Finalisers in \ourgc}
+
+The decision to make \ourgc a conservative GC was relatively simple. A much
+more difficult question is: what should we do with drop methods? There are,
+broadly speaking, three possible design choices one could make.
 
 First, one could universally call drop methods from finalisers. However, this
 leads to soundness (i.e.~seemingly safe Rust code can lead to problems,
 including undefined behaviour, that should only be possible with unsafe code)
-and performance issues (since finalisers are costly).
+and performance (since finalisers are costly) issues.
 
 Second, one could require the programmer to manually implement one or more
 special methods/traits for each type they want to place in a \lstinline{Gc<T>}.
@@ -281,13 +284,11 @@ finalisers: types whose drop methods are safe can be automatically used in a
 \lstinline{Gc<T>}. Similarly, one could automatically analyse drop methods to
 see if they need to be called when a type is finalised or not.
 
-The allure of this third approach lies in automatically determining which
-drop methods are sound and which can be optimised away. Unsurprisingly, this
-is the approach we have taken in \ourgc. However, one way of achieving
-the first of these aims would be to define simple, onerous, rules that rule out most
-drop methods being used as finalisers --- we contend that such a GC
-would be of limited use and interest to Rust programmers. Thus the challenge
-is not so much in the overall design, but in the details: how can we identify
+This third approach may seem obviously the best choice, but it would
+be possible to achieve it by defining such onerous rules that most drop
+methods could not be used as finalisers. We contend that such a GC
+would be of limited use and interest to Rust programmers. Thus this third approach is
+as much an aim as it is a design choice: how can we identify
 as many drop methods as possible as sound and as many drop methods as possible
 as being unnecessary when used as finalisers? In the rest of this paper we
 explain more precisely the challenges in doing so, and \ourgc's solutions to
