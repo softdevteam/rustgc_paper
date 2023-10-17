@@ -113,7 +113,10 @@ read-write reference (`\lstinline{&mut}'); references cannot outlast the owner.
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However, some
 useful data structures cannot be expressed in a \emph{safe} (i.e.~fully statically
-checked by the compiler) manner, most notably cyclic data structures,
+checked by the compiler) manner, most notably cyclic data structures\jake{Are we
+saying cyclic because we tackle this later on with \ourgc? because it might be
+worth pointing out that Rust ownership alone actually struggles with any sort of
+shared ownership, even DAGs!},
 because, by definition, they require values to have more than one owner.
 
 \laurie{jake: can we find a minimal example here? linked lists are an obvious
@@ -121,17 +124,20 @@ one, but they're too complicated i think: we can at least reference
 \lstinline{https://rust-unofficial.github.io/too-many-lists/} as proof of that.
 maybe the bronze GC paper has some good examples. otherwise, maybe we just
 introduce a type `S' which can reference other `S`s and show the problems with
-rc and rc/refcell?}
+rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
 
 
 \section{Destructors vs.~Finalisers}
 \label{sec:finaliser_issues}
 
 In this section we look at the challenge of destructors for a GC for Rust.
-Rust uses destructors pervasively in the form of \emph{drop methods}.
+Rust uses destructors pervasively in the form of \emph{drop methods}.\jake{Do we
+need a footnote saying that drop is a trait, and types which implement it have
+destructors? Maybe liken it to the \lstinline{\~Foo()} destructor method in C++?}
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value's drop
-method is called. For example, suitably simplified, the \lstinline{Rc<T>} type has the
+method is called. For example, suitably simplified\jake{should we mention that we are
+ignoring weak pointers?}, the \lstinline{Rc<T>} type has the
 following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
@@ -139,7 +145,8 @@ impl<T> Drop for Rc<T> {
   fn drop(&must self) {
     self.inner.count -= 1;
     if self.inner.count == 0 {
-      unsafe { Box::into_raw(self.inner.block); }
+        unsafe { Box::into_raw(self.inner.block); } \jake{Shouldn't this be
+        \lstinline{Box::from_raw}}?
     }
   }
 }
@@ -155,7 +162,8 @@ method (which deallocates the underlying heap memory).
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
 about when destructors are called. This then enables a style of programming
-that originated in C++ called RAII (Resource Acquisition Is Initialization).
+that originated in C++ called RAII (Resource Acquisition Is
+Initialization)\jake{cite}.
 For example, Rust's standard \lstinline{Mutex} type has a method
 \lstinline{lock} which returns a \lstinline{MutexGuard} value;
 \lstinline{MutexGuard}'s drop method automatically unlocks the
@@ -169,25 +177,35 @@ most obvious difference between the two in \ourgc is that Rust programmers can
 statically determine when a destructor will be called, but GC finalisers are
 only called at some unspecified point in time after the last \lstinline{Gc<T>}
 reference to a GCed value is dropped. This delay is an inevitable part of any
-non-reference-counting GC and something we assume that users of \ourgc are
+non-reference-counting\jake{better to say tracing?} GC and something we assume that users of \ourgc are
 comfortable with.
 
 However, finalisation suffers from other, more subtle,
-issues~\cite{boehm03destructors}. For example, where are finalisers run? If we
+issues~\cite{boehm03destructors}.\jake{Before we get into the subtleties, should
+we mention in maybe a sentence in the para above the most well understood issue
+-- that finalisers are not guaranteed to run at all?} For example, where are finalisers run? If we
 run them on the same thread as normal code, then we can encounter similar
-challenges to Unix signal handlers: if normal code holds a mutex, and is then
+challenges to Unix signal handlers\jake{Unix people refer to these as async-safe
+functions. Not sure if it's worth mentioning this term so that people can more
+easily make the connection?}: if normal code holds a mutex, and is then
 interrupted by a finaliser which tries to lock that mutex, then the program has
 deadlocked. However, not all values, or \lstinline{drop} methods, can safely be
 run on another thread. A very different example is what to do with finalisers
 in values that form a cycle? A finaliser can then reference values that are
 partly, or wholly, `finalised' and it can `resurrect' finalised objects by
-copying their GC reference to the main part of a program. Issues such as these
+copying their GC reference to the main part of a program.\jake{Yes it can, but I
+think this mixes up two distinct problems: object resurrection can happen without cycles too. Resurrection is
+tackled by limiting finalisers to run at most once. For cycles, IMO the bigger
+problem is that a finaliser can point to a dangling reference, because it could
+deref an object that's already been finalised/deallocated.}Issues such as these
 have led to finalisers being viewed with increasing suspicion over time. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
 
 \laurie{jake, obvious question: do other GCs for Rust universally map destructors to finalisers? can we give an example of this causing a problem?}
+\jake{No. All the ones I've seen define their own \lstinline{Finalize} trait
+which duplicates drop code.}
 
 
 \section{\ourgc: Design Choices}
