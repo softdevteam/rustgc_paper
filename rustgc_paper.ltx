@@ -153,14 +153,11 @@ rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
 \label{sec:finaliser_issues}
 
 In this section we look at the challenge of destructors for a GC for Rust.
-Rust uses destructors pervasively in the form of \emph{drop methods}.\jake{Do we
-need a footnote saying that drop is a trait, and types which implement it have
-destructors? Maybe liken it to the \lstinline{\~Foo()} destructor method in C++?}
+Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value's drop
-method is called. For example, suitably simplified\jake{should we mention that we are
-ignoring weak pointers?}, the \lstinline{Rc<T>} type has the
-following drop method:
+method is called. For example, suitably simplified (e.g.~ignoring weak
+counts), the \lstinline{Rc<T>} type has the following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
@@ -174,7 +171,9 @@ impl<T> Drop for Rc<T> {
 }
 \end{lstlisting}
 
-In this example, \lstinline{Rc<T>} contains a reference count and a pointer to
+In this example, \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
+\emph{trait} (roughly equivalent to a Java interface) which then requires
+implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a reference count and a pointer to
 a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
 type (which allocates heap memory). Its drop method
 first decrements the reference count. If that count
@@ -183,9 +182,11 @@ and immediately goes out of scope, calling \lstinline{Box<T>}'s drop
 method (which deallocates the underlying heap memory).
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
-about when destructors are called. This then enables a style of programming
-that originated in C++ called RAII (Resource Acquisition Is
-Initialization)\jake{cite}.
+about when destructors are called\footnote{There are some exceptions: for
+example Rust's `temporary lifetime extension' can delay destruction, but how
+temporary values are kept alive is not currently fully defined.}. This then
+enables a style of programming that originated in C++ called RAII (Resource
+Acquisition Is Initialization)\jake{cite}.
 For example, Rust's standard \lstinline{Mutex} type has a method
 \lstinline{lock} which returns a \lstinline{MutexGuard} value;
 \lstinline{MutexGuard}'s drop method automatically unlocks the
@@ -194,33 +195,29 @@ a predictable point in the program, without having to explicitly call an unlock
 method.
 
 Destructors are a similar concept to GC finalisers: both concepts run user code
-just before the memory a value occupies can be reused by the wider system. The
-most obvious difference between the two in \ourgc is that Rust programmers can
-statically determine when a destructor will be called, but GC finalisers are
+just before the memory a value occupies can be reused by the wider system.
+There are two major differences. First, while Rust programmers can
+statically determine when a destructor will be called, GC finalisers are
 only called at some unspecified point in time after the last \lstinline{Gc<T>}
 reference to a GCed value is dropped. This delay is an inevitable part of any
 non-reference-counting\jake{better to say tracing?} GC and something we assume that users of \ourgc are
-comfortable with.
+comfortable with. Second, while Rust destructors are guaranteed
+to be called (with some minor exceptions), finalisers are not (though typically
+only those finalisers queued when a program exits are not run).
 
 However, finalisation suffers from other, more subtle,
-issues~\cite{boehm03destructors}.\jake{Before we get into the subtleties, should
-we mention in maybe a sentence in the para above the most well understood issue
--- that finalisers are not guaranteed to run at all?} For example, where are finalisers run? If we
+issues~\cite{boehm03destructors}. For example, where are finalisers run? If we
 run them on the same thread as normal code, then we can encounter similar
-challenges to Unix signal handlers\jake{Unix people refer to these as async-safe
-functions. Not sure if it's worth mentioning this term so that people can more
-easily make the connection?}: if normal code holds a mutex, and is then
+challenges to Unix signal handlers (where only `async-signal-safe' functions
+should be run): if normal code holds a mutex, and is then
 interrupted by a finaliser which tries to lock that mutex, then the program has
 deadlocked. However, not all values, or \lstinline{drop} methods, can safely be
 run on another thread. A very different example is what to do with finalisers
-in values that form a cycle? A finaliser can then reference values that are
-partly, or wholly, `finalised' and it can `resurrect' finalised objects by
-copying their GC reference to the main part of a program.\jake{Yes it can, but I
-think this mixes up two distinct problems: object resurrection can happen without cycles too. Resurrection is
-tackled by limiting finalisers to run at most once. For cycles, IMO the bigger
-problem is that a finaliser can point to a dangling reference, because it could
-deref an object that's already been finalised/deallocated.}Issues such as these
-have led to finalisers being viewed with increasing suspicion over time. Java,
+in values that form a cycle? In such a situation, a finaliser can reference
+values that are partly, or wholly, `finalised'. Other issues include the
+ability of finalisers to `resurrect' values by
+copying their GC reference to the main part of a program. Over time
+finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
