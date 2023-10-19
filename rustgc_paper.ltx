@@ -26,9 +26,9 @@ non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lsti
 \lstinline{free} functions). Rust's use of affine types and ownership does not
 fit within this classification: it is not GCed but it has implicit memory management.
 Many portions of many Rust programs are as
-succinct as a GCed equivalent but ownership is too
-inflexible to express cyclic data-structures. Workarounds have downsides such as:
-reference counting either leaks
+succinct as a GCed equivalent but ownership is too inflexible to express
+data-structures that require multiple owners (e.g.~cyclic data-structures).
+Workarounds have downsides such as: reference counting either leaks
 memory or requires juggling weak references; vectors-of-indices
 require manually encoding GC algorithms and cannot prevent dangling
 indices.
@@ -111,13 +111,35 @@ multiple read-only \emph{references} (`\lstinline{&}') to a value, or a single
 read-write reference (`\lstinline{&mut}'); references cannot outlast the owner.
 
 These basic rules allow many Rust programs to be written in a style that makes
-them indistinguishable from their equivalents in GCed languages. However, some
-useful data structures cannot be expressed in a \emph{safe} (i.e.~fully statically
-checked by the compiler) manner, most notably cyclic data structures\jake{Are we
-saying cyclic because we tackle this later on with \ourgc? because it might be
-worth pointing out that Rust ownership alone actually struggles with any sort of
-shared ownership, even DAGs!},
-because, by definition, they require values to have more than one owner.
+them indistinguishable from their equivalents in GCed languages. However,
+data structures that require values to have more than one owner cannot
+be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
+statically checked by the compiler). Instead, one must resort to indirect
+or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workarounds.
+
+Indirect workarounds include approaches such as vectors-of-indices. Instead of
+having direct Rust references to values, one uses an index into a vector. In
+essence the vector models RAM and the indices model pointers. Whereas
+dangling pointers cause insidious problems (generally leading to undefined
+behaviour), dangling indices fail in a safe way. However, as that suggests,
+`dangling' is still a problem. In essence, by modelling RAM and pointers, the
+programmer has also implicitly taken on the burden of determining when memory
+in the vector is no longer needed and can be reused. If one uses this technique
+to store cyclic data-structures, then one must encode GC techniques (e.g.~mark
+and sweep). It is easy to get these subtly wrong, and hard to make them run
+fast.
+
+Unsafe Rust allows programmers to bypass Rust's ownership rules, mostly by
+converting references to \emph{raw pointers}, manipulating the raw pointers
+(which have no ownership rules), and converting them back to references. Rust's
+standard library provides common unsafe datatypes such as the reference
+counting type \lstinline{Rc<T>}: a program written in safe Rust must assume
+that the unsafe datatype has been written with sufficient care that it does not
+accidentally undermine safe Rust's rules. However, unsafe data-structures on
+their own are not sufficient to directly encode cyclic data-structures. One
+can, for example, use the weak and strong counts of \lstinline{Rc<T>} to
+encode cyclic data-structures, but juggling the counts correctly is tricky:
+both early-reclamation and leaks are easily made.
 
 \laurie{jake: can we find a minimal example here? linked lists are an obvious
 one, but they're too complicated i think: we can at least reference
