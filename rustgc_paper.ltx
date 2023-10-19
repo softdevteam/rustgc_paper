@@ -5,11 +5,10 @@
 
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
-makes expressing programs with cyclic data structures awkward or inefficient.
+makes expressing data-structures whose values have multiple owners awkward or inefficient.
 Adding GC to Rust has previously required sacrificing
 at least one of ergonomics, performance, or soundness. We identify
-the major challenge for practical GC for Rust as destructors, which are used
-pervasively in Rust in the form of \lstinline{drop} methods. Mapping destructors
+the major challenge for practical GC for Rust as finalisers: mapping existing Rust destructors
 to GC finalisers seems natural but introduces subtle soundness, and significant
 performance, issues. In this paper we introduce \ourgc, a new GC for Rust,
 which provides solutions for these soundness and performance issues.
@@ -20,7 +19,7 @@ which provides solutions for these soundness and performance issues.
 
 \section{Introduction}
 
-Amongst the traditional ways one can classify programming languages are whether they
+Amongst the ways one can classify programming languages are whether they
 are Garbage Collected (GCed) or not: GCed languages enable implicit memory management;
 non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust's use of affine types and ownership does not
@@ -28,10 +27,7 @@ fit within this classification: it is not GCed but it has implicit memory manage
 Many portions of many Rust programs are as
 succinct as a GCed equivalent but ownership is too inflexible to express
 data-structures that require multiple owners (e.g.~cyclic data-structures).
-Workarounds have downsides such as: reference counting either leaks
-memory or requires juggling weak references; vectors-of-indices
-require manually encoding GC algorithms and cannot prevent dangling
-indices.
+Workarounds have downsides such as memory leaks, inflexibility, or complexity.
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
@@ -47,28 +43,31 @@ track indirect references, so seemingly safe programs can fail due to
 use-after-frees etc.), or performance (\laurie{use a sensible figure from the
 perf section}).
 
-In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
+In this paper we introduce \ourgc, a new tracing GC (i.e.~a `full' GC that,
+unlike reference counting, does not leak memory in the face of
+cycles~\cite{bacon04unified}) or Rust. \ourgc's basic design is
 similar to many other GCs for Rust, with some extensions to improve ergonomics.
-However, soundness and performance are harder issues, and the core of this
-paper. We identify the chief challenge for a sound,
+We identify the chief challenge for a sound,
 performant, GC for Rust as \emph{finalisers} (i.e.~code which is run just before a
 value is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
 is run just before a value is freed by Rust's implicit memory management)
 pervasively in the form of \lstinline{drop} methods. When a type
-\lstinline{T} with a destructor is placed in a \lstinline{Gc<T>} it is natural
+\lstinline{T} with a destructor is used with \lstinline{Gc<T>} it is natural
 to map its destructor to a finaliser. However, this introduces three
 problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
 and (3) finalisers are much slower than destructors.
 
-We introduce solutions for each of these problems, validating them in \ourgc:
+We introduce solutions for each of these problems:
 (1) \emph{finaliser safety analysis}
-extends Rust's type system to reject destructors that are unsafe to use as
-finalisers when, and only when, a type is placed into a
-\lstinline{Gc<T>};
+extends Rust's type system to reject programs which use type \lstinline{T} with
+\lstinline{Gc<T>} when \lstinline{T}'s destructor cannot be statically proven
+to be safe to use as a finaliser;
 (2) \emph{early finaliser prevention} inserts
 barriers that prevent optimisations such as scalar replacement from `tricking'
+\laurie{jake: for your early finaliser example, what (if anything!) was the
+optimisation (or just stack reuse?) that caused the finaliser to be called early?}
 the GC into collecting values early;
 and (3) \emph{finaliser elision} statically optimises away many finalisers,
 by recognising that many destructors only free heap memory, and do not need
@@ -76,8 +75,7 @@ to be run in a GC context. We validate \ourgc's performance with \laurie{...}.
 
 We do not pretend that \ourgc is a production-ready GC for Rust, but it is
 sufficiently polished to be usable for real programs: it has high-quality error
-messages and reasonable performance. We believe that finaliser safety analysis
-and finaliser elision will prove useful concepts for any future GC for Rust.
+messages and reasonable performance.
 
 \begin{figure}
 \begin{lstlisting}[
@@ -115,31 +113,16 @@ them indistinguishable from their equivalents in GCed languages. However,
 data structures that require values to have more than one owner cannot
 be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
 statically checked by the compiler). Instead, one must resort to indirect
-or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workarounds.
+and/or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workarounds.
 
-Indirect workarounds include approaches such as vectors-of-indices. Instead of
-having direct Rust references to values, one uses an index into a vector. In
-essence the vector models RAM and the indices model pointers. Whereas
-dangling pointers cause insidious problems (generally leading to undefined
-behaviour), dangling indices fail in a safe way. However, as that suggests,
-`dangling' is still a problem. In essence, by modelling RAM and pointers, the
-programmer has also implicitly taken on the burden of determining when memory
-in the vector is no longer needed and can be reused. If one uses this technique
-to store cyclic data-structures, then one must encode GC techniques (e.g.~mark
-and sweep). It is easy to get these subtly wrong, and hard to make them run
-fast.
-
-Unsafe Rust allows programmers to bypass Rust's ownership rules, mostly by
-converting references to \emph{raw pointers}, manipulating the raw pointers
-(which have no ownership rules), and converting them back to references. Rust's
-standard library provides common unsafe datatypes such as the reference
-counting type \lstinline{Rc<T>}: a program written in safe Rust must assume
-that the unsafe datatype has been written with sufficient care that it does not
-accidentally undermine safe Rust's rules. However, unsafe data-structures on
-their own are not sufficient to directly encode cyclic data-structures. One
-can, for example, use the weak and strong counts of \lstinline{Rc<T>} to
-encode cyclic data-structures, but juggling the counts correctly is tricky:
-both early-reclamation and leaks are easily made.
+Perhaps the most widely used workaround is to use the reference counting type
+\lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
+data-structures reference counting is a reasonable solution, but using it for
+cyclic data-structures requires juggling strong and weak counts, making it easy
+to accidentally reclaim, or leak, values. A different workaround is to use
+arenas, which tie the maximum lifetime of multiple objects to one another. Values
+can no longer be reclaimed too early, but nor can they be freed early if they are
+no longer needed, with obvious consequences for memory consumption.
 
 \laurie{jake: can we find a minimal example here? linked lists are an obvious
 one, but they're too complicated i think: we can at least reference
@@ -196,26 +179,21 @@ method.
 
 Destructors are a similar concept to GC finalisers: both concepts run user code
 just before the memory a value occupies can be reused by the wider system.
-There are two major differences. First, while Rust programmers can
-statically determine when a destructor will be called, GC finalisers are
+There is one obvious difference between the two: while Rust defines precisely
+when a destructor will be called, GC finalisers are
 only called at some unspecified point in time after the last \lstinline{Gc<T>}
 reference to a GCed value is dropped. This delay is an inevitable part of any
-non-reference-counting\jake{better to say tracing?} GC and something we assume that users of \ourgc are
-comfortable with. Second, while Rust destructors are guaranteed
-to be called (with some minor exceptions)\jake{This phrasing makes me
-uncomfortable. Rust doesn't guarantee that they're run and it's not just because
-of the uninitialized thing. It can also happen because of cycles, leaking via mem::forget,
-and FFI}, finalisers are not (though typically
-only those finalisers queued when a program exits are not run).
-
-However, finalisation suffers from other, more subtle,
-issues~\cite{boehm03destructors}. For example, where are finalisers run? If we
+tracing GC and something we assume that users of \ourgc are
+comfortable with. However, this then raises the question: where are finalisers run? If we
 run them on the same thread as normal code, then we can encounter similar
 challenges to Unix signal handlers (where only `async-signal-safe' functions
 should be run): if normal code holds a mutex, and is then
 interrupted by a finaliser which tries to lock that mutex, then the program has
 deadlocked. However, not all values, or \lstinline{drop} methods, can safely be
-run on another thread. A very different example is what to do with finalisers
+run on another thread.
+
+Indeed, finalisers in general have other subtle
+issues~\cite{boehm03destructors}. For example, what should we do with finalisers
 in values that form a cycle? In such a situation, a finaliser can reference
 values that are partly, or wholly, `finalised'. Other issues include the
 ability of finalisers to `resurrect' values by
@@ -317,16 +295,14 @@ cycles may still refer to partly or wholly finalised GCed values), but does
 so at the expense of forcing significant boilerplate and code duplication
 on the user.
 
-Third, one could analyse drop methods to determine if they are safe when run as
-finalisers: types whose drop methods are safe can be automatically used in a
-\lstinline{Gc<T>}. Similarly, one could automatically analyse drop methods to
-see if they need to be called when a type is finalised or not.
+Third, one could analyse drop methods to determine if: their destructors are
+safe to be run as finalisers; whether those drop methods need to be called at all
+when used as finalisers.
 
-This third approach may seem obviously the best choice, but it would
-be possible to achieve it by defining such onerous rules that most drop
-methods could not be used as finalisers.\jake{I don't think I understand this} We contend that such a GC
-would be of limited use and interest to Rust programmers. Thus this third approach is
-as much an aim as it is a design choice: how can we identify
+This third approach may seem obviously the best choice, but it is more of
+an aim than a design choice. A conservative analysis would be sound, but would
+rule out so many destructors that it would be of limited use. Put another way,
+the question we need to answer is: how can we identify
 as many drop methods as possible as sound and as many drop methods as possible
 as being unnecessary when used as finalisers? In the rest of this paper we
 explain more precisely the challenges in doing so, and \ourgc's solutions to
