@@ -101,7 +101,7 @@ fn main() {
 In this section we briefly show why some data structures that are easy to
 write in GCed languages are challenging in Rust.
 
-Rust uses affine types~\jake{cite TAPL} and \emph{ownership}
+Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} has a
 single owner (e.g.~a variable): an owner can \emph{move} that value to another owner; once
 the owner goes out of scope, then the value's \lstinline{drop} method (its destructor)
@@ -186,7 +186,7 @@ about when destructors are called\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
 temporary values are kept alive is not currently fully defined.}. This then
 enables a style of programming that originated in C++ called RAII (Resource
-Acquisition Is Initialization)\jake{cite}.
+Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
 For example, Rust's standard \lstinline{Mutex} type has a method
 \lstinline{lock} which returns a \lstinline{MutexGuard} value;
 \lstinline{MutexGuard}'s drop method automatically unlocks the
@@ -202,7 +202,10 @@ only called at some unspecified point in time after the last \lstinline{Gc<T>}
 reference to a GCed value is dropped. This delay is an inevitable part of any
 non-reference-counting\jake{better to say tracing?} GC and something we assume that users of \ourgc are
 comfortable with. Second, while Rust destructors are guaranteed
-to be called (with some minor exceptions), finalisers are not (though typically
+to be called (with some minor exceptions)\jake{This phrasing makes me
+uncomfortable. Rust doesn't guarantee that they're run and it's not just because
+of the uninitialized thing. It can also happen because of cycles, leaking via mem::forget,
+and FFI}, finalisers are not (though typically
 only those finalisers queued when a program exits are not run).
 
 However, finalisation suffers from other, more subtle,
@@ -323,7 +326,7 @@ see if they need to be called when a type is finalised or not.
 
 This third approach may seem obviously the best choice, but it would
 be possible to achieve it by defining such onerous rules that most drop
-methods could not be used as finalisers. We contend that such a GC
+methods could not be used as finalisers.\jake{I don't think I understand this} We contend that such a GC
 would be of limited use and interest to Rust programmers. Thus this third approach is
 as much an aim as it is a design choice: how can we identify
 as many drop methods as possible as sound and as many drop methods as possible
