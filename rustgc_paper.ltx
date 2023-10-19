@@ -306,7 +306,12 @@ performance issues because finalisers are more expensive to run than
 destructors.
 
 Second, one could require the programmer to manually implement finalisers
-for type they want to place in a \lstinline{Gc<T>}. For example, most other
+for type they want to place in a \lstinline{Gc<T>}.\jake{Here's a terminology
+issue that I struggled with a bit in my thesis. Technically speaking, it's
+"values of the type" or "objects of the type" that get placed inside a
+\lstinline{Gc<T>} because it's a runtime concept. When Rust docs talk about
+\lstinline{Rc<T>} they always say "values of type \lstinline{T}" when talking
+about the actual runtime objects.} For example, most other
 GCs for Rust (\laurie{e.g.~A and B}) require types to implement a
 a \lstinline{Finalizer} trait with a \lstinline{finaliser} method it. This
 trait is then required to satisfy \emph{bounds} (i.e.~restrictions that are,
