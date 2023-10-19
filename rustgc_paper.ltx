@@ -225,10 +225,6 @@ for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
 
-\laurie{jake, obvious question: do other GCs for Rust universally map destructors to finalisers? can we give an example of this causing a problem?}
-\jake{No. All the ones I've seen define their own \lstinline{Finalize} trait
-which duplicates drop code.}
-
 
 \section{\ourgc: Design Choices}
 
@@ -303,21 +299,23 @@ The decision to make \ourgc a conservative GC was relatively simple. A much
 more difficult question is: what should we do with drop methods? There are,
 broadly speaking, three possible design choices one could make.
 
-First, one could universally call drop methods from finalisers. However, this
-leads to soundness (i.e.~seemingly safe Rust code can lead to problems,
-including undefined behaviour, that should only be possible with unsafe code)
-and performance (since finalisers are costly) issues.
+First, one could universally call drop methods from finalisers. This would
+introduce soundness issues because, as we saw earlier, not all values and
+destructors can be run on a different thread. It would also introduce
+performance issues because finalisers are more expensive to run than
+destructors.
 
-Second, one could require the programmer to manually implement one or more
-special methods/traits for each type they want to place in a \lstinline{Gc<T>}.
-For example, a \lstinline{Finalizer} trait might require defining a finaliser
-method to be run when the type is placed in a \lstinline{Gc<T>}. By requiring
-this trait to implement Rust's standard \lstinline{Send + Sync} traits (which,
-roughly speaking, guarantee that a type is thread-safe), one would remove one
-source of unsoundness entirely. However, other soundness issues would remain
-and the requirement to implement `finaliser methods' would be onerous,
-especially as many of them would be functionally identical to the type's
-existing drop method.
+Second, one could require the programmer to manually implement finalisers
+for type they want to place in a \lstinline{Gc<T>}. For example, most other
+GCs for Rust (\laurie{e.g.~A and B}) require types to implement a
+a \lstinline{Finalizer} trait with a \lstinline{finaliser} method it. This
+trait is then required to satisfy \emph{bounds} (i.e.~restrictions that are,
+mostly, inferred automatically by \rustc) of \lstinline{Send + Sync} traits,
+which guarantee that the type to be finalised, and its finaliser, are thread
+safe. This solves some, but not all, soundness issues (e.g.~finalisers in
+cycles may still refer to partly or wholly finalised GCed values), but does
+so at the expense of forcing significant boilerplate and code duplication
+on the user.
 
 Third, one could analyse drop methods to determine if they are safe when run as
 finalisers: types whose drop methods are safe can be automatically used in a
