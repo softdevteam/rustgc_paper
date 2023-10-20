@@ -67,7 +67,9 @@ to be safe to use as a finaliser;
 (2) \emph{early finaliser prevention} inserts
 barriers that prevent optimisations such as scalar replacement from `tricking'
 \laurie{jake: for your early finaliser example, what (if anything!) was the
-optimisation (or just stack reuse?) that caused the finaliser to be called early?}
+optimisation (or just stack reuse?) that caused the finaliser to be called
+early?} \jake{It was register reuse: the compiler thought the outer object was
+never used again so it didnt hold onto the reference}
 the GC into collecting values early;
 and (3) \emph{finaliser elision} statically optimises away many finalisers,
 by recognising that many destructors only free heap memory, and do not need
@@ -119,7 +121,7 @@ Perhaps the most widely used workaround is to use the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
 data-structures reference counting is a reasonable solution, but using it for
 cyclic data-structures requires juggling strong and weak counts, making it easy
-to accidentally reclaim, or leak, values. A different workaround is to use
+to accidentally reclaim\jake{im not sure this is true?}, or leak, values. A different workaround is to use
 arenas, which tie the maximum lifetime of multiple objects to one another. Values
 can no longer be reclaimed too early, but nor can they be freed early if they are
 no longer needed, with obvious consequences for memory consumption.
@@ -147,12 +149,12 @@ impl<T> Drop for Rc<T> {
   fn drop(&must self) {
     self.inner.count -= 1;
     if self.inner.count == 0 {
-        unsafe { Box::into_raw(self.inner.block); } \jake{Shouldn't this be
-        \lstinline{Box::from_raw}}?
-    }
+        unsafe { Box::into_raw(self.inner.block); }
   }
 }
 \end{lstlisting}
+
+\jake{Shouldn't this example use \lstinline{Box::from_raw} instead?}
 
 In this example, \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
 \emph{trait} (roughly equivalent to a Java interface) which then requires
