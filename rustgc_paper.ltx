@@ -36,7 +36,7 @@ can be \emph{cloned} (i.e.~duplicated) at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
 variables, variables on the stack, etc.) then the GC can reclaim the
 underlying memory. Unfortunately, existing GCs for Rust require sacrificing at
-least one of ergonomics (e.g.~user-level GC libraries cannot allow types
+least one of ergonomics (e.g.~many user-level GC libraries cannot allow types
 defined in external libraries to be put in the \lstinline{Gc<T>} type),
 soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
 track indirect references, so seemingly safe programs can fail due to
@@ -200,16 +200,12 @@ finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
 
 
-\section{\ourgc: Design Choices}
+\section{\ourgc: Basic Design Choices}
 
 The fundamental aim of \ourgc is to add GC for Rust in a way that is ergonomic,
-sound, and performant. In this section we start with the basic design choices
-we made in \ourgc. We then outline the overall design choice we made for finalisers
-in \ourgc: the rest of the paper then fleshes out how to realise that design
-choice in a way that preserves soundness and ensures good performance.
-
-
-\subsection{Basic Design Choices}
+sound, and performant. In this section we outline with the basic design choices
+we made in \ourgc. The rest of the paper then fleshes the design out, showing
+how \ourgc ensure both soundness and good performance.
 
 Like most GCs for Rust, \ourgc provides a \lstinline{Gc<T>} type.
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
@@ -267,42 +263,26 @@ semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler op
 than duplicating an \lstinline{Rc<T>}.
 
 
-\subsection{Finalisers in \ourgc}
+\section{Finaliser Safety Analysis}
 
 The decision to make \ourgc a conservative GC was relatively simple. A much
-more difficult question is: what should we do with drop methods? There are,
-broadly speaking, three possible design choices one could make.
+more difficult question is: what should we do with drop methods and finalisers?
+There are, broadly speaking, three possible design choices: (1) universally
+call drop methods from finalisers and accept that this undermines soundness;
+(2) require programmers to manually implement a finaliser for each type they
+wish to GC and accept the resulting boilerplate; (3) analyse drop methods and
+automatically use those determined to be safe as finalisers. Existing GCs for Rust take the first
+\laurie{jake: do any take the first?} or second \laurie{jake: pick a couple as
+examples} approaches. \ourgc introduces the novel concept of \emph{Finaliser Safety Analysis} (FSA)
+as a way of realising the third approach.
 
-First, one could universally call drop methods from finalisers. This would
-introduce soundness issues because, as we saw earlier, not all values and
-destructors can be run on a different thread. It would also introduce
-performance issues because finalisers are more expensive to run than
-destructors.
+FSA is an extension to Rust's static checks that determines when a drop method
+can safely be used as a finaliser. FSA is designed to be a sound analysis
+(i.e.~without false positives), meaning that it is not complete --- a practical
+challenge for FSA is therefore to ensure it identifies enough safe drop methods
+to be useful.
 
-Second, one could require the programmer to manually implement finalisers
-for each type \lstinline{T} they use with \lstinline{Gc<T>}. For example, most other
-GCs for Rust (\laurie{e.g.~A and B}) require types to implement a
-a \lstinline{Finalizer} trait with a \lstinline{finaliser} method it. This
-trait is then required to satisfy \emph{bounds} (i.e.~restrictions that are,
-mostly, inferred automatically by \rustc) of \lstinline{Send + Sync} traits,
-which guarantee that the type to be finalised, and its finaliser, are thread
-safe. This solves some, but not all, soundness issues (e.g.~finalisers in
-cycles may still refer to partly or wholly finalised GCed values), but does
-so at the expense of forcing significant boilerplate and code duplication
-on the user.
-
-Third, one could analyse drop methods to determine if: their destructors are
-safe to be run as finalisers; whether those drop methods need to be called at all
-when used as finalisers.
-
-This third approach may seem obviously the best choice, but it is more of
-an aim than a design choice. A conservative analysis would be sound, but would
-rule out so many destructors that it would be of limited use. Put another way,
-the question we need to answer is: how can we identify
-as many drop methods as possible as sound and as many drop methods as possible
-as being unnecessary when used as finalisers? In the rest of this paper we
-explain more precisely the challenges in doing so, and \ourgc's solutions to
-those challenges.
+\laurie{remember to mention auto-traits and type coherence here}
 
 
 \section{Finalisers background}
