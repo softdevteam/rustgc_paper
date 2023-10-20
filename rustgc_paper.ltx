@@ -163,7 +163,7 @@ method (which deallocates the underlying heap memory).
 Rust has simple, well-defined rules that allow programmers to accurately reason
 about when destructors are called\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
-temporary values are kept alive is not currently fully defined.}. This then
+long temporary values are kept alive for is not currently fully defined.}. This then
 enables a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
 For example, Rust's standard \lstinline{Mutex} type has a method
