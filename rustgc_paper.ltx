@@ -64,12 +64,8 @@ We introduce solutions for each of these problems:
 extends Rust's type system to reject programs which use type \lstinline{T} with
 \lstinline{Gc<T>} when \lstinline{T}'s destructor cannot be statically proven
 to be safe to use as a finaliser;
-(2) \emph{early finaliser prevention} inserts
-barriers that prevent optimisations such as scalar replacement from `tricking'
-\laurie{jake: for your early finaliser example, what (if anything!) was the
-optimisation (or just stack reuse?) that caused the finaliser to be called
-early?} \jake{It was register reuse: the compiler thought the outer object was
-never used again so it didnt hold onto the reference}
+(2) \emph{early finaliser prevention} inserts barriers that prevent factors
+such as optimisations or register allocation from `tricking'
 the GC into collecting values early;
 and (3) \emph{finaliser elision} statically optimises away many finalisers,
 by recognising that many destructors only free heap memory, and do not need
@@ -149,12 +145,10 @@ impl<T> Drop for Rc<T> {
   fn drop(&must self) {
     self.inner.count -= 1;
     if self.inner.count == 0 {
-        unsafe { Box::into_raw(self.inner.block); }
+        unsafe { Box::from_raw(self.inner.block); }
   }
 }
 \end{lstlisting}
-
-\jake{Shouldn't this example use \lstinline{Box::from_raw} instead?}
 
 In this example, \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
 \emph{trait} (roughly equivalent to a Java interface) which then requires
@@ -162,8 +156,8 @@ implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a refe
 a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
 type (which allocates heap memory). Its drop method
 first decrements the reference count. If that count
-goes to zero then the \lstinline{Box<T>} is reconstituted from its raw pointer,
-and immediately goes out of scope, calling \lstinline{Box<T>}'s drop
+goes to zero then the \lstinline{Box<T>} is reconstituted from its raw pointer
+(with \lstinline{from_raw}, and immediately goes out of scope, calling \lstinline{Box<T>}'s drop
 method (which deallocates the underlying heap memory).
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
