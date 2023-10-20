@@ -285,912 +285,6 @@ to be useful.
 \laurie{remember to mention auto-traits and type coherence here}
 
 
-\section{Finalisers background}
-\label{bg:advanced_finalisers}
-
-Finalisers are a common component of most tracing GCs which are used to run code
-for cleanup once an object dies (e.g.~closing a file handle or a database
-connection). Unfortunately, finalisation is fraught with problems, many of which
-are subtle and difficult to detect. In this section, I outline these general
-issues across languages and implementations, and how existing GCs have mitigated
-them. This is necessary to understand the design decisions that \ourgc has made
-to ensure that its own finalisers are sound.
-
-\subsection{Finalisers are not guaranteed to run}
-
-Most GC specifications are usually cautious about making guarantees about
-finaliser behaviour, often for correctness reasons. In fact, in any GC,
-finalisers are never guaranteed to be called at all. While this is true for
-destructors in languages such as C++ and Rust too, its more likely to happen
-with finalisers for several reasons. First, the window between when an object
-is last used by the mutator and when it is finalised is greater, so the
-opportunity for missed finalisers is greater if the program exits within this
-window.
-
-Second, a program may accidentally hold onto a reference to an object which the
-programmer expects to be freed, thus preventing its finaliser from being called.
-In some cases, this type of memory leak can be due to programmer error, and is
-not a problem exclusive to finalisers. However, because a GC can
-over-approximate the root-set when marking, this can happen by means outside of
-the programmer's control. For example, a conservative GC may retain objects from
-a previous collection (known as \emph{floating garbage}) because of a lingering
-reference in a disused stack slot. This would prevent those objects' finalisers
-from ever being called.
-
-Finally, note that in \autoref{bg:finaliser_order}, a GC which guarantees
-finalisation order will not finalise objects with finalisation cycles because it
-cannot determine a safe order in which to run them.
-
-\begin{figure}[t!]
-\begin{lstlisting}
-class Count {
-    public static Count globalCount = null;
-    int count = 0;
-
-    @Override
-    protected void finalize() {
-        // Resurrect object by keeping a reference to it alive
-        globalCount = this;
-    }
-}
-\end{lstlisting}
-    \caption{An example of a Java program with object resurrection. The
-    finaliser for \lstinline{Count} places a reference to its instance in a
-    static, causing the collector to keep it alive (line 8). If Java allowed
-    \lstinline{finalise} to be called more than once, this object would never be
-    reclaimed, as it would keep being resurrected.}
-    \label{java_resurrection}
-\end{figure}
-
-\subsection{Object resurrection}
-
-\emph{Object resurrection} is where a finaliser method stores a reference to its object
-in a global data structure or the field of another object, preventing it from
-being reclaimed. Object resurrection can lead to objects being kept alive longer
-than expected and is often difficult to detect. If an object's finaliser could
-run more than once, a resurrected object would be re-finalised and thus
-resurrected again ad infinitum (\autoref{java_resurrection}). To prevent this,
-most GC'd languages such as Java and C\# guarantee that an object's finaliser
-will be run at most once. This is also true of \ourgc.
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=0.9\textwidth]{images/ordered_finalisation.pdf}
-    \caption{An example of ordered finalisation where the finalisers reference
-    their inner objects. This object graph will be finalised in order from the
-    outermost layer (\textbf{A}) to the innermost (\textbf{D}). Finalising this
-    object graph requires four finalisation cycles because each inner object is
-    reachable from the outer layer.}
-\label{fig:ordered_finalisation}
-\end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \subfloat[\centering Original order]{\includegraphics[width=0.4\textwidth]{images/finaliser_cycle1.pdf}}
-    \hfill
-    \subfloat[\centering Refactored to handle
-    cycles]{\includegraphics[width=0.4\textwidth]{images/finaliser_cycle2.pdf}}
-    \caption{An example from \citet[p.~218]{jones16garbage} which shows how
-    objects can be restructured to force finalisation order in cyclic object
-    graphs.}
-\label{fig:finaliser_cycles}
-\end{figure}
-
-\subsection{Finaliser ordering}
-\label{bg:finaliser_order}
-
-
-A language implementation has a choice as to whether to guarantee that
-finalisers will run in a certain order. Some GCs implementations guarantee a
-finalisation order, because for some applications, this is important if one
-resource must be cleaned up before another.
-
-For example, consider the objects in~\autoref{fig:ordered_finalisation}. The
-finalisers for the ``outer'' objects all reference the object in the layer
-to the right of them, so they must be finalised ``outside-in''.
-
-However, this guaranteed finalisation order has two disadvantages. First,
-finalising all the objects in a chain of floating garbage happens over multiple
-finalisation cycles because an object can only be finalised if it is not reachable
-from other unreachable objects. In~\autoref{fig:ordered_finalisation}, this
-would require four finalisation cycles before the floating garbage is reclaimed.
-Such a delay in the eventual reclamation of objects can cause \emph{heap drag},
-where unreachable objects are kept alive longer than necessary.
-
-Second, and most significantly, this approach is not able to finalise cycles of
-objects where more than one object needs finalising, which can lead to resource
-leaks. This is because the collector cannot know which (if any) object is safe
-to finalise first: if an object references another object which has already been
-finalised, this is unsound. Boehm proposes a workaround for this where
-programmers can refactor the objects in order to break the finalisation
-cycle~\citep{boehm03destructors} (\autoref{fig:finaliser_cycles} from
-\citet[p.~218]{jones16garbage}). Another workaround is to allow users to use weak
-references to break cycles (similar to breaking reference count cycles).
-Unfortunately this is often difficult to implement
-correctly~\citep{jones16garbage}.
-
-Some GCs such as Blink's Oilpan GC~\citep{ager13oilpan} do not specify a finalisation order. This
-permits the GC to finalise cycles of objects where more than one object needs
-finalising with an important restriction placed on the programmer: an object's finaliser must not reference
-any other object. This caveat is necessary to prevent dereferencing an already
-finalised object. This approach is used in V8: finalisers are not able to
-dereference through to other JavaScript objects. In the rare cases where this is
-too restrictive, Oilpan also has pre-finalisers, which are run during the GC's
-stop-the-world pause, and allow object fields to be
-dereferenced~\citep{ager13oilpan}. The compromise here is performance:
-pre-finalisers increase the mutator pause time and cannot be enqueued to run
-later.
-
-\subsection{Finalisers and deadlocks}
-\label{bg:synchronisation}
-
-It is common in many languages for finalisers to access fields from other
-objects or even global state. Since an object's finaliser is run at some unknown
-point in time once it is considered unreachable by the collector, it must be
-able to safely access such state without racing with the mutator.
-
-\begin{figure}[t!]
-\begin{lstlisting}
-class X {
-    Count count;
-
-    @Override
-    protected void finalize() {
-        count.increment();
-    }
-
-    public static void main(String[] args) {
-        Count count = new Count();
-        X x = new X(count);
-
-        ...
-
-        count.increment();
-}
-
-class Count {
-    Mutex mutex = new Mutex();
-    int count = 0;
-
-    public void increment() {
-        try {
-            mutex.acquire();
-            count++;
-        }
-        catch (InterruptedException e) {
-            e.printStackTrace();
-        } finally {
-           mutex.release();
-        }
-    }
-}
-\end{lstlisting}
-    \caption{An example Java program showing how a finaliser could deadlock if
-    run from the same thread as the mutator. The \lstinline{Count} object has a
-    method \lstinline{increment} which acquires a mutex (line 22). A new
-    instance of \lstinline{Count} is created and a reference to it
-    passed to a new instance of \lstinline{X} (lines 10-11). If the collector
-    decided to invoke \lstinline{X.finalize()} while the mutator executes
-    \lstinline{count.increment()} on line 15, then the program will deadlock as
-    they both try to acquire the mutex on the same thread. This can be solved by
-    ensuring that finalisers run on a separate thread to the mutator: the
-    finaliser thread would simply spin or sleep while it waits for the mutator
-    to release the mutex.}
-    \label{java_finaliser_deadlock}
-\end{figure}
-
-It is common in many languages for finalisers to access fields from other
-objects or even global state. Since an object's finaliser is run at some unknown
-point in time once it is considered unreachable by the collector, it must be
-able to safely access such state without racing with the mutator. If a finaliser
-runs on a separate thread to the mutator, it's clear that data accessed from a
-finaliser must be performed in a way which is thread-safe. However, what's less
-obvious is that for correctness reasons, finalisers cannot be scheduled to run
-on the mutator thread.
-
-\autoref{java_finaliser_deadlock} shows how finalisers run on the same thread as
-the mutator can cause a deadlock. When the finaliser for an instance of
-\lstinline{Counter} is called, it tries to acquire the lock for the object's
-\lstinline{count} member. If this happens while the mutator already holds the
-lock, the program will deadlock. While one might consider using re-entrant locks
-to solve this problem, it can in fact worsen the problem by turning an obvious
-failure into a race where two logically separate operations mutate data in a way
-which should be performed atomically. This can cause intermittent incorrect
-execution~\citep{boehm03destructors}.
-
-For this reason, most languages run finalisers on a separate thread from the
-mutator~\citep{boehm03destructors}. Though programmers must still ensure they access
-shared state via some form of synchronisation such as mutexes, they are able to
-spin or sleep when blocked, allowing the mutator to progress without
-deadlocking.
-
-\subsection{Finalisers can run earlier than expected}
-\label{bg:early_finalisation}
-
-Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
-are called by a garbage collector non-deterministically. They can run at the
-collector's leisure; often this means that they run later than desired, however,
-in rare cases, an object can be finalised while it is still being used by the
-mutator! This is because compiler optimisations -- unaware of the presence of a
-GC -- can remove the single reference to an object which is keeping it alive. An
-outer object can therefore be considered unreachable while its inner object is
-still in use. An unfortunately timed GC cycle could  end up finalising the outer
-object, and run its finaliser. This can lead to subtle races in programs where
-the finaliser interleaves execution with the mutator.
-
-For this reason, VM specifications do not commit to running finalisers at a
-specific time. This includes allowing an object's finaliser to be run while the
-mutator is potentially still using it. For the reasons outlined in
-\autoref{bg:synchronisation}, GC implementations must synchronise access to
-objects inside a finaliser. \citet[p~.218]{jones16garbage} suggests this can be
-used to defer finalisation until later if a finaliser attempts to acquire an
-object lock which is already held by the mutator.
-
-More generally, however, the fundamental problem is that the compiler optimises
-away the reference to the object too soon. C\#'s .NET runtime
-provides a \lstinline{gc.KeepAlive} function as a solution to this.
-\lstinline{gc.KeepAlive} is an opaque empty function which the compiler cannot
-optimise away. The idea is that a reference to an object can be passed to
-\lstinline{gc.KeepAlive}, ensuring it lives long enough so that the collector
-does not deem it unreachable and finalise it too soon. This mitigation is
-limited, however, as it is up to the user to call \lstinline{gc.KeepAlive} when
-they require it.
-
-\newpage
-
-\section{Rust destructors}
-
-\label{destructors_detailed}
-
-To understand the design decisions that \ourgc makes surrounding finalisation,
-some background is needed on Rust's destructors.
-
-Destructors in Rust were briefly introduced in \autoref{bg:basic_destructors} as
-a way of running cleanup code when an initialized variable or temporary goes out
-of scope. A destructor is run automatically at the end of the scope for values
-which implement the \lstinline{Drop} trait. Consider the following example,
-which uses a Rust destructor to close a file descriptor:
-
-\begin{lstrustsmall}
-struct FileDescriptor {
-    fd: u64
-}
-
-impl Drop for FileDescriptor {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-fn main() {
-    let f = FileDescriptor { fd: 1 };
-} // FileDescriptor::drop called.
-\end{lstrustsmall}
-
-The file descriptor \lstinline{f} is destructed (or \emph{dropped}) at the end
-of the \lstinline{main} function, where it is no longer in scope. The ability to
-drop objects is a key component of Rust's ownership semantics, and is used
-extensively in the standard library.
-
-A struct which has a drop implementation may have fields which also need
-dropping. For example, consider a \lstinline{FileBuffer}, which has a field of
-type \lstinline{FileDescriptor}:
-
-\begin{lstrustsmall}
-struct FileBuffer {
-    descriptor: FileDescriptor,
-}
-
-impl Drop for FileBuffer {
-    fn drop(&mut self) {
-        self.flush();
-    }
-}
-\end{lstrustsmall}
-
-Here, both the \lstinline{FileBuffer} and its field \lstinline{FileDescriptor}
-have drop methods which need running. Rust will automatically insert calls
-to drop them both when a \lstinline{FileBuffer} value goes out of scope. In Rust
-terminology, a value is considered dropped once its drop method, and all drop
-methods belonging to its fields, have been dropped.
-
-\subsubsection{Rust drop order}
-
-\label{rust_drop_order}
-
-Drop methods are used by Rust programmers for situations such as releasing
-locks. In such cases, the order in which values are dropped is vital for
-program correctness.
-
-Variables and temporaries are dropped in reverse declaration order. For example:
-
-\begin{lstrustsmall}
-fn main() {
-    let s1 = String::from("s1");
-    let s2 = String::from("s2");
-    let s3 = String::from("s3");
-}
-\end{lstrustsmall}
-
-At the end of \lstinline{main}, \lstinline{s3} would be dropped first, followed
-by \lstinline{s2}, and finally \lstinline{s1}.
-
-Rust specifies that fields are dropped in declaration order. For example,
-consider the following struct definition:
-
-\begin{lstrustsmall}
-impl Drop for S {
-    fn drop(&mut self) {
-        println!("Dropping S");
-    }
-}
-
-struct S  {
-    a: String,
-    b: u64, // u64 does not implement the `Drop` trait.
-    c: Vec<bool>,
-}
-\end{lstrustsmall}
-
-\lstinline{S} contains two fields (\lstinline{a} and \lstinline{c})
-which also need dropping. Rust will drop \lstinline{S} first, followed by
-the field \lstinline{a}, and then the field \lstinline{c}.
-
-If any component of a type implements \lstinline{Drop}, Rust will drop them when
-they go out of scope. For example, consider an enum \lstinline{E} (a tagged
-union), where one variant needs dropping:
-
-\begin{lstrustsmall}
-enum E  {
-    A(String),
-    B(bool),
-}
-\end{lstrustsmall}
-
-Even though \lstinline{E} does not have a drop method, when it goes out of scope,
-Rust will still insert a drop call because the variant \lstinline{E::A} contains
-a droppable type, \lstinline{String}. It's not possible to know at runtime which
-variant of the enum is active, so Rust inserts some additional code which checks
-dynamically which variant (if any) to drop.
-
-
-Since Rust ensures that drop methods are called automatically, it is not
-possible to call the drop method for a value (or any of its fields) directly.
-This ensures that a value is only dropped once, an important protection against
-double-freeing resources. This can be restrictive, because sometimes it's useful
-to drop a value earlier than at the end of its scope. Consider a common example,
-where a \lstinline{Mutex}'s lock is released from its drop method:
-
-\begin{lstrustsmall}
-fn main() {
-    let mutex = Mutex::new(123); // A mutex which guards a u64 value.
-    let data = mutex.lock().unwrap();
-    println("locked value: {}", data);
-
-    // Code that shouldn't belong in the critical section
-    ...
-} // lock is released as part of drop.
-\end{lstrustsmall}
-
-By unlocking the mutex at the end of main, sometimes we can execute more code
-than is necessary in the critical section. Rust provides a standard library
-helper function, \lstinline{std::mem::drop} which can accept values of any type
-in order to drop them early:
-
-\begin{lstrustsmall}
-fn main() {
-    let mutex = Mutex::new(123); // A mutex which guards a u64 value.
-    let data = mutex.lock().unwrap();
-    println("locked value: {}", data);
-
-    // Release the lock early
-    std::mem::drop(data);
-
-    // Code that shouldn't belong in the critical section
-    ...
-} // lock is released as part of drop.
-\end{lstrustsmall}
-
-\lstinline{std::main::drop} is implemented as an empty function. Since ownership
-of \lstinline{data} is transferred (line 7), Rust will insert a call to
-\lstinline{data}'s drop method immediately afterwards.
-
-\subsubsection{Drop methods are not guaranteed to run}
-
-Destructors in Rust are guaranteed to run at most once --- but they may not be
-run at all. This is for three reasons.
-
-First, consider the example back in \autoref{ch:rust} (\autoref{rc_cycle_drop}) where a cycle is created
-between two \lstinline{Rc} values. A reference cycle such as this introduces a
-memory leak and thus the values in this data structure are never dropped.
-
-Second, values are only dropped if they are initialized. It is not always
-possible to know whether a value is initialised so Rust can sometimes end up
-performing dynamic checks to know whether a value should be dropped. The details
-of this are not relevant to the rest of the thesis.
-
-Third, one can explicitly prevent a value from being dropped by passing it to
-the \lstinline{std::mem::forget<T>} function. This is commonly used when the
-underlying resource originated from non-Rust code, and therefore destruction of
-it should happen outside of Rust.
-
-\subsubsection{What types can be dropped?}
-
-\label{bg:drop_what_types}
-
-In short, Rust will automatically call drop for any type which implements the
-\lstinline{Drop} trait when it goes out of scope. However, copyable types
-(those which implement the \lstinline{Copy} trait, mostly primitive
-types such as \lstinline{bool}s, \lstinline{char}s, numeric types and so on)
-cannot implement Drop because doing so would mean that
-when values are copied they would be dropped multiple times. This
-would violate Rust's guarantee that drop is called at most once.
-
-Rust also supports C-like union types, which in contrast to enums do not use
-runtime tags to denote the active variant. Union types are not automatically
-dropped because there is no way for Rust to know which variant to insert a drop
-method for.
-
-
-\section{Soundness in \ourgc}
-
-\begin{itemize}
-    \item \emph{Early finaliser prevention} guarantees that finalisers will not
-        be run if any part an object may still be in use.
-        before all parts of an object are provably not used. This occurs
-        because compiler optimisations such as scalar replacement can extract
-        part of an object, making the object seem unused, even though its
-        finaliser may refer to the extracted parts.
-
-    \item \emph{Finaliser safety analysis} is an extension to Rust's type
-        system that statically rejects destructors that are unsafe to use as
-        finalisers when, and only when, a type is placed into a
-        \lstinline{Gc<T>}. Finaliser safety analysis not only solves issues
-        specific to destructors-as-finalisers in Rust, but also issues that
-        affect most other GCed languages (e.g.~object resurrection).
-
-    \item \emph{Finaliser Elision} statically optimises away many finalisers,
-        significantly reducing performance overhead. The basic observation is
-        that common Rust types (e.g.~\lstinline{Vec}) only have a destructor to
-        free their backing memory on the heap: \ourgc allocates this backing
-        memory on the GC heap so that it is freed without the need for a
-        destructor. By recursively tracking elided finalisers, many types that
-        need a destructor do not need a finaliser.
-\end{itemize}
-
-\section{Design choices for finalisers in Rust}
-
-Before explaining finalisation in \ourgc, we should ask an over-arching design
-question: what should a finaliser in a Rust GC look like? Other approaches to GC
-in Rust, such as \rustgc and \bronze define a custom \lstinline{Finalize} trait,
-which types can implement to specify finaliser behaviour when they are used in a
-\lstinline{Gc} (shown in \autoref{lst:finalise_trait}).
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-struct S;
-
-impl Drop for S {
-    fn drop(&mut self) {
-        println!("Dropping S");
-    }
-}
-
-impl Finalize for S {
-    // Run before collection when value used in a `Gc`.
-    fn finalize(&mut self) {
-        println!("Finalizing S");
-    }
-}
-
-fn main() {
-    let s1 = S;
-    let s2 = S;
-
-    let gc1 = Gc::new(s2);
-} // Dropping s1
-\end{lstrustsmall}
-    \caption{An example from \rustgc, where a custom \lstinline{Finalize} trait
-    is used for finalisation semantics. In this scenario, before \lstinline{s2}
-    is collected, \rustgc calls \lstinline{S}'s \lstinline{finalize} method
-    (line 11).}
-    \label{lst:finalise_trait}
-\end{figure}
-
-
-The benefit of this approach is that it creates a logical separation between
-destructors expected to run in an RAII based context, and GC finalisers. This
-allows finalisers, which have subtly different rules to destructors, to be
-correctly specified by the user (as we will see in
-\autoref{ourgc:threadsafe_finalisation}, there are specific restrictions that need to be placed on
-finalisers in Rust in order to guarantee soundness).
-
-\ourgc takes a different approach, however, as separating destruction and
-finalisation in this way has unfortunate consequences. First, for most types
-that already implement Drop, their destruction logic must be duplicated in a
-finaliser. This is, at least, significant extra effort; it also offers many
-opportunities for copy and paste errors.
-
-Second, a separate \lstinline{Finalize} trait has as a major ergonomic cost
-because it's not possible to implement \lstinline{Finalize} on code from
-external libraries. This is because Rust enforces \emph{trait coherence}, a
-property in the language which ensures that every type has at most one
-implementation of a given trait. This coherence rule is fundamental to the
-language, because it removes ambiguity in trait method resolution, ensuring
-there is only one implementation of a trait method to choose from.
-
-Trait coherence is a problem for programs that use external compilation
-units known as \emph{crates} (roughly speaking, `libraries'), because if two
-unrelated crates provide separate implementations for the same trait, then those
-crates cannot be imported together.
-\begin{figure}[t!]
-% Hack to get the listing in the figure
-\newsavebox{\orphanalisting}
-\begin{lrbox}{\orphanalisting}
-\begin{lstrustsmall}
-use a::{MyType, MyTrait};
-
-impl MyTrait for MyType {
-    fn method1() {
-        ...
-    }
-
-    fn method2() {
-        ...
-    }
-}
-
-\end{lstrustsmall}
-\end{lrbox}
-
-\newsavebox{\orphanblisting}
-\begin{lrbox}{\orphanblisting}
-\begin{lstrustsmall}
-error[E0117]: only traits defined in the current
-              crate can be implemented for types
-              defined outside of the crate
- --> src/lib.rs:3:1
-3 | impl MyTrait for MyType {}
-  | ^^^^^^^^^^^^^^^^^------
-  | |                |
-  | |                `MyType` is not defined in
-  | |                the current crate
-  | impl doesn't use only types from inside the
-  | current crate
-
-\end{lstrustsmall}
-\end{lrbox}
-    \centering
-    \subfloat[\centering Invalid trait implementations]{\usebox{\orphanalisting}}
-    \hfill
-    \subfloat[\centering Compiler error]{\usebox{\orphanblisting}}
-    \caption{
-        Here, we try to provide an implementation of the externally defined
-        trait, \lstinline{MyTrait} for the externally defined type,
-        \lstinline{MyType}. This results in a compile error in Rust because it
-        violates the orphan rule.}
-    \label{lst:coherence}
-\end{figure}
-
-To address this, traits in Rust must adhere to something called the \emph{orphan
-rule}. The rule is simple: it is not possible to implement a trait for a type
-where both the trait and the type are defined in separate crates. This prevents
-multiple conflicting trait implementations from existing across crates.
-\autoref{lst:coherence} shows how the orphan rule is enforced at compile-time in
-Rust.
-
-The problem with the orphan rule is that it would become a major source of
-ergonomic frustration for \ourgc if it defined a separate \lstinline{Finalize}
-trait. It would not be possible to implement \lstinline{Finalize} for any type
-which was not defined in the user's current crate. If types from external crates
-do not provide their own implementations for \lstinline{Finalize}, then those
-types may cause resource leaks when used in a \lstinline{Gc}.
-
-A workaround for the orphan rule is to use the \emph{new-type idiom}, where the
-current crate defines a wrapper type for an external type. Unfortunately, this
-workaround can be cumbersome to write and makes types in Rust harder to read.
-\autoref{lst:orphan_workaround} shows how the new-type idiom can be used to add
-a finaliser to a type defined outside of the current crate. This can be used in
-other GC designs for Rust which use a separate \lstinline{Finalize} trait such
-as \rustgc.
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-use a::MyType;
-
-struct Wrapper(MyType);
-
-impl Finalize for Wrapper {
-    fn finalize(&mut self) {
-        println!("Finalizing MyType via Wrapper");
-    }
-}
-
-fn main() {
-    let a = Gc::new(Wrapper(MyType::new()));
-}
-\end{lstrustsmall}
-\caption{A workaround the orphan rule using the \emph{new type idiom}. Here, a
-    new \lstinline{Wrapper} type is defined for which we define a finaliser. To
-    garbage collected \lstinline{MyType} objects, one could then use
-    \lstinline{Gc<Wrapper>} instead of \lstinline{Gc<MyType>} to ensure that its
-    finaliser is called.}
-    \label{lst:orphan_workaround}
-\end{figure}
-
-\section{Finalisers in \ourgc}
-\label{alloy_fins}
-
-\ourgc takes a novel approach to finalisation compared to previous Rust GCs in
-that it uses existing drop methods as garbage collection finalisers, saving
-users the potentially error-prone task of manually writing both desctructor and
-finaliser methods for GC managed objects. Despite this, Rust's
-semantics do not expect GC, so \ourgc must also consider soundness issues that
-other GC'd languagess have not had to face. In the rest of this chapter, I explain how
-\ourgc addresses these issues. Finally, as destructors in Rust are used
-frequently, methods are pervasive in Rust, this implies that finalisers must also
-be pervasive. Since finalisers impose significant performance costs, one only
-wants to run them when strictly necessary. \ourgc thus introduces a number of
-static analyses that are able to remove most finalisers at compile-time.
-
-In \ourgc, a \lstinline{Gc<T>} will call \lstinline{T::drop} when \lstinline{T}'s
-value is unreachable. For example:
-
-\begin{lstrustsmall}
-struct S;
-
-impl Drop for S {
-    fn drop(&mut self) {
-        println!("Dropping S");
-    }
-}
-
-fn main() {
-    let s1 = S;
-    let s2 = S;
-
-    let gc = Gc::new(s2);
-} // Dropping s1
-\end{lstrustsmall}
-
-Two values of type \lstinline{S} are created, \lstinline{s1} is dropped normally
-at the end of \lstinline{main}. \lstinline{s2}, however is moved inside a
-\lstinline{Gc}, so in order for its drop method to be called, \ourgc finalises
-it once it becomes unreachable. Consider another example, where a \lstinline{Gc}
-box stores an owning reference to other, non-GC'd values on the heap:
-
-\begin{lstrustsmall}
-let a = Box::new(String::from("Hello"));
-let b = Gc::new(a);
-\end{lstrustsmall}
-
-The sole owning reference to the heap allocation \lstinline{Box<String>} is
-moved into \lstinline{Gc::new}, which creates a \lstinline{Gc} object containing
-the reference to the \lstinline{Box<String>}. This has the following
-representation in memory:
-
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/alloy_finaliser_memory}
-\end{center}
-
-When the \lstinline{Gc}'s underlying allocation (called GcBox) becomes
-unreachable, \ourgc will call its finaliser, which means that \lstinline{drop}
-is called on all the component types (in the same way that Rust automatically
-calls drop in \autoref{rust_drop_order}). If, for whatever reason, the finaliser
-is not run, then the allocations for the \lstinline{Box} and the
-\lstinline{String} will leak (i.e. their heap allocation will never be
-reclaimed). I thus define a finaliser in \ourgc as calling drop on the contents
-of a \lstinline{Gc} (including its field types). Therefore a type
-\lstinline{Gc<T>} has a finaliser if type \lstinline{T} needs dropping.
-
-\subsection{Omitting finalisers}
-
-Finalisation is not always desirable. For example, consider a \lstinline{FileDescriptor}
-which uses its drop method to close the descriptor:
-
-\begin{lstrustsmall}
-struct FileDescriptor {
-    fd: u64
-}
-
-impl Drop for FileDescriptor {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-\end{lstrustsmall}
-
-Here, objects of type \lstinline{Gc<FileDescriptor>} would use a finaliser to
-call the \lstinline{FileDescriptor}'s drop method. However, if we were to close
-the descriptor in the mutator once we are finished with the object, the
-finaliser is no longer necessary:
-
-\begin{lstrustsmall}
-let stdout = FileDescriptor { fd: 1 };
-let descriptor = Gc::new(stdout);
-...
-descriptor.close()
-\end{lstrustsmall}
-
-To allow for this, \ourgc provides a special wrapper type,
-\lstinline{NonFinalizable<T>}, which can be used to create a \lstinline{Gc}
-which omits finalisers on an individual basis:
-
-\begin{lstrustsmall}
-let descriptor = Gc::new(NonFinalizable::new(stdout));
-\end{lstrustsmall}
-
-Here, when the \lstinline{Gc<NonFinalizable<FileDescriptor>>} is collected, it
-will not be finalised. The \lstinline{NonFinalizable<T>} type has no additional
-storage costs, and at runtime is represented as a bare
-\lstinline{FileDescriptor}.
-
-This is only intended to be used in exceptional circumstances where performance
-is a concern: It can easily lead to resources leaks if not used carefully.
-
-\section{Safely finalising objects off-thread}
-\label{ourgc:threadsafe_finalisation}
-
-In \autoref{bg:synchronisation}, I explained that running finalisers on
-the same thread as the mutator can cause deadlocks.
-\autoref{fig:rust_finaliser_deadlock} shows how this could happen in a
-hypothetical version of \ourgc where finalisers are scheduled to run from the
-mutator thread.
-
-As with any GC, \ourgc can finalise objects at its leisure, with no way for the
-programmer to know when this will happen. Rust does not prevent users
-from writing code which deadlocks, but it does not make the situation worse.
-However, if \ourgc were to perform on-thread finalisation, it would open
-the possibility of previously non-deadlocking code deadlocking.
-
-One possible solution might seem to be to prohibit finalisers from acquiring
-locks, however this can cause race-like bugs because of how finalisers can
-interleave asynchronously with the mutator~\citep{niko13destructors}.
-
-\begin{figure}[htbp]
-\begin{lstrustsmall}
-use std::gc::Gc;
-use std::rc::Rc;
-use std::sync::Mutex;
-
-struct CounterWrapper {
-    value: Rc<Mutex<usize>>
-}
-
-impl Drop for CounterWrapper  {
-    fn drop(&mut self) {
-        let mut count = self.value.lock().unwrap();
-        *count += 1;
-    }
-}
-
-fn main() {
-    // Create a reference counted counter object protected by a mutex.
-    let counter = Rc::new(Mutex::new(0));
-
-    {
-        // Create a new garbage collected object which contains a reference
-        // counted pointer to the counter. When this object is collected, the
-        // drop methods for `CounterWrapper` and `Rc` will be called as
-        // finalizers.
-        let gc = Gc::new(CounterWrapper { value: Rc::clone(&counter) });
-    }
-
-    // Assume GC can happen here because `gc` is unreachable.
-
-    // If the finalizer for the `Gc<CounterWrapper>` is asynchronously called
-    // while `counter.lock()` below is already acquired, a deadlock will occur.
-    let lock = counter.lock().unwrap();
-    ...
-
-    assert_eq!(*counter, 0);
-}
-\end{lstrustsmall}
-    \caption{An example showing how a
-    potential deadlock can be caused if finalisers are run on the mutator
-    thread. A shared counter is created using a reference counted container (line 18), a
-    reference to this is then placed inside a garbage collected container (line
-    25). This is potentially short-lived, as it is only
-    reachable by the \lstinline{gc} variable until the end of the inner scope
-    (line 26). If \ourgc decides to
-    schedule a collection after this (e.g.~on line 28) then the
-    \lstinline{CounterWrapper} could be considered garbage, where a finaliser
-    would run its drop method (line 10). If this happens while the main mutator
-    thread already holds \lstinline{counter.lock()} (line 32-36) then this program
-    can deadlock. When finalisers are run on the same thread, there is nothing
-    the programmer can do in this situation to guarantee that this kind of
-    deadlock does not occur.}
-    \label{fig:rust_finaliser_deadlock}
-\end{figure}
-
-\subsection{Off-thread finalisation}
-
-\label{alloy_off_thread}
-
-\ourgc finalises unreachable objects on a separate finalisation thread.
-This means that finalisers cannot deadlock simply by acquiring a
-lock held by the mutator: the finalisation thread will simply wait and attempt
-to re-acquire the lock later. However, this now means that shared data, or other
-objects accessed from a finaliser must be done in a thread-safe way. The problem
-with this is that in \ourgc, a finaliser calls a type's existing drop methods.
-Since \lstinline{Drop} was not originally defined in expectation of being
-called on a separate thread, it does not guarantee thread safety.
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-use std::cell::Cell;
-use std::gc::Gc;
-use std::thread;
-
-struct Counter(Cell<usize>);
-
-// `Counter` is not `Sync` by default because it contains a `Cell`. However,
-// it doesn't have a drop method, so it's safe to use inside a `Gc`. In order to
-// do this, we must explicitly mark it as `Sync` so that `Gc` accepts it.
-unsafe impl Sync for Counter {}
-
-fn main() {
-    let gc = Gc::new(Counter(Cell::new(0)));
-    let gc2 = gc;
-
-
-    // By explicitly implementing `Sync` for `Counter`, we've accidentally
-    // allowed it to be used across threads in ways unrelated to finalisers
-    // which are not thread-safe. E.g. the following can race, as the counts are
-    // not updated atomically.
-    thread::spawn(move || {
-        for i in 0..1000 {
-            gc2.0.set(gc.0.get() + 1);
-        }
-    });
-
-    for i in 0..1000 {
-        gc.0.set(gc.0.get() + 1);
-    }
-}
-\end{lstrustsmall}
-    \caption{An example of the \lstinline{Send} + \lstinline{Sync} dilemma if
-    \ourgc required \lstinline{T: Send + Sync} for \lstinline{Gc<T>} to provide finaliser
-    safety. Such a restriction on \lstinline{T} is overly strict, and could lead
-    to users explicitly marking types as \lstinline{Send} or \lstinline{Sync} so
-    \ourgc considers them safe for finalisation. This example shows how this can
-    lead to inadvertantly bypassing Rust's concurrency safety when such types
-    are used elsewhere. By default, \lstinline{Counter} cannot be used inside a \lstinline{Gc} because
-    it contains a field \lstinline{Cell} which does not implement
-    \lstinline{Sync}. To allow the construction of \lstinline{Gc<Counter>},
-    \lstinline{Sync} can be explicitly implemented on \lstinline{Counter} (line
-    10). However, this now allows objects of this type to be used across threads
-    without any synchronisation (lines 21-29), which can cause surprising races.}
-    \label{send_sync_dilemma}
-\end{figure}
-
-The most obvious solution to this is to ensure that only thread-safe types
-can be used inside a garbage collected container. In other words, a type
-\lstinline{T} could not be placed inside a \lstinline{Gc} unless \lstinline{T}
-implements both \lstinline{Send} and \lstinline{Sync} -- Rust's builtin traits
-for concurrency safety (see \autoref{sendsync}). This solution would
-prevent programs from compiling if an object without synchronisation is placed
-inside a \lstinline{Gc} container. While this would ensure that finalisers are
-thread-safe, it is less than ideal for two reasons.
-
-First, it would restrict a \lstinline{Gc} from managing many valid types: a
-non-\lstinline{Send} and non-\lstinline{Sync} type would be prevented from being
-used in a \lstinline{Gc} even if it doesn't have a drop method (and therefore,
-never needed finalising in the first place!).
-
-Second, for \lstinline{T} to be \lstinline{Send} and \lstinline{Sync}, all of
-\lstinline{T}'s component types must be \lstinline{Send} and \lstinline{Sync}
-too. This presents a dilemma: either every field of \lstinline{T} must be
-thread-safe (even those which are never used in a finaliser); or, the user,
-certain in the knowledge that \lstinline{T}'s drop method is thread-safe,
-forcibly \lstinline{unsafe} implements \lstinline{Send} and \lstinline{Sync} on \lstinline{T}. In the
-case of the latter approach, \lstinline{T} can then be accidentally be used in
-concurrency contexts unrelated to garbage collection, bypassing an important
-part of the type system in order to keep \ourgc happy.
-\autoref{send_sync_dilemma} shows how this could cause a leaky abstraction which
-introduces bugs in non-GC related code.
-
-
 \subsection{Finaliser safety analysis}
 \label{fsa}
 
@@ -1287,8 +381,6 @@ the finaliser but is \emph{called} by the finaliser.
 % example, as is often the case in practise, the offending line is not \emph{in}
 % the finaliser but is \emph{called} by the finaliser.
 
-
-\newpage
 
 FSA permits a \lstinline{Gc} to contain values with non-thread-safe fields
 provided they are not used in the drop method. Consider the following example:
@@ -1400,8 +492,6 @@ such a field access would constitute a \emph{place projection}, where a place is
 a memory location (or lvalue), and a projection is a field access. A single MIR
 statement can contain more than one field projection
 (e.g.~\lstinline{self.foo.bar.baz}).
-
-\newpage
 
 This part of the analysis happens in the \lstinline{CheckCallsite} function:
 
@@ -1761,6 +851,754 @@ unsafe impl<'a> ReferenceFree for Wrapper<'a> {}
 This will now compile and \lstinline{Gc<Wrapper>} will be finalised before
 collection. However, it is unsafe as the onus is now on the programmer to ensure
 \lstinline{Wrapper}'s drop method never uses \lstinline{&a}.
+
+
+\subsection{Finaliser ordering}
+\label{bg:finaliser_order}
+
+A language implementation has a choice as to whether to guarantee that
+finalisers will run in a certain order. Some GCs implementations guarantee a
+finalisation order, because for some applications, this is important if one
+resource must be cleaned up before another.
+
+For example, consider the objects in~\autoref{fig:ordered_finalisation}. The
+finalisers for the ``outer'' objects all reference the object in the layer
+to the right of them, so they must be finalised ``outside-in''.
+
+However, this guaranteed finalisation order has two disadvantages. First,
+finalising all the objects in a chain of floating garbage happens over multiple
+finalisation cycles because an object can only be finalised if it is not reachable
+from other unreachable objects. In~\autoref{fig:ordered_finalisation}, this
+would require four finalisation cycles before the floating garbage is reclaimed.
+Such a delay in the eventual reclamation of objects can cause \emph{heap drag},
+where unreachable objects are kept alive longer than necessary.
+
+Second, and most significantly, this approach is not able to finalise cycles of
+objects where more than one object needs finalising, which can lead to resource
+leaks. This is because the collector cannot know which (if any) object is safe
+to finalise first: if an object references another object which has already been
+finalised, this is unsound. Boehm proposes a workaround for this where
+programmers can refactor the objects in order to break the finalisation
+cycle~\citep{boehm03destructors} (\autoref{fig:finaliser_cycles} from
+\citet[p.~218]{jones16garbage}). Another workaround is to allow users to use weak
+references to break cycles (similar to breaking reference count cycles).
+Unfortunately this is often difficult to implement
+correctly~\citep{jones16garbage}.
+
+Some GCs such as Blink's Oilpan GC~\citep{ager13oilpan} do not specify a finalisation order. This
+permits the GC to finalise cycles of objects where more than one object needs
+finalising with an important restriction placed on the programmer: an object's finaliser must not reference
+any other object. This caveat is necessary to prevent dereferencing an already
+finalised object. This approach is used in V8: finalisers are not able to
+dereference through to other JavaScript objects. In the rare cases where this is
+too restrictive, Oilpan also has pre-finalisers, which are run during the GC's
+stop-the-world pause, and allow object fields to be
+dereferenced~\citep{ager13oilpan}. The compromise here is performance:
+pre-finalisers increase the mutator pause time and cannot be enqueued to run
+later.
+
+\subsection{Finalisers and deadlocks}
+\label{bg:synchronisation}
+
+It is common in many languages for finalisers to access fields from other
+objects or even global state. Since an object's finaliser is run at some unknown
+point in time once it is considered unreachable by the collector, it must be
+able to safely access such state without racing with the mutator.
+
+\begin{figure}[t!]
+\begin{lstlisting}
+class X {
+    Count count;
+
+    @Override
+    protected void finalize() {
+        count.increment();
+    }
+
+    public static void main(String[] args) {
+        Count count = new Count();
+        X x = new X(count);
+
+        ...
+
+        count.increment();
+}
+
+class Count {
+    Mutex mutex = new Mutex();
+    int count = 0;
+
+    public void increment() {
+        try {
+            mutex.acquire();
+            count++;
+        }
+        catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+           mutex.release();
+        }
+    }
+}
+\end{lstlisting}
+    \caption{An example Java program showing how a finaliser could deadlock if
+    run from the same thread as the mutator. The \lstinline{Count} object has a
+    method \lstinline{increment} which acquires a mutex (line 22). A new
+    instance of \lstinline{Count} is created and a reference to it
+    passed to a new instance of \lstinline{X} (lines 10-11). If the collector
+    decided to invoke \lstinline{X.finalize()} while the mutator executes
+    \lstinline{count.increment()} on line 15, then the program will deadlock as
+    they both try to acquire the mutex on the same thread. This can be solved by
+    ensuring that finalisers run on a separate thread to the mutator: the
+    finaliser thread would simply spin or sleep while it waits for the mutator
+    to release the mutex.}
+    \label{java_finaliser_deadlock}
+\end{figure}
+
+It is common in many languages for finalisers to access fields from other
+objects or even global state. Since an object's finaliser is run at some unknown
+point in time once it is considered unreachable by the collector, it must be
+able to safely access such state without racing with the mutator. If a finaliser
+runs on a separate thread to the mutator, it's clear that data accessed from a
+finaliser must be performed in a way which is thread-safe. However, what's less
+obvious is that for correctness reasons, finalisers cannot be scheduled to run
+on the mutator thread.
+
+\autoref{java_finaliser_deadlock} shows how finalisers run on the same thread as
+the mutator can cause a deadlock. When the finaliser for an instance of
+\lstinline{Counter} is called, it tries to acquire the lock for the object's
+\lstinline{count} member. If this happens while the mutator already holds the
+lock, the program will deadlock. While one might consider using re-entrant locks
+to solve this problem, it can in fact worsen the problem by turning an obvious
+failure into a race where two logically separate operations mutate data in a way
+which should be performed atomically. This can cause intermittent incorrect
+execution~\citep{boehm03destructors}.
+
+For this reason, most languages run finalisers on a separate thread from the
+mutator~\citep{boehm03destructors}. Though programmers must still ensure they access
+shared state via some form of synchronisation such as mutexes, they are able to
+spin or sleep when blocked, allowing the mutator to progress without
+deadlocking.
+
+
+\section{Early Finaliser Prevention}
+\label{bg:early_finalisation}
+
+Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
+are called by a garbage collector non-deterministically. They can run at the
+collector's leisure; often this means that they run later than desired, however,
+in rare cases, an object can be finalised while it is still being used by the
+mutator! This is because compiler optimisations -- unaware of the presence of a
+GC -- can remove the single reference to an object which is keeping it alive. An
+outer object can therefore be considered unreachable while its inner object is
+still in use. An unfortunately timed GC cycle could  end up finalising the outer
+object, and run its finaliser. This can lead to subtle races in programs where
+the finaliser interleaves execution with the mutator.
+
+For this reason, VM specifications do not commit to running finalisers at a
+specific time. This includes allowing an object's finaliser to be run while the
+mutator is potentially still using it. For the reasons outlined in
+\autoref{bg:synchronisation}, GC implementations must synchronise access to
+objects inside a finaliser. \citet[p~.218]{jones16garbage} suggests this can be
+used to defer finalisation until later if a finaliser attempts to acquire an
+object lock which is already held by the mutator.
+
+More generally, however, the fundamental problem is that the compiler optimises
+away the reference to the object too soon. C\#'s .NET runtime
+provides a \lstinline{gc.KeepAlive} function as a solution to this.
+\lstinline{gc.KeepAlive} is an opaque empty function which the compiler cannot
+optimise away. The idea is that a reference to an object can be passed to
+\lstinline{gc.KeepAlive}, ensuring it lives long enough so that the collector
+does not deem it unreachable and finalise it too soon. This mitigation is
+limited, however, as it is up to the user to call \lstinline{gc.KeepAlive} when
+they require it.
+
+
+\section{Rust destructors}
+
+\label{destructors_detailed}
+
+To understand the design decisions that \ourgc makes surrounding finalisation,
+some background is needed on Rust's destructors.
+
+Destructors in Rust were briefly introduced in \autoref{bg:basic_destructors} as
+a way of running cleanup code when an initialized variable or temporary goes out
+of scope. A destructor is run automatically at the end of the scope for values
+which implement the \lstinline{Drop} trait. Consider the following example,
+which uses a Rust destructor to close a file descriptor:
+
+\begin{lstrustsmall}
+struct FileDescriptor {
+    fd: u64
+}
+
+impl Drop for FileDescriptor {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+fn main() {
+    let f = FileDescriptor { fd: 1 };
+} // FileDescriptor::drop called.
+\end{lstrustsmall}
+
+The file descriptor \lstinline{f} is destructed (or \emph{dropped}) at the end
+of the \lstinline{main} function, where it is no longer in scope. The ability to
+drop objects is a key component of Rust's ownership semantics, and is used
+extensively in the standard library.
+
+A struct which has a drop implementation may have fields which also need
+dropping. For example, consider a \lstinline{FileBuffer}, which has a field of
+type \lstinline{FileDescriptor}:
+
+\begin{lstrustsmall}
+struct FileBuffer {
+    descriptor: FileDescriptor,
+}
+
+impl Drop for FileBuffer {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+\end{lstrustsmall}
+
+Here, both the \lstinline{FileBuffer} and its field \lstinline{FileDescriptor}
+have drop methods which need running. Rust will automatically insert calls
+to drop them both when a \lstinline{FileBuffer} value goes out of scope. In Rust
+terminology, a value is considered dropped once its drop method, and all drop
+methods belonging to its fields, have been dropped.
+
+\subsubsection{Rust drop order}
+
+\label{rust_drop_order}
+
+Drop methods are used by Rust programmers for situations such as releasing
+locks. In such cases, the order in which values are dropped is vital for
+program correctness.
+
+Variables and temporaries are dropped in reverse declaration order. For example:
+
+\begin{lstrustsmall}
+fn main() {
+    let s1 = String::from("s1");
+    let s2 = String::from("s2");
+    let s3 = String::from("s3");
+}
+\end{lstrustsmall}
+
+At the end of \lstinline{main}, \lstinline{s3} would be dropped first, followed
+by \lstinline{s2}, and finally \lstinline{s1}.
+
+Rust specifies that fields are dropped in declaration order. For example,
+consider the following struct definition:
+
+\begin{lstrustsmall}
+impl Drop for S {
+    fn drop(&mut self) {
+        println!("Dropping S");
+    }
+}
+
+struct S  {
+    a: String,
+    b: u64, // u64 does not implement the `Drop` trait.
+    c: Vec<bool>,
+}
+\end{lstrustsmall}
+
+\lstinline{S} contains two fields (\lstinline{a} and \lstinline{c})
+which also need dropping. Rust will drop \lstinline{S} first, followed by
+the field \lstinline{a}, and then the field \lstinline{c}.
+
+If any component of a type implements \lstinline{Drop}, Rust will drop them when
+they go out of scope. For example, consider an enum \lstinline{E} (a tagged
+union), where one variant needs dropping:
+
+\begin{lstrustsmall}
+enum E  {
+    A(String),
+    B(bool),
+}
+\end{lstrustsmall}
+
+Even though \lstinline{E} does not have a drop method, when it goes out of scope,
+Rust will still insert a drop call because the variant \lstinline{E::A} contains
+a droppable type, \lstinline{String}. It's not possible to know at runtime which
+variant of the enum is active, so Rust inserts some additional code which checks
+dynamically which variant (if any) to drop.
+
+
+Since Rust ensures that drop methods are called automatically, it is not
+possible to call the drop method for a value (or any of its fields) directly.
+This ensures that a value is only dropped once, an important protection against
+double-freeing resources. This can be restrictive, because sometimes it's useful
+to drop a value earlier than at the end of its scope. Consider a common example,
+where a \lstinline{Mutex}'s lock is released from its drop method:
+
+\begin{lstrustsmall}
+fn main() {
+    let mutex = Mutex::new(123); // A mutex which guards a u64 value.
+    let data = mutex.lock().unwrap();
+    println("locked value: {}", data);
+
+    // Code that shouldn't belong in the critical section
+    ...
+} // lock is released as part of drop.
+\end{lstrustsmall}
+
+By unlocking the mutex at the end of main, sometimes we can execute more code
+than is necessary in the critical section. Rust provides a standard library
+helper function, \lstinline{std::mem::drop} which can accept values of any type
+in order to drop them early:
+
+\begin{lstrustsmall}
+fn main() {
+    let mutex = Mutex::new(123); // A mutex which guards a u64 value.
+    let data = mutex.lock().unwrap();
+    println("locked value: {}", data);
+
+    // Release the lock early
+    std::mem::drop(data);
+
+    // Code that shouldn't belong in the critical section
+    ...
+} // lock is released as part of drop.
+\end{lstrustsmall}
+
+\lstinline{std::main::drop} is implemented as an empty function. Since ownership
+of \lstinline{data} is transferred (line 7), Rust will insert a call to
+\lstinline{data}'s drop method immediately afterwards.
+
+\subsubsection{Drop methods are not guaranteed to run}
+
+Destructors in Rust are guaranteed to run at most once --- but they may not be
+run at all. This is for three reasons.
+
+First, consider the example back in \autoref{ch:rust} (\autoref{rc_cycle_drop}) where a cycle is created
+between two \lstinline{Rc} values. A reference cycle such as this introduces a
+memory leak and thus the values in this data structure are never dropped.
+
+Second, values are only dropped if they are initialized. It is not always
+possible to know whether a value is initialised so Rust can sometimes end up
+performing dynamic checks to know whether a value should be dropped. The details
+of this are not relevant to the rest of the thesis.
+
+Third, one can explicitly prevent a value from being dropped by passing it to
+the \lstinline{std::mem::forget<T>} function. This is commonly used when the
+underlying resource originated from non-Rust code, and therefore destruction of
+it should happen outside of Rust.
+
+\subsubsection{What types can be dropped?}
+
+\label{bg:drop_what_types}
+
+In short, Rust will automatically call drop for any type which implements the
+\lstinline{Drop} trait when it goes out of scope. However, copyable types
+(those which implement the \lstinline{Copy} trait, mostly primitive
+types such as \lstinline{bool}s, \lstinline{char}s, numeric types and so on)
+cannot implement Drop because doing so would mean that
+when values are copied they would be dropped multiple times. This
+would violate Rust's guarantee that drop is called at most once.
+
+Rust also supports C-like union types, which in contrast to enums do not use
+runtime tags to denote the active variant. Union types are not automatically
+dropped because there is no way for Rust to know which variant to insert a drop
+method for.
+
+
+\section{Design choices for finalisers in Rust}
+
+Before explaining finalisation in \ourgc, we should ask an over-arching design
+question: what should a finaliser in a Rust GC look like? Other approaches to GC
+in Rust, such as \rustgc and \bronze define a custom \lstinline{Finalize} trait,
+which types can implement to specify finaliser behaviour when they are used in a
+\lstinline{Gc} (shown in \autoref{lst:finalise_trait}).
+
+\begin{figure}[t!]
+\begin{lstrustsmall}
+struct S;
+
+impl Drop for S {
+    fn drop(&mut self) {
+        println!("Dropping S");
+    }
+}
+
+impl Finalize for S {
+    // Run before collection when value used in a `Gc`.
+    fn finalize(&mut self) {
+        println!("Finalizing S");
+    }
+}
+
+fn main() {
+    let s1 = S;
+    let s2 = S;
+
+    let gc1 = Gc::new(s2);
+} // Dropping s1
+\end{lstrustsmall}
+    \caption{An example from \rustgc, where a custom \lstinline{Finalize} trait
+    is used for finalisation semantics. In this scenario, before \lstinline{s2}
+    is collected, \rustgc calls \lstinline{S}'s \lstinline{finalize} method
+    (line 11).}
+    \label{lst:finalise_trait}
+\end{figure}
+
+
+The benefit of this approach is that it creates a logical separation between
+destructors expected to run in an RAII based context, and GC finalisers. This
+allows finalisers, which have subtly different rules to destructors, to be
+correctly specified by the user (as we will see in
+\autoref{ourgc:threadsafe_finalisation}, there are specific restrictions that need to be placed on
+finalisers in Rust in order to guarantee soundness).
+
+\ourgc takes a different approach, however, as separating destruction and
+finalisation in this way has unfortunate consequences. First, for most types
+that already implement Drop, their destruction logic must be duplicated in a
+finaliser. This is, at least, significant extra effort; it also offers many
+opportunities for copy and paste errors.
+
+Second, a separate \lstinline{Finalize} trait has as a major ergonomic cost
+because it's not possible to implement \lstinline{Finalize} on code from
+external libraries. This is because Rust enforces \emph{trait coherence}, a
+property in the language which ensures that every type has at most one
+implementation of a given trait. This coherence rule is fundamental to the
+language, because it removes ambiguity in trait method resolution, ensuring
+there is only one implementation of a trait method to choose from.
+
+Trait coherence is a problem for programs that use external compilation
+units known as \emph{crates} (roughly speaking, `libraries'), because if two
+unrelated crates provide separate implementations for the same trait, then those
+crates cannot be imported together.
+\begin{figure}[t!]
+% Hack to get the listing in the figure
+\newsavebox{\orphanalisting}
+\begin{lrbox}{\orphanalisting}
+\begin{lstrustsmall}
+use a::{MyType, MyTrait};
+
+impl MyTrait for MyType {
+    fn method1() {
+        ...
+    }
+
+    fn method2() {
+        ...
+    }
+}
+
+\end{lstrustsmall}
+\end{lrbox}
+
+\newsavebox{\orphanblisting}
+\begin{lrbox}{\orphanblisting}
+\begin{lstrustsmall}
+error[E0117]: only traits defined in the current
+              crate can be implemented for types
+              defined outside of the crate
+ --> src/lib.rs:3:1
+3 | impl MyTrait for MyType {}
+  | ^^^^^^^^^^^^^^^^^------
+  | |                |
+  | |                `MyType` is not defined in
+  | |                the current crate
+  | impl doesn't use only types from inside the
+  | current crate
+
+\end{lstrustsmall}
+\end{lrbox}
+    \centering
+    \subfloat[\centering Invalid trait implementations]{\usebox{\orphanalisting}}
+    \hfill
+    \subfloat[\centering Compiler error]{\usebox{\orphanblisting}}
+    \caption{
+        Here, we try to provide an implementation of the externally defined
+        trait, \lstinline{MyTrait} for the externally defined type,
+        \lstinline{MyType}. This results in a compile error in Rust because it
+        violates the orphan rule.}
+    \label{lst:coherence}
+\end{figure}
+
+To address this, traits in Rust must adhere to something called the \emph{orphan
+rule}. The rule is simple: it is not possible to implement a trait for a type
+where both the trait and the type are defined in separate crates. This prevents
+multiple conflicting trait implementations from existing across crates.
+\autoref{lst:coherence} shows how the orphan rule is enforced at compile-time in
+Rust.
+
+The problem with the orphan rule is that it would become a major source of
+ergonomic frustration for \ourgc if it defined a separate \lstinline{Finalize}
+trait. It would not be possible to implement \lstinline{Finalize} for any type
+which was not defined in the user's current crate. If types from external crates
+do not provide their own implementations for \lstinline{Finalize}, then those
+types may cause resource leaks when used in a \lstinline{Gc}.
+
+A workaround for the orphan rule is to use the \emph{new-type idiom}, where the
+current crate defines a wrapper type for an external type. Unfortunately, this
+workaround can be cumbersome to write and makes types in Rust harder to read.
+\autoref{lst:orphan_workaround} shows how the new-type idiom can be used to add
+a finaliser to a type defined outside of the current crate. This can be used in
+other GC designs for Rust which use a separate \lstinline{Finalize} trait such
+as \rustgc.
+
+\begin{figure}[t!]
+\begin{lstrustsmall}
+use a::MyType;
+
+struct Wrapper(MyType);
+
+impl Finalize for Wrapper {
+    fn finalize(&mut self) {
+        println!("Finalizing MyType via Wrapper");
+    }
+}
+
+fn main() {
+    let a = Gc::new(Wrapper(MyType::new()));
+}
+\end{lstrustsmall}
+\caption{A workaround the orphan rule using the \emph{new type idiom}. Here, a
+    new \lstinline{Wrapper} type is defined for which we define a finaliser. To
+    garbage collected \lstinline{MyType} objects, one could then use
+    \lstinline{Gc<Wrapper>} instead of \lstinline{Gc<MyType>} to ensure that its
+    finaliser is called.}
+    \label{lst:orphan_workaround}
+\end{figure}
+
+\begin{lstrustsmall}
+let a = Box::new(String::from("Hello"));
+let b = Gc::new(a);
+\end{lstrustsmall}
+
+The sole owning reference to the heap allocation \lstinline{Box<String>} is
+moved into \lstinline{Gc::new}, which creates a \lstinline{Gc} object containing
+the reference to the \lstinline{Box<String>}. This has the following
+representation in memory:
+
+\begin{center}
+\includegraphics[width=0.75\textwidth]{images/alloy_finaliser_memory}
+\end{center}
+
+When the \lstinline{Gc}'s underlying allocation (called GcBox) becomes
+unreachable, \ourgc will call its finaliser, which means that \lstinline{drop}
+is called on all the component types (in the same way that Rust automatically
+calls drop in \autoref{rust_drop_order}). If, for whatever reason, the finaliser
+is not run, then the allocations for the \lstinline{Box} and the
+\lstinline{String} will leak (i.e. their heap allocation will never be
+reclaimed). I thus define a finaliser in \ourgc as calling drop on the contents
+of a \lstinline{Gc} (including its field types). Therefore a type
+\lstinline{Gc<T>} has a finaliser if type \lstinline{T} needs dropping.
+
+\subsection{Omitting finalisers}
+
+Finalisation is not always desirable. For example, consider a \lstinline{FileDescriptor}
+which uses its drop method to close the descriptor:
+
+\begin{lstrustsmall}
+struct FileDescriptor {
+    fd: u64
+}
+
+impl Drop for FileDescriptor {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+\end{lstrustsmall}
+
+Here, objects of type \lstinline{Gc<FileDescriptor>} would use a finaliser to
+call the \lstinline{FileDescriptor}'s drop method. However, if we were to close
+the descriptor in the mutator once we are finished with the object, the
+finaliser is no longer necessary:
+
+\begin{lstrustsmall}
+let stdout = FileDescriptor { fd: 1 };
+let descriptor = Gc::new(stdout);
+...
+descriptor.close()
+\end{lstrustsmall}
+
+To allow for this, \ourgc provides a special wrapper type,
+\lstinline{NonFinalizable<T>}, which can be used to create a \lstinline{Gc}
+which omits finalisers on an individual basis:
+
+\begin{lstrustsmall}
+let descriptor = Gc::new(NonFinalizable::new(stdout));
+\end{lstrustsmall}
+
+Here, when the \lstinline{Gc<NonFinalizable<FileDescriptor>>} is collected, it
+will not be finalised. The \lstinline{NonFinalizable<T>} type has no additional
+storage costs, and at runtime is represented as a bare
+\lstinline{FileDescriptor}.
+
+This is only intended to be used in exceptional circumstances where performance
+is a concern: It can easily lead to resources leaks if not used carefully.
+
+\section{Safely finalising objects off-thread}
+\label{ourgc:threadsafe_finalisation}
+
+In \autoref{bg:synchronisation}, I explained that running finalisers on
+the same thread as the mutator can cause deadlocks.
+\autoref{fig:rust_finaliser_deadlock} shows how this could happen in a
+hypothetical version of \ourgc where finalisers are scheduled to run from the
+mutator thread.
+
+As with any GC, \ourgc can finalise objects at its leisure, with no way for the
+programmer to know when this will happen. Rust does not prevent users
+from writing code which deadlocks, but it does not make the situation worse.
+However, if \ourgc were to perform on-thread finalisation, it would open
+the possibility of previously non-deadlocking code deadlocking.
+
+One possible solution might seem to be to prohibit finalisers from acquiring
+locks, however this can cause race-like bugs because of how finalisers can
+interleave asynchronously with the mutator~\citep{niko13destructors}.
+
+\begin{figure}[htbp]
+\begin{lstrustsmall}
+use std::gc::Gc;
+use std::rc::Rc;
+use std::sync::Mutex;
+
+struct CounterWrapper {
+    value: Rc<Mutex<usize>>
+}
+
+impl Drop for CounterWrapper  {
+    fn drop(&mut self) {
+        let mut count = self.value.lock().unwrap();
+        *count += 1;
+    }
+}
+
+fn main() {
+    // Create a reference counted counter object protected by a mutex.
+    let counter = Rc::new(Mutex::new(0));
+
+    {
+        // Create a new garbage collected object which contains a reference
+        // counted pointer to the counter. When this object is collected, the
+        // drop methods for `CounterWrapper` and `Rc` will be called as
+        // finalizers.
+        let gc = Gc::new(CounterWrapper { value: Rc::clone(&counter) });
+    }
+
+    // Assume GC can happen here because `gc` is unreachable.
+
+    // If the finalizer for the `Gc<CounterWrapper>` is asynchronously called
+    // while `counter.lock()` below is already acquired, a deadlock will occur.
+    let lock = counter.lock().unwrap();
+    ...
+
+    assert_eq!(*counter, 0);
+}
+\end{lstrustsmall}
+    \caption{An example showing how a
+    potential deadlock can be caused if finalisers are run on the mutator
+    thread. A shared counter is created using a reference counted container (line 18), a
+    reference to this is then placed inside a garbage collected container (line
+    25). This is potentially short-lived, as it is only
+    reachable by the \lstinline{gc} variable until the end of the inner scope
+    (line 26). If \ourgc decides to
+    schedule a collection after this (e.g.~on line 28) then the
+    \lstinline{CounterWrapper} could be considered garbage, where a finaliser
+    would run its drop method (line 10). If this happens while the main mutator
+    thread already holds \lstinline{counter.lock()} (line 32-36) then this program
+    can deadlock. When finalisers are run on the same thread, there is nothing
+    the programmer can do in this situation to guarantee that this kind of
+    deadlock does not occur.}
+    \label{fig:rust_finaliser_deadlock}
+\end{figure}
+
+\subsection{Off-thread finalisation}
+
+\label{alloy_off_thread}
+
+\ourgc finalises unreachable objects on a separate finalisation thread.
+This means that finalisers cannot deadlock simply by acquiring a
+lock held by the mutator: the finalisation thread will simply wait and attempt
+to re-acquire the lock later. However, this now means that shared data, or other
+objects accessed from a finaliser must be done in a thread-safe way. The problem
+with this is that in \ourgc, a finaliser calls a type's existing drop methods.
+Since \lstinline{Drop} was not originally defined in expectation of being
+called on a separate thread, it does not guarantee thread safety.
+
+\begin{figure}[t!]
+\begin{lstrustsmall}
+use std::cell::Cell;
+use std::gc::Gc;
+use std::thread;
+
+struct Counter(Cell<usize>);
+
+// `Counter` is not `Sync` by default because it contains a `Cell`. However,
+// it doesn't have a drop method, so it's safe to use inside a `Gc`. In order to
+// do this, we must explicitly mark it as `Sync` so that `Gc` accepts it.
+unsafe impl Sync for Counter {}
+
+fn main() {
+    let gc = Gc::new(Counter(Cell::new(0)));
+    let gc2 = gc;
+
+
+    // By explicitly implementing `Sync` for `Counter`, we've accidentally
+    // allowed it to be used across threads in ways unrelated to finalisers
+    // which are not thread-safe. E.g. the following can race, as the counts are
+    // not updated atomically.
+    thread::spawn(move || {
+        for i in 0..1000 {
+            gc2.0.set(gc.0.get() + 1);
+        }
+    });
+
+    for i in 0..1000 {
+        gc.0.set(gc.0.get() + 1);
+    }
+}
+\end{lstrustsmall}
+    \caption{An example of the \lstinline{Send} + \lstinline{Sync} dilemma if
+    \ourgc required \lstinline{T: Send + Sync} for \lstinline{Gc<T>} to provide finaliser
+    safety. Such a restriction on \lstinline{T} is overly strict, and could lead
+    to users explicitly marking types as \lstinline{Send} or \lstinline{Sync} so
+    \ourgc considers them safe for finalisation. This example shows how this can
+    lead to inadvertantly bypassing Rust's concurrency safety when such types
+    are used elsewhere. By default, \lstinline{Counter} cannot be used inside a \lstinline{Gc} because
+    it contains a field \lstinline{Cell} which does not implement
+    \lstinline{Sync}. To allow the construction of \lstinline{Gc<Counter>},
+    \lstinline{Sync} can be explicitly implemented on \lstinline{Counter} (line
+    10). However, this now allows objects of this type to be used across threads
+    without any synchronisation (lines 21-29), which can cause surprising races.}
+    \label{send_sync_dilemma}
+\end{figure}
+
+The most obvious solution to this is to ensure that only thread-safe types
+can be used inside a garbage collected container. In other words, a type
+\lstinline{T} could not be placed inside a \lstinline{Gc} unless \lstinline{T}
+implements both \lstinline{Send} and \lstinline{Sync} -- Rust's builtin traits
+for concurrency safety (see \autoref{sendsync}). This solution would
+prevent programs from compiling if an object without synchronisation is placed
+inside a \lstinline{Gc} container. While this would ensure that finalisers are
+thread-safe, it is less than ideal for two reasons.
+
+First, it would restrict a \lstinline{Gc} from managing many valid types: a
+non-\lstinline{Send} and non-\lstinline{Sync} type would be prevented from being
+used in a \lstinline{Gc} even if it doesn't have a drop method (and therefore,
+never needed finalising in the first place!).
+
+Second, for \lstinline{T} to be \lstinline{Send} and \lstinline{Sync}, all of
+\lstinline{T}'s component types must be \lstinline{Send} and \lstinline{Sync}
+too. This presents a dilemma: either every field of \lstinline{T} must be
+thread-safe (even those which are never used in a finaliser); or, the user,
+certain in the knowledge that \lstinline{T}'s drop method is thread-safe,
+forcibly \lstinline{unsafe} implements \lstinline{Send} and \lstinline{Sync} on \lstinline{T}. In the
+case of the latter approach, \lstinline{T} can then be accidentally be used in
+concurrency contexts unrelated to garbage collection, bypassing an important
+part of the type system in order to keep \ourgc happy.
+\autoref{send_sync_dilemma} shows how this could cause a leaky abstraction which
+introduces bugs in non-GC related code.
+
 
 \subsection{Finalisation order}
 
@@ -2453,8 +2291,6 @@ The algorithm for finaliser elision is implemented as a compiler intrinsic,
 finaliser. This intrinsic is then called during the construction of new
 \lstinline{Gc} objects (inside \lstinline{Gc::new}):
 
-\newpage
-
 \begin{lstrustsmall}
 impl Gc<T> {
     pub fn new(value: T) -> Self {
@@ -2488,7 +2324,7 @@ called the moment they go out of scope. However, when such allocations are owned
 by a \lstinline{Gc}, they will be freed by the collector along with the
 \lstinline{Gc}.
 
-\section{Optimising early finaliser prevention}
+\subsection{Optimising early finaliser prevention}
 \label{optimising_early_finalisers}
 
 Early finalisation prevention (\autoref{early_finaliser_prevention})
