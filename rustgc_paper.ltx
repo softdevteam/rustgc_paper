@@ -43,7 +43,7 @@ track indirect references, so seemingly safe programs can fail due to
 use-after-frees etc.), or performance (\laurie{use a sensible figure from the
 perf section}).
 
-In this paper we introduce \ourgc, a new tracing GC (i.e.~a `full' GC that,
+In this paper we introduce \ourgc, a new \emph{tracing} GC (i.e.~a `full' GC that,
 unlike reference counting, does not leak memory in the face of
 cycles~\cite{bacon04unified}) or Rust. \ourgc's basic design is
 similar to many other GCs for Rust, with some extensions to improve ergonomics.
@@ -176,17 +176,15 @@ method.
 Destructors are a similar concept to GC finalisers: both concepts run user code
 just before the memory a value occupies can be reused by the wider system.
 There is one obvious difference between the two: while Rust defines precisely
-when a destructor will be called, GC finalisers are
-only called at some unspecified point in time after the last \lstinline{Gc<T>}
+when a destructor will be run, GC finalisers are
+only run at some unspecified point in time after the last \lstinline{Gc<T>}
 reference to a GCed value is dropped. This delay is an inevitable part of any
 tracing GC and something we assume that users of \ourgc are
 comfortable with. However, this then raises the question: where are finalisers run? If we
-run them on the same thread as normal code, then we can encounter similar
-challenges to Unix signal handlers (where only `async-signal-safe' functions
-should be run): if normal code holds a mutex, and is then
-interrupted by a finaliser which tries to lock that mutex, then the program has
-deadlocked. However, not all values, or \lstinline{drop} methods, can safely be
-run on another thread.
+run them on the same thread as \emph{mutator} (i.e.~`normal user') code is running,
+then the finaliser can cause a deadlock if it tries to access a resource that
+the normal code holds (see~\cref{finaliser_thread} for more details). However,
+not all \lstinline{drop} methods can safely be run on another thread.
 
 Indeed, finalisers in general have other subtle
 issues~\cite{boehm03destructors}. For example, what should we do with finalisers
@@ -271,18 +269,37 @@ There are, broadly speaking, three possible design choices: (1) universally
 call drop methods from finalisers and accept that this undermines soundness;
 (2) require programmers to manually implement a finaliser for each type they
 wish to GC and accept the resulting boilerplate; (3) analyse drop methods and
-automatically use those determined to be safe as finalisers. Existing GCs for Rust take the first
+only allow those determined to be safe to be used as finalisers. Existing GCs for Rust take the first
 \laurie{jake: do any take the first?} or second \laurie{jake: pick a couple as
-examples} approaches. \ourgc introduces the novel concept of \emph{Finaliser Safety Analysis} (FSA)
-as a way of realising the third approach.
+examples} approaches.
 
-FSA is an extension to Rust's static checks that determines when a drop method
-can safely be used as a finaliser. FSA is designed to be a sound analysis
-(i.e.~without false positives), meaning that it is not complete --- a practical
-challenge for FSA is therefore to ensure it identifies enough safe drop methods
-to be useful.
+\ourgc introduces the novel concept of \emph{Finaliser Safety Analysis} (FSA)
+as a way of realising the third approach. FSA extends Rust's type rules to
+reject unsafe drop methods when used as finalisers, requiring the user to
+either override the check, or to implement a separate finaliser. Since FSA is
+designed to be sound (i.e.~without false positives), a practical challenge is
+to make it accept enough safe drop methods to be useful. In this section we
+explain the motivation for, design, and implementation in \rustc, of FSA.
 
 \laurie{remember to mention auto-traits and type coherence here}
+
+
+\subsection{Which drop methods are safe finalisers?}
+\label{finaliser_thread}
+
+A fundamental property of finalisers is that they are run at some unspecified
+point in time after the last \lstinline{Gc<T>} reference to a GCed value is
+dropped. If we assume a \emph{stop-the-world} GC (i.e.~a GC which periodically
+pauses all mutator threads while GC actions are performed) then it may seem logical
+to run finalisers during GC pauses. However this causes similar challenges to
+Unix signal handlers (where only `async-signal-safe' functions should be run):
+if a mutator holds a resource (e.g.~a mutex), and is then interrupted by a
+finaliser which tries to acquire that same resource, then the program has
+deadlocked. Most GCs, including BDWGC and thus \ourgc, run finalisers on a
+separate `finalisers only' thread to avoid this problem.
+
+For it to be safe to run finalisers on a separate thread, those finalisers
+must be thread safe.
 
 
 \subsection{Finaliser safety analysis}
