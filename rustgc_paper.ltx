@@ -208,9 +208,9 @@ prevents problems such as object resurrection~\cite{goetz21deprecated}.
 \section{\ourgc: Basic Design Choices}
 
 The fundamental aim of \ourgc is to add GC for Rust in a way that is ergonomic,
-sound, and performant. In this section we outline with the basic design choices
+sound, and performant. In this section we outline the basic design choices
 we made in \ourgc. The rest of the paper then fleshes the design out, showing
-how \ourgc ensure both soundness and good performance.
+how \ourgc ensures both soundness\jake{modulo CSS I suppose} and good performance.
 
 Like most GCs for Rust, \ourgc provides a \lstinline{Gc<T>} type.
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
@@ -238,14 +238,19 @@ pointers to GC values that are stored in Rust \lstinline{usize} values.
 
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a conservative GC (i.e.~scans all words in
-memory, irrespective of their compile-time type, for pointers to the GC heap).
+memory \jake{This doesn't sound quite right, I get what you mean, but we don't
+scan all words in memory, just those reachable from the root-set}, irrespective of their compile-time type, for pointers to the GC heap).
 Although conservative GC is sometimes looked down upon\footnote{It is also
 sadly the case that there remains no cross-platform, or cross-compiler,
 mechanism for automated, precise GC.}, it is used in the
 two most widely used web browsers: Chrome uses it in its rendering
 engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
 VM~\citep{pizlo17riptide}. We thus take
-the practical soundness of conservative GC as a given. Currently, \ourgc uses
+the practical soundness \jake{In my viva, Richard raised the point that the term
+soundness isn't really a sliding scale so terms like practical soundness don't
+make sense -- you're either sound or you aren't. It's
+fine to say that "modulo XYZ we are sound" but can
+we say the same thing without mentioning explicitly mentioning soundness and upsetting theory people?} of conservative GC as a given. Currently, \ourgc uses
 the well-known Boehm-Demers-Weiser conservative collector
 (\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
 this paper will remain the same no matter what underlying conservative GC is
@@ -277,8 +282,9 @@ call drop methods from finalisers and accept that this undermines soundness;
 (2) require programmers to manually implement a finaliser for each type they
 wish to GC and accept the resulting boilerplate; (3) analyse drop methods and
 only allow those determined to be safe to be used as finalisers. Existing GCs for Rust take the first
-\laurie{jake: do any take the first?} or second \laurie{jake: pick a couple as
-examples} approaches.
+\laurie{jake: do any take the first?}\jake{I'm not aware of any that take the
+first} or second \laurie{jake: pick a couple as
+examples} \jake{rust-gc, bronze, boa} approaches.
 
 \ourgc introduces the novel concept of \emph{Finaliser Safety Analysis} (FSA)
 as a way of realising the third approach. FSA extends Rust's type rules to
