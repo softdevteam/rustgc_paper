@@ -207,10 +207,10 @@ prevents problems such as object resurrection~\cite{goetz21deprecated}.
 
 \section{\ourgc: Basic Design Choices}
 
-The fundamental aim of \ourgc is to add GC for Rust in a way that is ergonomic,
-sound, and performant. In this section we outline the basic design choices
-we made in \ourgc. The rest of the paper then fleshes the design out, showing
-how \ourgc ensures both soundness\jake{modulo CSS I suppose} and good performance.
+The fundamental aim of \ourgc is to add GC for Rust in a way that is
+sound, performant, and ergonomic. In this section we outline the basic design choices
+we made in \ourgc --- the rest of the paper then goes into the detail on the more
+advanced aspects.
 
 Like most GCs for Rust, \ourgc provides a \lstinline{Gc<T>} type.
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
@@ -237,24 +237,30 @@ into pointers and back again, it must be able to track
 pointers to GC values that are stored in Rust \lstinline{usize} values.
 
 Having acknowledged that pointers may end up disguised as integers, it is then
-inevitable that \ourgc must be a conservative GC (i.e.~scans all words in
-memory \jake{This doesn't sound quite right, I get what you mean, but we don't
-scan all words in memory, just those reachable from the root-set}, irrespective of their compile-time type, for pointers to the GC heap).
-Although conservative GC is sometimes looked down upon\footnote{It is also
-sadly the case that there remains no cross-platform, or cross-compiler,
-mechanism for automated, precise GC.}, it is used in the
-two most widely used web browsers: Chrome uses it in its rendering
+inevitable that \ourgc must be a \emph{conservative} GC. In essence, such GCs,
+starting from the roots, treat machine words as possible pointers: if
+a word does point into a GCed block of memory, then that block itself is also
+conservatively scanned. Since a conservative GC doesn't know if a word is a
+pointer from the program's perspective, or just happens to be a sequence of
+bits that also happens to make it a valid pointer, this over-approximates the
+\emph{live set} (i.e.~the blocks that the GC will not reclaim) \laurie{jake:
+cite the steve blackburn paper that shows this isn't a big problem}.
+
+Conservative GC occupies a grey zone in programming language semantics. In
+most languages (including the semantics of most compiler IRs) conservative GC
+relies on undefined behaviour. \ourgc's use of conservative GC means \ourgc
+is, formally speaking, unsound. However, conservative GC is widely used,
+including in the two most widespread web browsers: Chrome uses it in its rendering
 engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
-VM~\citep{pizlo17riptide}. We thus take
-the practical soundness \jake{In my viva, Richard raised the point that the term
-soundness isn't really a sliding scale so terms like practical soundness don't
-make sense -- you're either sound or you aren't. It's
-fine to say that "modulo XYZ we are sound" but can
-we say the same thing without mentioning explicitly mentioning soundness and upsetting theory people?} of conservative GC as a given. Currently, \ourgc uses
-the well-known Boehm-Demers-Weiser conservative collector
-(\boehm)~\citep{boehm88garbage}, although the major challenges we tackle in
-this paper will remain the same no matter what underlying conservative GC is
-used.
+VM~\citep{pizlo17riptide}. Even in 2023, we lack good
+alternatives: there is no cross-platform API for precise GC; and while some
+compilers such as LLVM provide some support for GC features, we have found them
+incomplete and buggy. Practically speaking, despite the potential soundness
+worries, conservative GC remains a widely used technique, and one can consider \ourgc
+to rely on `safety in numbers'. Currently, \ourgc uses the well-known
+Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
+challenges we tackle in this paper will remain the same no matter what
+underlying conservative GC is used.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
