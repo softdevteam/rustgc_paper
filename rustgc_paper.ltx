@@ -42,10 +42,8 @@ use-after-frees etc.), performance (\laurie{use a sensible figure from the
 perf section}), or ergonomics (e.g.~requiring drop methods to be duplicated
 as finalisers).
 
-In this paper we introduce \ourgc, a new \emph{tracing} GC (i.e.~a `full' GC that,
-unlike reference counting, does not leak memory in the face of
-cycles~\cite{bacon04unified}) for Rust. \ourgc's basic design is
-similar to many other GCs for Rust. Unlike previous GCs,
+In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
+similar to many other GCs for Rust but unlike previous GCs,
 we identify the chief challenge for a sound,
 performant, ergonomic GC for Rust as \emph{finalisers} (i.e.~code which is run just before a
 value is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
@@ -76,7 +74,15 @@ duplicated without requiring verbose function calls. Less visible is that we
 extend FSA to enlarge the set of types whose destructors can be statically
 proven to be safe finalisers.
 
-We do not pretend that \ourgc is a production-ready GC for Rust, but it is
+\ourgc is implemented as a fork / extension of the standard Rust compiler
+\rustc, using conservative GC in order to support a fully idiomatic Rust API
+for \lstinline{Gc<T>}. Although conservative GC is used in widespread
+programs such as Chrome and Safari, it is unsound in most languages
+and compilers: thus \ourgc's soundness guarantees are modulo the trade-offs
+implied by conservative GC (see~\cref{conservative_gc}). In practise we do not
+consider this a major concern, and one could create a variant of \ourgc with a
+less idiomatic Rust API that would not require conservative GC if so desired.
+Overall, while we do not pretend that it is a production-ready GC for Rust, it is
 sufficiently polished to be usable for real programs: it has high-quality error
 messages and reasonable performance. Although \ourgc is necessarily tied to
 Rust, we believe that most of the techniques in this paper would generalise to
@@ -236,6 +242,7 @@ back. In other words, if \ourgc wants to allow GCed values to be converted
 into pointers and back again, it must be able to track
 pointers to GC values that are stored in Rust \lstinline{usize} values.
 
+\label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a \emph{conservative} GC. In essence, such GCs,
 starting from the roots, treat machine words as possible pointers: if
