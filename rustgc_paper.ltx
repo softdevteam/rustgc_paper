@@ -217,25 +217,29 @@ finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
 
 
-\section{\ourgc: Basic Design Choices}
+\section{\ourgc: Basic Design Choices and Implementation Approach}
 
 The fundamental aim of \ourgc is to add GC for Rust in a way that is
-sound, performant, and ergonomic. In this section we outline the basic design choices
-we made in \ourgc --- the rest of the paper then goes into the detail on the more
+sound, performant, and ergonomic. In this section we outline \ourgc's basic design choices
+and implementation approach -- the rest of the paper then goes into detail on the more
 advanced aspects.
 
-Like most GCs for Rust, \ourgc provides a \lstinline{Gc<T>} type.
-When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
-moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to where \lstinline{v} is stored on the GC
-heap.
 
-Most GCs for Rust expose a relatively small API for \lstinline{Gc<T>}. \ourgc
-deliberately exposes a fuller API modelled on the reference counting type \lstinline{Rc<T>}
-from Rust's standard library because \lstinline{Rc<T>}: is conceptually
+\subsection{Basic Design Choices}
+
+\ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
+reference counting type \lstinline{Rc<T>} from Rust's standard library, because
+\lstinline{Rc<T>}: is conceptually
 similar to \lstinline{Gc<T>}; is widely used in Rust code, and so its API is
 familiar; and its API reflects long-term experience about what Rust programmers
 need from such a type.
+
+When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
+moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
+simple wrapper around a pointer to \lstinline{v} on the GC heap. Dereferencing
+a \lstinline{Gc<T>} produces an immutable Rust reference to the underlying
+value: there is no way to directly mutate GCed values and users must use other
+standard Rust types (e.g.~\lstinline{Mutex<T>}) that enable \emph{interior mutability}.
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
@@ -270,10 +274,7 @@ alternatives: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
 incomplete and buggy. Practically speaking, despite the potential soundness
 worries, conservative GC remains a widely used technique, and one can consider \ourgc
-to rely on `safety in numbers'. Currently, \ourgc uses the well-known
-Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
-challenges we tackle in this paper will remain the same no matter what
-underlying conservative GC is used.
+to rely on `safety in numbers'.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
@@ -290,6 +291,16 @@ convenience can be a real boon because copying frees the programmer from Rust's 
 restrictions on ownership and moving. It also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
 than duplicating an \lstinline{Rc<T>}.
+
+
+\subsection{Implementation Approach}
+
+\laurie{rustc fork, BDWGC, GcBox, etc.}
+
+Currently, \ourgc uses the well-known
+Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
+challenges we tackle in this paper will remain the same no matter what
+underlying conservative GC is used.
 
 
 \section{Finaliser Safety Analysis}
