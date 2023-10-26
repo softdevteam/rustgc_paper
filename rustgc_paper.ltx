@@ -129,11 +129,17 @@ and/or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workaro
 Perhaps the most widely used workaround is to use the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
 data-structures reference counting is a reasonable solution, but using it for
-cyclic data-structures requires juggling strong and weak counts, making it easy
-to accidentally reclaim\jake{im not sure this is true?}, or leak, values. A different workaround is to use
+cyclic data-structures requires juggling strong and weak counts, which makes
+it easy for values to live for shorter or longer than required. Another solution is to use
 arenas, which tie the maximum lifetime of multiple objects to one another. Values
 can no longer be reclaimed too early, but nor can they be freed early if they are
-no longer needed, with obvious consequences for memory consumption.
+no longer needed, with obvious consequences for memory consumption. A proposed
+Rust-specific workaround are \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+which allow cyclic data-structures to be built. This works by, in essence,
+statically guaranteeing that there is a single owner for the entire
+data-structure at any point in the program, thus preventing use cases where,
+for example, multiple threads need concurrent mutable access to parts of a
+data-structure.
 
 \laurie{jake: can we find a minimal example here? linked lists are an obvious
 one, but they're too complicated i think: we can at least reference
@@ -151,7 +157,7 @@ Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value's drop
 method is called. For example, suitably simplified (e.g.~ignoring weak
-counts), the \lstinline{Rc<T>} type has the following drop method:
+counts), \lstinline{Rc<T>} has the following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
