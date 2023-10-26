@@ -287,10 +287,10 @@ There are, broadly speaking, three possible design choices: (1) universally
 call drop methods from finalisers and accept that this undermines soundness;
 (2) require programmers to manually implement a finaliser for each type they
 wish to GC and accept the resulting boilerplate; (3) analyse drop methods and
-only allow those determined to be safe to be used as finalisers. Existing GCs for Rust take the first
-\laurie{jake: do any take the first?}\jake{I'm not aware of any that take the
-first} or second \laurie{jake: pick a couple as
-examples} \jake{rust-gc, bronze, boa} approaches.
+only allow those determined to be safe to be used as finalisers. To the
+best of our knowledge, all current GCs for Rust that support finalisers
+\laurie{do i remember correctly that some, maybe luster, don't support
+finalisers?} use the second approach.
 
 \ourgc introduces the novel concept of \emph{Finaliser Safety Analysis} (FSA)
 as a way of realising the third approach. FSA extends Rust's type rules to
