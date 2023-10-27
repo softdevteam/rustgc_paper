@@ -3050,6 +3050,7 @@ implemented as reference counting. Since then, there have been
 several attempts at a more advanced form of GC than the reference counting
 library \lstinline{Rc} to the language.\laurie{cite the last commit which removes it}
 
+\laurie{what does \rustbacon do with finalisers?}
 \rustbacon~\citep{rustbacon} is a Rust library implementation of the Bacon-Rajan
 cycle collecting reference counting implementation~\citep{bacon01concurrent}.
 \rustbacon is single-threaded, and provides thread-local reference counted boxes
@@ -3065,7 +3066,8 @@ possible~\citep{bacon01concurrent}). However, unlike \ourgc, \rustbacon is
 purely library based: it does not require any modifications to the Rust compiler
 to work. In addition, as a reference counted approach, it still maintains the
 advantages and disadvantages of reference counting over \ourgc's tracing GC --
-except, of course, that it can collect cycles!
+except, of course, that it can collect cycles \laurie{if it can collect cycles,
+then it has none of the disadvantages of Rc, surely?}!
 
 \rustgc~\citep{rustgc} is library for Rust which provides optional
 single-threaded mark-sweep GC with the \lstinline{Gc<T>} type. The API for
@@ -3074,6 +3076,8 @@ single-threaded mark-sweep GC with the \lstinline{Gc<T>} type. The API for
 to obtain additional pointers to garbage-collected objects, the \lstinline{Gc}
 must be cloned.
 
+\laurie{what is the practical difference between \rustbacon and \rustgc?
+from the description they sound identical from a user's perspective}
 \rustgc is implemented as a hybrid form of reference counting and tracing GC.
 There is no mechanism for scanning the stack for roots as in traditional GC, so
 roots are tracked using reference counting, with a mark-sweep then performed
@@ -3118,7 +3122,7 @@ stackmaps. When a GC call is requested, Bronze iterates over the stackmaps
 generated its current call stack in order to locate the roots for garbage
 collection. However, Bronze does not implement this for transitive references
 from arbitrary objects. In other words, if a \lstinline{Gc<T>} exists as a field
-inside another object instead of directly on the stack, it would not be tracked
+inside another object instead of directly on the stack, it \laurie{is?} would not be tracked
 as a root for garbage collection.
 
 The second major difference between \rustgc and Bronze is that Bronze's
@@ -3163,7 +3167,7 @@ fn main() {
 
 \shifgrethor~\citep{shifgrethor} is an experimental GC API for Rust which investigated a way for
 potential GC implemenations to precisely identify and trace roots to GC'd
-objects. \shifgrethor is therefore not a GC, but instead an
+objects. \shifgrethor is therefore not a GC \laurie{?}, but instead an
 experimental design for how a GC could interface with the language.
 
 The basic idea is that in order to create a \lstinline{Gc} object, it must be
@@ -3171,6 +3175,7 @@ created by, and exist alongside a corresponding \lstinline{Root<'root>} type on
 the stack. The \lstinline{Root<'root>} can then dish out references to the
 underlying \lstinline{Gc} which are tied to \lstinline{Root<'root>}'s lifetime.
 
+\laurie{can \gcarena handle cycles? what about finalisers?}
 \gcarena~\citep{gcarena} is another experimental approach at sound GC design in Rust. It was
 originally developed as part of the \emph{luster} VM~\citep{luster}: an experimental Lua VM
 written in Rust. Unlike \ourgc and the other approaches to GC in Rust seen so
