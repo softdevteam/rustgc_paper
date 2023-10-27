@@ -302,6 +302,400 @@ Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
 challenges we tackle in this paper will remain the same no matter what
 underlying conservative GC is used.
 
+\ourgc introduces a new smart pointer type, \lstinline{Gc<T>}, which provides
+shared ownership of a value of type \lstinline{T} allocated in the heap and
+managed by a garbage collector. Consider a simple example and its corresponding
+representation in memory:
+
+\begin{minipage}[c]{0.5\linewidth}
+\begin{lstrustsmall}
+use std::gc::Gc;
+
+fn main() {
+    let a = Gc::new(123);
+}
+\end{lstrustsmall}
+\end{minipage}
+\begin{minipage}[c]{0.5\linewidth}
+    \includegraphics[width=1\textwidth]{images/alloy_basic_gc_1}
+\end{minipage}
+
+This creates a garbage collected object which contains the \lstinline{u64} value
+\lstinline{123}. A \lstinline{Gc}'s data is stored in a \lstinline{GcBox}
+internally. \lstinline{GcBox}es are managed by the collector, though this is not visible to the
+user.
+
+\lstinline{Gc} references are copyable (i.e.~they implement the \lstinline{Copy}
+trait), with copied references pointing to the same object in the heap:
+
+\begin{minipage}[c]{0.5\linewidth}
+\begin{lstrustsmall}
+fn main() {
+    let a = Gc::new(123);
+    let b = a;
+}
+\end{lstrustsmall}
+\end{minipage}
+\begin{minipage}[c]{0.5\linewidth}
+    \includegraphics[width=1\textwidth]{images/alloy_basic_gc_2}
+\end{minipage}
+
+This makes \lstinline{Gc} more ergonomic to use than \lstinline{Rc}, as there is
+no need to call \lstinline{clone} on a \lstinline{Gc} to obtain another
+reference to its data.
+
+The \lstinline{GcBox} referenced by a \lstinline{Gc} is guaranteed not to be
+freed while there are still references to it. When there are no longer any
+references, the collector will reclaim it at some point in the future. The
+garbage collector runs intermittently in the background, so \lstinline{Gc}
+objects may live longer than they need to.
+
+\subsubsection{Dereferencing}
+
+A \lstinline{Gc<T>} dereferences to \lstinline{T} with the dereference
+(\lstinline{*}) operator:
+
+\begin{minipage}[c]{0.5\linewidth}
+\begin{lstrustsmall}
+fn main() {
+    let a = Gc::new(123);
+    let b = *a;
+    foo(b);
+}
+
+fn print(int: u64) {
+    println!("{}", int);
+}
+\end{lstrustsmall}
+\end{minipage}
+\begin{minipage}[c]{0.5\linewidth}
+    \includegraphics[width=1\textwidth]{images/alloy_basic_gc_3}
+\end{minipage}
+
+Here, the value can be copied out of the \lstinline{Gc} into \lstinline{b}
+because \lstinline{u64}s are copyable. The \lstinline{Gc} type also allows the
+dot operator to be used for calling methods of type \lstinline{T} on a
+\lstinline{Gc<T>}:
+
+\begin{lstrustsmall}
+struct Wrapper(u64);
+
+impl Wrapper {
+    fn foo(&self) {
+        ...
+    }
+}
+
+fn main() {
+    let a = Gc::new(Wrapper(123));
+    a.foo();
+}
+\end{lstrustsmall}
+
+\subsection{Mutation}
+
+There is no way to mutate, or obtain a mutable reference (\lstinline{&mut T})
+to a \lstinline{Gc<T>} once it has been allocated. This is because mutable
+references must not alias with any other references, and there is no way to know
+at compile-time whether there is only one \lstinline{Gc} reference to the data.
+
+As with other shared ownership types in Rust, interior mutability
+(\autoref{intmut}) must be used when mutating the contents inside a
+\lstinline{Gc}:
+
+\begin{lstrustsmall}
+fn main() {
+    let a = Gc::new(RefCell::new(123));
+    *a.borrow_mut() = 456; // Mutate the value inside the GC
+}
+\end{lstrustsmall}
+
+\subsubsection{Concurrency}
+\label{sendsync}
+
+The Rust type system is able to guarantee statically that values are being used
+in a thread-safe way. It does this with the use of two special "marker" traits:
+\lstinline{Send} and \lstinline{Sync}.
+
+A value whose type implements the \lstinline{Send} trait can be transferred to
+other threads. Almost all types in Rust implement the \lstinline{Send} trait
+save for a few exceptions. One such exception is the \lstinline{Rc<T>}
+(reference counting) type. This does \emph{not} implement \lstinline{Send}
+because it does not perform count operations on its underlying contents
+atomically. If it were sent to another thread, it could race if both threads
+tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
+type (an atomic implementation of \lstinline{Rc<T>}) does implement
+\lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
+
+The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
+implemented on types whose values perform mutation in a thread-safe manner. For
+example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
+exclusive access to its underlying data atomically. On the other hand, a
+\lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
+\lstinline{Sync} because it only provides single-threaded interior
+mutability. This is because its underlying mechanism to increment and decrement
+borrow counts are not performed atomically.
+
+The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
+trait known as \emph{auto traits}. This means that they are automatically
+implemented for every type, unless the type, or a type it contains, has
+explicitly opted out. Types can be opted out via a \emph{negative impl}:
+
+\begin{lstrustsmall}
+    impl !Send for T {}
+\end{lstrustsmall}
+
+If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
+from the example above, then the entire struct \lstinline{S} will also not
+implement \lstinline{Send}.
+
+\lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
+doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
+is safe to use in a multi-threaded context.
+
+\ourgc's \lstinline{Gc} reference is fundamentally thread-safe: if \lstinline{T}
+implements \lstinline{Send} + \lstinline{Sync}, then \lstinline{Gc<T>} will too.
+The \lstinline{Gc<T>} type therefore conditionally implements \lstinline{Send} +
+\lstinline{Sync} depending on \lstinline{T}:
+
+\begin{lstrustsmall}
+unsafe impl<T: Send> Send for Gc<T> {}
+unsafe impl<T: Sync> Sync for Gc<T> {}
+\end{lstrustsmall}
+
+\subsubsection{Conservative GC}
+
+\label{ourgc:soundness}
+
+\ourgc is a conservative GC (\autoref{bg:css}), which means that by nature, it
+is unsound. This is because, technically speaking, the way conservative GC works
+violates the rules of most languages, most compilers, and most operating
+systems. In very rare cases, compilers have been known to perform
+optimisations which can obfuscate pointers from the
+collector~\citep{chromium20cssbug}. Fortunately, the ubiquity of conservative GCs in industrial strength
+VMs means that in practise it is well supported. If one can accept this caveat,
+\ourgc is otherwise correct-by-design provided that users do not hide,
+accidentally or otherwise, pointers from the GC. Programming techniques which
+rely on \emph{pointer obfuscation}~\citep{boehm96simple} are therefore not
+allowed in \ourgc. This rules out the use of certain data structures such as XOR
+lists.
+
+When \ourgc performs a collection, it must first identify the roots from which
+the rest of the object graph is traced. Such roots exist on the call stack, in
+registers, and in segments of the program which store global values. When a
+collection is scheduled, the BDWGC spills register values to the stack so that
+their contents can be scanned for pointers along with the rest of the
+stack~\citep{boehm88garbage}. The call stack is exhaustively examined for
+possible pointers to instances of objects, with each aligned word on the stack
+is checked to see whether it points to an instance of an object: if it does,
+that object is considered a root. \autoref{fig:roots} shows an example of what
+\ourgc considers roots to garbage collected objects.
+
+\begin{figure}
+% Hack to get the listing in the figure
+\newsavebox{\rootlisting}
+\begin{lrbox}{\rootlisting}
+\begin{lstrustsmallnonums}
+// `a` exists on the stack.
+let a = Gc::new(1);
+let b = a; // obtain copy
+
+
+
+let c = Gc::new(Gc::new(2));
+// obtain a rust (&) ref
+let d = c.as_ref();
+\end{lstrustsmallnonums}
+\end{lrbox}
+    \centering
+    \subfloat[\centering Roots on the stack]{\usebox{\rootlisting}}
+    \hfill
+    \subfloat[\centering Representation in memory]{
+        \includegraphics[width=0.5\textwidth]{images/gc_roots.pdf}
+    }
+    \caption{An example showing values on the stack which are considered
+    roots to \lstinline{GcBox}es.}
+    \label{fig:roots}
+\end{figure}
+
+\begin{figure}[t]
+\begin{lstrustsmall}
+use std::gc::GcAllocator;
+
+#[global_allocator]
+static ALLOCATOR: GcAllocator = GcAllocator;
+
+fn main() {
+    ...
+}
+\end{lstrustsmall}
+    \caption{Setting the global allocator to use the BDWGC in \ourgc using
+    Rust's \lstinline{global_allocator} attribute.}
+\label{fig:allocator}
+\end{figure}
+
+\subsubsection{Garbage collected objects in other heap objects}
+
+In \ourgc, references to garbage collected objects can be stored in
+traditional, non-garbage-collected Rust objects:
+
+\begin{lstrustsmall}
+fn main() {
+    let v = Vec::new();
+    v.push(Gc::new(1));
+    v.push(Gc::new(2));
+}
+\end{lstrustsmall}
+
+Here, the vector contains two references to garbage collected objects which are
+managed by \ourgc. Even though the vector itself is not garbage collected, its
+backing store must still be traced during a collection in order to locate GC
+objects. To support this, every allocation in a \ourgc must use the BDW
+allocator -- even those which are not garbage collectable. This is because the
+BDW allocator stores bookkeeping information such as mark bits and the memory
+block size which are needed during a collection.
+
+
+Rust provides a convenient way to set the global allocator for a program, and
+because \ourgc extends the standard library to include the BDW allocator,
+programs can easily be made \ourgc-compliant. This is shown in
+\autoref{fig:allocator}.
+
+This ensures that every heap allocation (except those created using a
+\lstinline{Gc::new()}) is made using the BDW allocator's
+\lstinline{GC_malloc_uncollectable} function. This allocates a
+non-garbage-collected block which the collector is aware of and can scan for
+pointers to other garbage collected objects. As with the call stack, the BDWGC
+scans all allocated blocks in memory that are reachable from the root-set
+conservatively word-by-word.
+
+\subsubsection{Pointer obfuscation}
+
+\label{ourgc:pointer_obfuscation}
+
+As a systems programming language, Rust permits operations directly on pointers.
+This includes: casting pointers to and from integer types; pointer arithmetic;
+and bitwise operations on pointers. All three of these operations can be used to
+obfuscate a pointer, hiding it from the collector and causing it to
+erroneously determine that an object is unreachable. The user must not obfuscate
+any pointers in this way.
+
+\begin{figure}
+\begin{lstrustsmall}
+fn make_obfuscated() -> usize {
+    let a = Gc::new(123_u64);
+
+    // Get a raw pointer to the underlying allocation
+    let aptr = a.as_ref() as *const u64;
+
+    // Use the bitwise NOT operator to obfuscate the pointer
+    return !(aptr as usize)
+}
+
+fn main() {
+    let obf = make_obfuscated();
+
+    ...
+
+    // GC cycle here. The `Gc` is potentially unreachable!
+
+    let reify = (!obf) as *const u64;
+
+    // `unsafe` is needed to dereference a raw pointer
+    let value = unsafe { *reify };
+}
+\end{lstrustsmall}
+\caption{An example of how pointer obfuscation in Rust can hide a pointer from
+    the collector. \ourgc uses the BDWGC to conservatively scan the stack, so
+    this allocation could be missed if its only remaining reference is the one
+    obfuscated on line 8. Fortunately, however, it requires an unsafe block to
+    dereference (line 21).}
+\label{lst:obfuscation}
+\end{figure}
+
+\subsubsection{Pointer casting and word alignment}
+
+For \ourgc to be able to locate pointers during a marking, all references, raw
+pointers, and machine-word sized integers (\lstinline{usize}) must be
+word-aligned. This is because Boehm scans the stack and heap blocks for pointers
+Word-by-word, so non-word-aligned values may be missed.
+
+It's easy to see that \ourgc needs to be able to identify objects via references
+or raw pointers, and thus requires them to be word-aligned. The reason this is
+also true for \lstinline{usize}s is more subtle, and is necessary because it's
+possible in Rust to cast between raw pointers and word-sized integers using the
+\lstinline{as} keyword. Consider the following:
+
+\begin{lstrustsmall}
+let gc = Gc::new(Value);
+let gc_ref = gc.as_ref(); // Get a &Value reference.
+let ptr_to_int = (gc_ref as *const Value) as usize;
+\end{lstrustsmall}
+
+We first obtain a reference to the \lstinline{Value} stored inside the
+\lstinline{Gc} before casting it to a raw pointer, and then a \lstinline{usize}
+(a word-sized unsized integer). If \lstinline{gc} and \lstinline{gc_ref} were to
+go out of scope, the \lstinline{ptr_to_int} is enough to keep the GC'd object
+alive, because when \ourgc scans the stack, it would correctly identify that
+\lstinline{ptr_to_int} looks like a pointer to a valid GC object.
+
+\section{The collector}
+\label{ourgc:collector}
+
+\ourgc uses the Boehm-Demers-Weiser GC (\boehm) as the collector implementation
+~\citep{boehm88garbage}. The BDWGC is a conservative mark-sweep collector. It
+scans the Rust program's call stack conservatively to look for pointers to
+garbage-collected objects when marking. The rest of this section describes the
+features available in \boehm which are used by \ourgc.
+
+\subsection{Blacklisting}
+
+\ourgc uses the \boehm's blacklisting mechanism. This means that if, during
+marking, the collector identifies a bit-pattern which resembles a pointer to a
+block which is not yet allocated, it will prevent objects from being allocated
+in that block in the future (i.e. blacklist them). This is designed to reduce
+false-positives in pointer identification which can leak memory.
+
+\subsection{Incremental marking}
+
+\ourgc uses the BDWGC's incremental marking to reduce the latency. This means that
+instead of using single stop-the-world (STW) pause, bits of marking are
+performed in smaller chunks that interleave with the mutator to reduce the
+latency of the program. This does not require any modifications to \ourgc.
+
+\subsection{Parallel collector threads}
+
+The BDWGC uses parallel collector threads for both mark and sweep phases.
+However, as \ourgc does not use write barriers explicitly, no collection happens
+concurrently to the mutator.
+
+\subsection{Non-moving generational collection}
+
+The BDWGC is a non-moving collector. However, it provides a form of non-moving
+generational GC using sticky mark-bits which \ourgc enables by default. This is
+implemented by not clearing the mark bit between minor collections. This way,
+objects that were live at the previous collection are considered the old
+generation~\citep{demers89combining}.
+
+\subsection{Parallel mutator threads}
+
+In order to support thread-safe \lstinline{Gc}s in \ourgc, the BDWGC must be
+able to scan each thread's call stack for roots. I extend the Rust compiler to
+register newly spawned threads with BDWGC's collector, and to unregister them
+when they are destroyed.
+
+\ourgc relies on the BDWGC's signal spin implementation to come to a GC
+safepoint. That is, when a mutator thread comes under allocation pressure and
+needs to schedule a GC, the BDWGC will send a SIGPWR signal to each registered
+thread and has them spin in a signal handler while the collection cycle takes
+place.
+
+The main disadvantage of this approach is that it makes use of
+implementation-defined behaviour because it relies on the target OS's mechanism
+for pausing threads. The BDWGC provides implementations for most platforms, but
+it is not portable. An implementation where Rust inserts thread pause safepoints
+at appropriate locations would largely solve these issues, though at
+the expense of considerable implementation effort.
 
 \section{Finaliser Safety Analysis}
 

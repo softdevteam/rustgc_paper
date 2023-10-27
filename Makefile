@@ -13,6 +13,8 @@ DIAGRAMS = images/finaliser_cycle1.pdf images/finaliser_cycle2.pdf \
 		   images/finaliser_elision_3.pdf images/finaliser_elision_4.pdf \
 		   images/finaliser_elision_5.pdf images/finaliser_elision_6.pdf \
 		   images/finaliser_elision_7.pdf images/finaliser_elision_8.pdf \
+		   images/alloy_basic_gc_1.pdf images/alloy_basic_gc_2.pdf \
+		   images/alloy_basic_gc_3.pdf images/gc_roots.pdf \
 		   images/partial_finaliser_elision_1.pdf
 
 GRAPHS = graphs/bounce_memory.pdf graphs/bubblesort_memory.pdf \
