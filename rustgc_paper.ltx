@@ -130,16 +130,15 @@ Perhaps the most widely used workaround is to use the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
 data-structures reference counting is a reasonable solution, but using it for
 cyclic data-structures requires juggling strong and weak counts, which makes
-it easy for values to live for shorter or longer than required. Another solution is to use
-arenas, which tie the maximum lifetime of multiple objects to one another. Values
+it easy for values to live for shorter or longer than required. Another solution are
+arenas which, having accumulated multiple values, free all of them at once: values
 can no longer be reclaimed too early, but nor can they be freed early if they are
-no longer needed, with obvious consequences for memory consumption. A proposed
-Rust-specific workaround are \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
-which allow cyclic data-structures to be built. This works by, in essence,
-statically guaranteeing that there is a single owner for the entire
-data-structure at any point in the program, thus preventing use cases where,
-for example, multiple threads need concurrent mutable access to parts of a
-data-structure.
+no longer needed. A type-based approach are \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+which allow cyclic data-structures to be built by statically guaranteeing that
+there is a single owner for the entire data-structure at any point in the
+program. However, this prevents use cases where multiple owners (possibly,
+though not necessarily, in different threads) need to read or mutate different
+parts of a data-structure.
 
 \laurie{jake: can we find a minimal example here? linked lists are an obvious
 one, but they're too complicated i think: we can at least reference
