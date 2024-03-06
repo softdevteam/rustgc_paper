@@ -6,9 +6,8 @@
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
 makes expressing data-structures whose values have multiple owners awkward or inefficient.
-Adding GC to Rust has previously required sacrificing
-at least one of performance, soundness, or ergonomics. We identify
-the major challenge for practical GC for Rust as finalisers: mapping existing Rust destructors
+In this paper we explore a new design for GC in Rust, identifying
+the major challenge as finalisers: mapping existing Rust destructors
 to GC finalisers seems natural but introduces subtle soundness, significant
 performance, and irritating ergonomic issues. In this paper we introduce \ourgc, a new GC for Rust,
 which provides solutions for each of these issues.
@@ -24,18 +23,18 @@ are Garbage Collected (GCed) or not: GCed languages enable implicit memory manag
 non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust's use of affine types and ownership does not
 fit within this classification: it is not GCed but it has implicit memory management.
-Many portions of many Rust programs are as
+Most portions of most Rust programs are as
 succinct as a GCed equivalent but ownership is too inflexible to express
 data-structures that require multiple owners (e.g.~linked lists).
-Workarounds have downsides such as memory leaks, inflexibility, or complexity.
+Workarounds have many downsides, from memory leaks, inflexibility, or complexity.
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
 type \lstinline{T} to the GC heap and then wraps a pointer to it. \lstinline{Gc<T>}
 can be \emph{cloned} (i.e.~duplicated) at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
-variables, variables on the stack, etc.) then the GC reclaims the
-underlying memory. However, existing GCs for Rust require sacrificing at
+variables, variables on the stack, etc.) to the underlying value then the
+GC reclaims the relevant memory. However, existing GCs for Rust require sacrificing at
 least one of soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
 track indirect references, so seemingly safe programs can fail due to
 use-after-frees etc.), performance (\laurie{use a sensible figure from the
@@ -53,7 +52,7 @@ pervasively in the form of \lstinline{drop} methods. When a type
 to map its destructor to a finaliser. However, this introduces three
 fundamental problems:
 (1) some safe destructors are not safe finalisers;
-(3) finalisers can be run too early;
+(2) finalisers can be run too early;
 and (3) finalisers are prohibitively slower than destructors.
 
 We introduce solutions for each of these problems:
@@ -70,7 +69,7 @@ to be run in a GC context.
 
 As well as solving these fundamental problems, we also introduce several
 ergonomic improvements. The most visible is that we allow GC types to be
-duplicated without requiring verbose function calls. Less visible is that we
+duplicated without requiring explicit calls to \texttt{clone}. Less visible is that we
 extend FSA to enlarge the set of types whose destructors can be statically
 proven to be safe finalisers.
 
@@ -78,11 +77,13 @@ proven to be safe finalisers.
 \rustc, using conservative GC in order to support a fully idiomatic Rust API
 for \lstinline{Gc<T>}. Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
-and compilers: thus \ourgc's soundness guarantees are modulo the trade-offs
-implied by conservative GC (see~\cref{conservative_gc}). In practise we do not
-consider this a major concern, and one could create a variant of \ourgc with a
+and compilers: thus \ourgc's is sound only to the extent that implied
+by conservative GCs in general (see~\cref{conservative_gc}). Since
+conservative GC is widely used, we consider this a pragmatic trade-off:
+we believe that one could create a variant of \ourgc with a
 less idiomatic Rust API that would not require conservative GC if so desired.
-Overall, while we do not pretend that it is a production-ready GC for Rust, it is
+
+Overall, while we do not pretend that \ourgc is a production-ready GC for Rust, it is
 sufficiently polished to be usable for real programs: it has high-quality error
 messages and reasonable performance. Although \ourgc is necessarily tied to
 Rust, we believe that most of the techniques in this paper would generalise to
@@ -117,7 +118,7 @@ the owner goes out of scope, then the value's \lstinline{drop} method (its destr
 is run and its memory can be reused. An owner can give references to a value
 to other code, subject to the following static restrictions: there can be
 multiple read-only \emph{references} (`\lstinline{&}') to a value, or a single
-read-write reference (`\lstinline{&mut}'); references cannot outlast the owner.
+read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
 
 These basic rules allow many Rust programs to be written in a style that makes
 them indistinguishable from their equivalents in GCed languages. However,
