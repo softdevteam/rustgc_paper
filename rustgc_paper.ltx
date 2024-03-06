@@ -149,6 +149,12 @@ introduce a type `S' which can reference other `S`s and show the problems with
 rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
 
 
+\subsection{GC terminology}
+
+\laurie{tracing vs.non-tracing}
+\laurie{mutator vs.~non-mutator}
+
+
 \section{Destructors vs.~Finalisers}
 \label{sec:finaliser_issues}
 
@@ -164,7 +170,8 @@ impl<T> Drop for Rc<T> {
   fn drop(&must self) {
     self.inner.count -= 1;
     if self.inner.count == 0 {
-        unsafe { Box::from_raw(self.inner.block); }
+      unsafe { Box::from_raw(self.inner.block);
+    }
   }
 }
 \end{lstlisting}
@@ -173,48 +180,58 @@ In this example, \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
 \emph{trait} (roughly equivalent to a Java interface) which then requires
 implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a reference count and a pointer to
 a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
-type (which allocates heap memory). Its drop method
+type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
 first decrements the reference count. If that count
-goes to zero then the \lstinline{Box<T>} is reconstituted from its raw pointer
-(with \lstinline{from_raw}, and immediately goes out of scope, calling \lstinline{Box<T>}'s drop
-method (which deallocates the underlying heap memory).
+goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
+(with \lstinline{from_raw}), and immediately goes out of scope, implicitly
+calling \lstinline{Box<T>}'s drop method. This will then call \lstinline{T}'s
+drop method and then deallocate the underlying heap memory.
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
 about when destructors are called\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
-long temporary values are kept alive for is not currently fully defined.}. This then
+long temporary values are kept alive for is currently unspecified.}. This then
 enables a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
 For example, Rust's standard \lstinline{Mutex} type has a method
 \lstinline{lock} which returns a \lstinline{MutexGuard} value;
 \lstinline{MutexGuard}'s drop method automatically unlocks the
 \lstinline{Mutex}; and so a programmer can rely on a locked mutex being unlocked at
-a predictable point in the program, without having to explicitly call an unlock
+a predictable point, without having to explicitly call an unlock
 method.
 
-Destructors are a similar concept to GC finalisers: both concepts run user code
+At first destructors can appear identical to GC finalisers: both concepts run user code
 just before the memory a value occupies can be reused by the wider system.
-There is one obvious difference between the two: while Rust defines precisely
+However, there is one obvious difference between the two: while Rust defines precisely
 when a destructor will be run, GC finalisers are
-only run at some unspecified point in time after the last \lstinline{Gc<T>}
-reference to a GCed value is dropped. This delay is an inevitable part of any
-tracing GC and something we assume that users of \ourgc are
-comfortable with. However, this then raises the question: where are finalisers run? If we
-run them on the same thread as \emph{mutator} (i.e.~`normal user') code is running,
+only run at some unspecified point in time after the last
+reference to a GCed value is dropped.
+
+If we assume the existence in Rust of a `fully' GCed type \lstinline{Gc<T>}
+this immediately raises an important question: when are \lstinline{Gc<T>}
+finalisers run? When the reference count in an \lstinline{Rc<T>} goes to 0, \lstinline{T}'s
+drop method is called immediately. But when the last reference to an \lstinline{Gc<T>}
+is lost, \lstinline{T}'s drop method may not be called for some time. Indeed,
+`when` is not the only question this raises: where are finalisers run? If we
+were to run them on the same thread as mutator code is running,
 then the finaliser can cause a deadlock if it tries to access a resource that
 the normal code holds (see~\cref{finaliser_thread} for more details). However,
 not all \lstinline{drop} methods can safely be run on another thread.
 
-Indeed, finalisers in general have other subtle
+In addition to `when' and `where', finalisers have other subtle
 issues~\cite{boehm03destructors}. For example, what should we do with finalisers
 in values that form a cycle? In such a situation, a finaliser can reference
 values that are partly, or wholly, `finalised'. Other issues include the
 ability of finalisers to `resurrect' values by
-copying their GC reference to the main part of a program. Over time
+copying their GC reference to the main part of a program.
+
+Over time
 finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
+\laurie{we need to briefly talk about how a couple of other rust gcs handle (or
+presumably don't) finalisation}
 
 
 \section{\ourgc: Basic Design Choices and Implementation Approach}
@@ -269,7 +286,7 @@ relies on undefined behaviour. \ourgc's use of conservative GC means \ourgc
 is, formally speaking, unsound. However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its rendering
 engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
-VM~\citep{pizlo17riptide}. Even in 2023, we lack good
+VM~\citep{pizlo17riptide}. Even in 2024, we lack good
 alternatives: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
 incomplete and buggy. Practically speaking, despite the potential soundness
