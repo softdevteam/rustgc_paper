@@ -290,8 +290,7 @@ VM~\citep{pizlo17riptide}. Even in 2024, we lack good
 alternatives: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
 incomplete and buggy. Practically speaking, despite the potential soundness
-worries, conservative GC remains a widely used technique, and one can consider \ourgc
-to rely on `safety in numbers'.
+worries, conservative GC remains a widely used technique.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
