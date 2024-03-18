@@ -77,8 +77,8 @@ proven to be safe finalisers.
 \rustc, using conservative GC in order to support a fully idiomatic Rust API
 for \lstinline{Gc<T>}. Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
-and compilers: thus \ourgc's is sound only to the extent that implied
-by conservative GCs in general (see~\cref{conservative_gc}). Since
+and compilers: thus \ourgc is sound only to the extent that
+conservative GCs in general are sound (see~\cref{conservative_gc}). Since
 conservative GC is widely used, we consider this a pragmatic trade-off:
 we believe that one could create a variant of \ourgc with a
 less idiomatic Rust API that would not require conservative GC if so desired.
