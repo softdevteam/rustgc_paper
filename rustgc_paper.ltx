@@ -41,6 +41,17 @@ use-after-frees etc.), performance (\laurie{use a sensible figure from the
 perf section}), or ergonomics (e.g.~requiring drop methods to be duplicated
 as finalisers).
 
+\jake{Right now the performance story is disappointing. We are 40\%
+slower than regular \lstinline{Rc}, this is down how multi-threading user
+threads are handled in BDWGC. The long and short of it is that we must disable
+parallel marking in order to prevent severe lock contention on the heap when we
+have more than one user thread. If we don't do this, multi-threaded
+applications would slow down by around 10x!. However, by disabling parallel
+marking we end up making regular single-threaded applications 20\% slower than they were
+before. In other words, we've gone from a 20\% slowdown to a 40\% slowdown, and
+I don't have a satisfying answer to this with BDWGC as our current collector
+backend. (See \ref{graph:som_bar} / \ref{graph:som_bar_new} for a before and after comparison)}
+
 In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
 similar to many other GCs for Rust but unlike previous GCs,
 we identify the chief challenge for a sound,
@@ -75,7 +86,7 @@ proven to be safe finalisers.
 
 \ourgc is implemented as a fork / extension of the standard Rust compiler
 \rustc, using conservative GC in order to support a fully idiomatic Rust API
-for \lstinline{Gc<T>}. Although conservative GC is used in widespread
+for \lstinline{Gc<T>}. \jake{I think a take-away from this work is that you can't have a sound, ergononic, and performant GC library without modifying the language itself}  Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
 and compilers: thus \ourgc is sound only to the extent that
 conservative GCs in general are sound (see~\cref{conservative_gc}). Since
@@ -115,13 +126,13 @@ Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} has a
 single owner (e.g.~a variable): an owner can \emph{move} that value to another owner; once
 the owner goes out of scope, then the value's \lstinline{drop} method (its destructor)
-is run and its memory can be reused. An owner can give references to a value
+is run and its memory can be reused\jake{phrasing doesn't quite work}. An owner can give references to a value
 to other code, subject to the following static restrictions: there can be
 multiple read-only \emph{references} (`\lstinline{&}') to a value, or a single
-read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
+read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner. \jake{This is where we must make a decision about whether we use read-only / read-write or immutable / mutable terminology for the rest of the paper. I like the former, but I think the latter is more familiar to Rust programmers}
 
 These basic rules allow many Rust programs to be written in a style that makes
-them indistinguishable from their equivalents in GCed languages. However,
+them indistinguishable from their equivalents in GCed languages\jake{I'm not sure I agree, what does this mean?}. However,
 data structures that require values to have more than one owner cannot
 be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
 statically checked by the compiler). Instead, one must resort to indirect
@@ -162,7 +173,7 @@ In this section we look at the challenge of destructors for a GC for Rust.
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, or if the value is explicitly
 passed to the \lstinline{std::mem::drop} function, then the value's drop
-method is called. For example, suitably simplified (e.g.~ignoring weak
+method is called.\jake{This is just an empty method which makes the value go out of scope, so really it's the same as the first point. There's nothing special about this function. The interesting one is \lstinline{drop_in_place} that takes a non-owned pointer, but this will complicate things in this paragraph. I suggest removing the bit about \lstinline{std::mem::drop} entirely.} For example, suitably simplified (e.g.~ignoring weak
 counts), \lstinline{Rc<T>} has the following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
@@ -184,7 +195,7 @@ type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
 first decrements the reference count. If that count
 goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
 (with \lstinline{from_raw}), and immediately goes out of scope, implicitly
-calling \lstinline{Box<T>}'s drop method. This will then call \lstinline{T}'s
+calling \lstinline{Box<T>}'s drop method. This will then \jake{recursively?} call \lstinline{T}'s
 drop method and then deallocate the underlying heap memory.
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
@@ -2977,6 +2988,16 @@ follows:
     30 process executions, where the error bars represent 99\% confidence
     intervals.}
 \label{graph:som_bar}
+\end{figure}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{graphs/som_bar_new.pdf}
+    \caption{Results from the \perf experiment, where the SOM benchmark suite is
+    run with both configurations: \somrsrc, and \somrsgc. The vertical bars
+    represent the wall-clock time of \somrsgc, normalised to the wall-clock time
+    of \somrsrc.}
+\label{graph:som_bar_new}
 \end{figure}
 
 I use the SOM language's existing suite of synthetic benchmarks, adapted from

@@ -33,7 +33,7 @@ GRAPHS = graphs/bounce_memory.pdf graphs/bubblesort_memory.pdf \
 		 graphs/whileloop_memory.pdf graphs/som_bar.pdf \
 		 graphs/box_vs_rs_memory.pdf graphs/call_performance_memory.pdf \
 		 graphs/jmptbl_memory.pdf graphs/nvec_memory.pdf \
-		 graphs/wlambda_bar.pdf
+		 graphs/wlambda_bar.pdf graphs/som_bar_new.pdf
 
 all: rustgc_paper.pdf
 
