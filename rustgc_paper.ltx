@@ -73,7 +73,7 @@ extends Rust's type system to reject programs which use type \lstinline{T} with
 to be safe to use as a finaliser;
 (2) \emph{early finaliser prevention} inserts barriers that prevent factors
 such as optimisations or register allocation from `tricking'
-the GC into collecting values early;
+the GC into collecting values before they are dead;
 and (3) \emph{finaliser elision} statically optimises away many finalisers,
 by recognising that many destructors only free heap memory, and do not need
 to be run in a GC context.
@@ -667,7 +667,23 @@ go out of scope, the \lstinline{ptr_to_int} is enough to keep the GC'd object
 alive, because when \ourgc scans the stack, it would correctly identify that
 \lstinline{ptr_to_int} looks like a pointer to a valid GC object.
 
-\subsubsection{Thread local storage}
+\section{The collector}
+\label{ourgc:collector}
+
+\ourgc uses the Boehm-Demers-Weiser GC (\boehm) as the collector implementation
+~\citep{boehm88garbage}. \boehm is a conservative mark-sweep collector. It
+scans the Rust program's call stack conservatively to look for pointers to
+garbage-collected objects when marking. The rest of this section describes the
+necessary changes we made to \boehm.
+
+\subsection{Disable parallel collection}
+
+The BDWGC uses parallel collector threads for both mark and sweep phases. We
+disable these for performance reasons because we found the performance impact
+of the lock contention over heap allocation too high when using concurrent
+mutator threads. \jake{TODO: explain}
+
+\subsection{Thread-local storage support}
 
 \boehm does not provide a way for us to scan thread-locals for pointers, se
 provide a solution to this for both the POSIX thread-local \lstinline{specific}
@@ -676,56 +692,43 @@ API, and thread-locals which use fast compiler generated TLS.
 even mentioning the POSIX stuff}.
 
 By default, Rust uses LLVM's TLS implementation where thread-local data is
-stored in the PT_TLS segment of the ELF binary. This must be considered part of
+stored in the \lstinline{PT_TLS} segment of the ELF binary. This must be considered part of
 the root-set during collection. So that \boehm can scan this, we must be able
-to locate the PT_TLS block for each thread when they are suspended during GC,
+to locate the \lstinline{PT_TLS} block for each thread when they are suspended during GC,
 and then add this to the range of values which need marking. Each thread that
 is suspended during a collection is scheduled will call
 \lstinline{dl_iterate_phdr(3)} to get the start and end of its own range in the
-PT_TLS segment. These ranges are then scanned during marking. We must do this
+\lstinline{PT_TLS} segment. These ranges are then scanned during marking. We must do this
 at each collection, rather than once at start-up because this segment can grow
 and shrink dynamically during the course of the application, and threads can be
 spawned or killed in-between collections.
 
-\section{The collector}
-\label{ourgc:collector}
+\subsection{Off-thread finalisation API}
 
-\ourgc uses the Boehm-Demers-Weiser GC (\boehm) as the collector implementation
-~\citep{boehm88garbage}. The BDWGC is a conservative mark-sweep collector. It
-scans the Rust program's call stack conservatively to look for pointers to
-garbage-collected objects when marking. The rest of this section describes the
-features available in \boehm which are used by \ourgc.
+We introduces new malloc functions in \boehm for allocating \lstinline{Gc<T>}
+objects which require finalising on a separate, dedicated finalisation thread
+(\lstinline{GC_buffered_finalize_malloc}, \lstinline{GC_posix_memalign}, \lstinline{GC_memalign}).
 
-\subsection{Blacklisting}
+These functions allocate objects where the first word in the object points to
+their finaliser. (specifically, a fn pointer to \lstinline{drop_in_place} for
+\lstinline{T} in \lstinline{Gc<T>}.). This fn pointer must also be tagged in
+order to differentiate it from an empty block (as \boehm uses an optimisation
+where the first word of empty blocks are used to create a threaded freelist
+implementation) \jake{probably unnecessary detail}.
 
-\ourgc uses the \boehm's blacklisting mechanism. This means that if, during
-marking, the collector identifies a bit-pattern which resembles a pointer to a
-block which is not yet allocated, it will prevent objects from being allocated
-in that block in the future (i.e. blacklist them). This is designed to reduce
-false-positives in pointer identification which can leak memory.
-
-\subsection{Incremental marking}
-
-\ourgc uses the BDWGC's incremental marking to reduce the latency. This means that
-instead of using single stop-the-world (STW) pause, bits of marking are
-performed in smaller chunks that interleave with the mutator to reduce the
-latency of the program. This does not require any modifications to \ourgc.
-
-\subsection{Parallel collector threads}
-
-The BDWGC uses parallel collector threads for both mark and sweep phases.
-However, as \ourgc does not use write barriers explicitly, no collection happens
-concurrently to the mutator.
-
-\subsection{Non-moving generational collection}
-
-The BDWGC is a non-moving collector. However, it provides a form of non-moving
-generational GC using sticky mark-bits which \ourgc enables by default. This is
-implemented by not clearing the mark bit between minor collections. This way,
-objects that were live at the previous collection are considered the old
-generation~\citep{demers89combining}.
+During the sweep phase of a collection, a pointer to each unreachable
+finalisable object is added to a \emph{finalisation buffer}. A separate
+finalisation thread goes through these objects in the buffer and finalises
+them, before deallocating the buffer entirely. This thread is suspended as with
+other mutator threads when a GC pause happens, so no synchronisation is needed
+between adding objects to the buffer and processing objects already in the
+buffer. This thread is spawned lazily depending on whether a finalisable object
+exists. If a program contains no finalisable objects, no finalisation thread is
+spawned.
 
 \subsection{Parallel mutator threads}
+
+\jake{This needs moving somewhere more sensible as it describes \boehm functionality as-is.}
 
 In order to support thread-safe \lstinline{Gc}s in \ourgc, the BDWGC must be
 able to scan each thread's call stack for roots. I extend the Rust compiler to
@@ -768,6 +771,16 @@ explain the motivation for, design, and implementation in \rustc, of FSA.
 
 \laurie{remember to mention auto-traits and type coherence here}
 
+\jake{Expanding here on the limitations of our FSA approach by re-using Drop}
+The major limitation of our approach to using \lstinline{Drop} as a GC
+finaliser is that it can cause breaking changes for upstream crate authors who
+were not aware their types' drop methods were being used downstream inside a
+GC. If they make changes to one of their \lstinline{T}'s drop method unaware of
+the consequences this has on GC, then a downstream crate may no longer compile
+because FSA rejects this. This means that breakages are possible without any
+changes to clearly delineated API boundaries such as function signatures. A
+separate \lstinline{Finalize} trait would solve this, but at the cost of a lot
+of boilerplate code.
 
 \subsection{Which drop methods are safe finalisers?}
 \label{finaliser_thread}
