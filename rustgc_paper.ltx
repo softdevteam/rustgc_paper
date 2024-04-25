@@ -165,6 +165,15 @@ rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
 \laurie{tracing vs.non-tracing}
 \laurie{mutator vs.~non-mutator}
 
+\jake{My preferences on terminology are as follows:}
+\jake{Tracing vs Reference Counting.}
+\jake{Mutator vs.~collector (when talking about threads)}
+\jake{The term 'concurrent' should only be used when referring to, whether the
+collector does stuff at the same time as the mutator threads. Alloy is
+therefore never concurrent.}
+\jake{Use parallel to refer to multiple mutator threads or multiple collector threads}.
+\jake{Gc'd language vs non-GC'd language (instead of managed / unmanaged)}.
+
 
 \section{Destructors vs.~Finalisers}
 \label{sec:finaliser_issues}
