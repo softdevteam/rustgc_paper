@@ -667,6 +667,26 @@ go out of scope, the \lstinline{ptr_to_int} is enough to keep the GC'd object
 alive, because when \ourgc scans the stack, it would correctly identify that
 \lstinline{ptr_to_int} looks like a pointer to a valid GC object.
 
+\subsubsection{Thread local storage}
+
+\boehm does not provide a way for us to scan thread-locals for pointers, se
+provide a solution to this for both the POSIX thread-local \lstinline{specific}
+API, and thread-locals which use fast compiler generated TLS.
+\jake{Realistically, people will only use the latter. So it might not be worth
+even mentioning the POSIX stuff}.
+
+By default, Rust uses LLVM's TLS implementation where thread-local data is
+stored in the PT_TLS segment of the ELF binary. This must be considered part of
+the root-set during collection. So that \boehm can scan this, we must be able
+to locate the PT_TLS block for each thread when they are suspended during GC,
+and then add this to the range of values which need marking. Each thread that
+is suspended during a collection is scheduled will call
+\lstinline{dl_iterate_phdr(3)} to get the start and end of its own range in the
+PT_TLS segment. These ranges are then scanned during marking. We must do this
+at each collection, rather than once at start-up because this segment can grow
+and shrink dynamically during the course of the application, and threads can be
+spawned or killed in-between collections.
+
 \section{The collector}
 \label{ourgc:collector}
 
