@@ -3701,6 +3701,22 @@ chapter, it is difficult to compare it ergonomically to other approaches.
 \label{graph:yksom_finalisers}
 \end{figure}
 
+\subsection{Early finaliser prevention}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{graphs/som_rs_barriers.pdf}
+     \caption{Results showing the performance of early finaliser prevention on
+     \somrs, which uses three configurations: \textit{None} where there are
+     no compiler barriers (which is unsound); \textit{All}, where every
+     single \lstinline{Gc} reference has a corresponding barrier; and
+     \textit{None}, where barriers can be optimised away where \ourgc is
+     certain they are unnecessary. Each configuration is compared using a
+     subset of benchmarks on the Rebench benchmarking suite for 30 process
+     executions, where I report 99\% confidence intervals.}
+\label{graph:yksom_finalisers}
+\end{figure}
+
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
