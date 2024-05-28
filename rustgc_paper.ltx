@@ -3665,6 +3665,42 @@ transferred between other arenas.
 Because \gcarena is so different in nature to the other GCs described in this
 chapter, it is difficult to compare it ergonomically to other approaches.
 
+\section{New performance numbers}
+\subsection{Performance}
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{graphs/som_rs_perf.pdf}
+    \caption{Results from the \somrs micro-benchmark experiment, where the SOM
+    benchmark suite is run with both configurations: \somrsrc, and \somrsgc.
+    Each benchmark is run for 30 process executions, where the error bars
+    represent 99\% confidence intervals.}
+\label{graph:som_rs_finalisers}
+\end{figure}
+
+\subsection{Finaliser elision}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{graphs/som_rs_finalisers.pdf}
+    \caption{Results of a performance of \somrs using two configurations: naive
+    finalisation (where no optimisation is performed); and \ourgc's finaliser
+    elision optimisation (where finalisers which are used only to deallocate
+    memory are removed). Each benchmark is run for 30 process executions, where
+    the error bars represent 99\% confidence intervals.}
+\label{graph:som_rs_finalisers}
+\end{figure}
+
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{graphs/yksom_finalisers.pdf}
+    \caption{Results of a performance of \yksom using two configurations: naive
+    finalisation (where no optimisation is performed); and \ourgc's finaliser
+    elision optimisation (where finalisers which are used only to deallocate
+    memory are removed). Each benchmark is run for 30 process executions, where
+    the error bars represent 99\% confidence intervals.}
+\label{graph:yksom_finalisers}
+\end{figure}
+
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
