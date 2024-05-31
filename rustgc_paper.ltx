@@ -8,8 +8,8 @@
 makes expressing data-structures whose values have multiple owners awkward or inefficient.
 In this paper we explore a new design for GC in Rust, identifying
 the major challenge as finalisers: mapping existing Rust destructors
-to GC finalisers seems natural but introduces subtle soundness, significant
-performance, and irritating ergonomic issues. In this paper we introduce \ourgc, a new GC for Rust,
+to GC finalisers seems natural but introduces soundness,significant
+performance, and ergonomic issues. In this paper we introduce \ourgc, a new GC for Rust,
 which provides solutions for each of these issues.
 \end{abstract}
 
@@ -41,17 +41,6 @@ use-after-frees etc.), performance (\laurie{use a sensible figure from the
 perf section}), or ergonomics (e.g.~requiring drop methods to be duplicated
 as finalisers).
 
-\jake{Right now the performance story is disappointing. We are 40\%
-slower than regular \lstinline{Rc}, this is down how multi-threading user
-threads are handled in BDWGC. The long and short of it is that we must disable
-parallel marking in order to prevent severe lock contention on the heap when we
-have more than one user thread. If we don't do this, multi-threaded
-applications would slow down by around 10x!. However, by disabling parallel
-marking we end up making regular single-threaded applications 20\% slower than they were
-before. In other words, we've gone from a 20\% slowdown to a 40\% slowdown, and
-I don't have a satisfying answer to this with BDWGC as our current collector
-backend. (See \ref{graph:som_bar} / \ref{graph:som_bar_new} for a before and after comparison)}
-
 In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
 similar to many other GCs for Rust but unlike previous GCs,
 we identify the chief challenge for a sound,
@@ -67,32 +56,31 @@ fundamental problems:
 and (3) finalisers are prohibitively slower than destructors.
 
 We introduce solutions for each of these problems:
-(1) \emph{Finaliser Safety Analysis} (FSA)
-extends Rust's type system to reject programs which use type \lstinline{T} with
-\lstinline{Gc<T>} when \lstinline{T}'s destructor cannot be statically proven
-to be safe to use as a finaliser;
-(2) \emph{early finaliser prevention} inserts barriers that prevent factors
-such as optimisations or register allocation from `tricking'
+(1) \emph{finaliser safety analysis}
+extends Rust's type system to reject programs whose destructors are not
+provably safe to be used as finalisers;
+(2) \emph{early finaliser prevention} inserts barriers that prevent
+optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead;
-and (3) \emph{finaliser elision} statically optimises away many finalisers,
-by recognising that many destructors only free heap memory, and do not need
-to be run in a GC context.
+and (3) \emph{finaliser elision} statically optimises away finalisers if
+the destructor that is their basis simply frees heap memory.
 
-As well as solving these fundamental problems, we also introduce several
+We also introduce several
 ergonomic improvements. The most visible is that we allow GC types to be
 duplicated without requiring explicit calls to \texttt{clone}. Less visible is that we
-extend FSA to enlarge the set of types whose destructors can be statically
-proven to be safe finalisers.
+make finaliser safety analysis gradually more permissive, allowing more destructors
+to be proven safe to use as finalisers.
 
 \ourgc is implemented as a fork / extension of the standard Rust compiler
 \rustc, using conservative GC in order to support a fully idiomatic Rust API
-for \lstinline{Gc<T>}. \jake{I think a take-away from this work is that you can't have a sound, ergononic, and performant GC library without modifying the language itself}  Although conservative GC is used in widespread
+for \lstinline{Gc<T>}. Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
 and compilers: thus \ourgc is sound only to the extent that
 conservative GCs in general are sound (see~\cref{conservative_gc}). Since
-conservative GC is widely used, we consider this a pragmatic trade-off:
-we believe that one could create a variant of \ourgc with a
-less idiomatic Rust API that would not require conservative GC if so desired.
+conservative GC is widely used, we consider this a pragmatic trade-off
+in general and specifically in Rust where some language design decisions
+(\laurie{forward reference usize/pointer conflation}) make precise GC
+impossible.
 
 Overall, while we do not pretend that \ourgc is a production-ready GC for Rust, it is
 sufficiently polished to be usable for real programs: it has high-quality error
