@@ -30,32 +30,38 @@ Workarounds have many downsides, from memory leaks, inflexibility, or complexity
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
-type \lstinline{T} to the GC heap and then wraps a pointer to it. \lstinline{Gc<T>}
-can be \emph{cloned} (i.e.~duplicated) at will by the user. When no
-\lstinline{Gc<T>} values can be found, indirectly or directly, from the program's \emph{roots} (e.g.~global
-variables, variables on the stack, etc.) to the underlying value then the
-GC reclaims the relevant memory. However, existing GCs for Rust require sacrificing at
-least one of soundness (e.g.~the Bronze GC~\cite{coblenz21bronze} cannot
+type \lstinline{T} to the GC heap and then wraps a pointer to that.
+\lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
+\emph{dereferenced} to \lstinline{T} at will by the user. When no
+\lstinline{Gc<T>} values can be found, indirectly or directly, from the
+program's \emph{roots} (e.g.~global variables, variables on the stack, etc.) to
+the underlying value, then the value's backing memory is reclaimed.
+
+Unfortunately, it has proven hard to find a satisfying design for a GC for
+Rust. Existing attempts have sacrificed at least least one of soundness (e.g.~the
+Bronze GC~\cite{coblenz21bronze} cannot
 track indirect references, so seemingly safe programs can fail due to
 use-after-frees etc.), performance (\laurie{use a sensible figure from the
 perf section}), or ergonomics (e.g.~requiring drop methods to be duplicated
 as finalisers).
 
-In this paper we introduce \ourgc, a new GC for Rust. \ourgc's basic design is
-similar to many other GCs for Rust but unlike previous GCs,
-we identify the chief challenge for a sound,
-performant, ergonomic GC for Rust as \emph{finalisers} (i.e.~code which is run just before a
-value is collected by the GC). Rust uses \emph{destructors} (i.e.~code which
-is run just before a value is freed by Rust's implicit memory management)
-pervasively in the form of \lstinline{drop} methods. When a type
-\lstinline{T} with a destructor is used with \lstinline{Gc<T>} it is natural
-to map its destructor to a finaliser. However, this introduces three
-fundamental problems:
+In this paper we introduce \ourgc, a new GC for Rust, that addresses most of
+the shortcomings of previous approaches. \ourgc exposes a similar
+\lstinline{Gc<T>} type to other GCs for Rust, but after that diverges.
+In particular, \ourgc allows Rust \emph{destructors} (i.e.~code
+which is run just before a value is freed by Rust's implicit memory management)
+to be used as GC \emph{finalisers} (i.e.~code which is run just before a value
+is collected by the GC).
+
+Mapping destructors to finalisers introduces three fundamental problems which
+are at the heart of \ourgc and this paper:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
-and (3) finalisers are prohibitively slower than destructors.
+and (3) finalisers are prohibitively slower than destructors. These are
+classical GC problems, but all are exacerbated in some way by Rust.
 
-We introduce solutions for each of these problems:
+We introduce solutions for each problem, each of which makes use,
+at least in part, of Rust's static guarantees:
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers;
@@ -65,29 +71,29 @@ the GC into collecting values before they are dead;
 and (3) \emph{finaliser elision} statically optimises away finalisers if
 the destructor that is their basis simply frees heap memory.
 
-We also introduce several
-ergonomic improvements. The most visible is that we allow GC types to be
-duplicated without requiring explicit calls to \texttt{clone}. Less visible is that we
-make finaliser safety analysis gradually more permissive, allowing more destructors
-to be proven safe to use as finalisers.
-
-\ourgc is implemented as a fork / extension of the standard Rust compiler
-\rustc, using conservative GC in order to support a fully idiomatic Rust API
-for \lstinline{Gc<T>}. Some aspects of Rust's designs (specifically the ability
-to convert pointers to integers and back again) means that conservative GC
-is the only general way of achieving our goals. Although conservative GC is used in widespread
+\ourgc also shows that, by extending the language and compiler, it is possible
+to make GC for Rust more ergonomic than in user-level libraries. For example,
+GCed values can, like reference counted values in Rust, be converted into
+pointers and back again. However, pointers in Rust can be converted to pointers
+and back again at will. This requires us to use \emph{conservative} GC
+(i.e.~treating all words in memory as possible pointers to GCed values) to
+achieve our goals. Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
 and compilers: thus \ourgc is sound only to the extent that
 conservative GCs in general are sound (see~\cref{conservative_gc}). Since
 conservative GC is widely used, we consider this a pragmatic trade-off
 in general, and specifically in Rust where some language design decisions
-make precise GC impossible.
+make it impossible to have flexible and precise GC together.
 
-Overall, while we do not pretend that \ourgc is a production-ready GC for Rust, it is
-sufficiently polished to be usable for real programs: it has high-quality error
-messages and reasonable performance. Although \ourgc is necessarily tied to
-Rust, we believe that most of the techniques in this paper would generalise to
-other ownership-based languages.
+We evaluate \ourgc on a number of benchmarks against non-GCed alternatives.
+Overall \laurie{performance is XYZ}.
+
+Although \ourgc is not production ready, it has good enough performance and
+other polish (e.g.~good quality error messages) that we believe one can see a
+path from research to production. Furthermore, although \ourgc is necessarily
+tied to Rust, we believe that most of the techniques in this paper,
+particularly those related to finalisation, will generalise to other
+ownership-based languages.
 
 \begin{figure}
 \begin{lstlisting}[
