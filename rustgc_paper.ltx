@@ -73,14 +73,15 @@ to be proven safe to use as finalisers.
 
 \ourgc is implemented as a fork / extension of the standard Rust compiler
 \rustc, using conservative GC in order to support a fully idiomatic Rust API
-for \lstinline{Gc<T>}. Although conservative GC is used in widespread
+for \lstinline{Gc<T>}. Some aspects of Rust's designs (specifically the ability
+to convert pointers to integers and back again) means that conservative GC
+is the only general way of achieving our goals. Although conservative GC is used in widespread
 programs such as Chrome and Safari, it is unsound in most languages
 and compilers: thus \ourgc is sound only to the extent that
 conservative GCs in general are sound (see~\cref{conservative_gc}). Since
 conservative GC is widely used, we consider this a pragmatic trade-off
-in general and specifically in Rust where some language design decisions
-(\laurie{forward reference usize/pointer conflation}) make precise GC
-impossible.
+in general, and specifically in Rust where some language design decisions
+make precise GC impossible.
 
 Overall, while we do not pretend that \ourgc is a production-ready GC for Rust, it is
 sufficiently polished to be usable for real programs: it has high-quality error
@@ -112,28 +113,29 @@ write in GCed languages are challenging in Rust.
 
 Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} has a
-single owner (e.g.~a variable): an owner can \emph{move} that value to another owner; once
-the owner goes out of scope, then the value's \lstinline{drop} method (its destructor)
-is run and its memory can be reused\jake{phrasing doesn't quite work}. An owner can give references to a value
+single owner (e.g.~a variable): an owner can \emph{move} a value to another owner
+at which point the original owner no longer has access to the value; and once
+a value's owner goes out of scope, the value's \lstinline{drop} method (its destructor)
+is run and its backing memory freed. An owner can pass \emph{references} to a value
 to other code, subject to the following static restrictions: there can be
-multiple read-only \emph{references} (`\lstinline{&}') to a value, or a single
-read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner. \jake{This is where we must make a decision about whether we use read-only / read-write or immutable / mutable terminology for the rest of the paper. I like the former, but I think the latter is more familiar to Rust programmers}
+multiple read-only references (`\lstinline{&}') to a value, or a single
+read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
 
-These basic rules allow many Rust programs to be written in a style that makes
-them indistinguishable from their equivalents in GCed languages\jake{I'm not sure I agree, what does this mean?}. However,
-data structures that require values to have more than one owner cannot
+These basic rules mean that many Rust programs are as succinct as their equivalents
+in GCed languages. However, data structures that require values to have more
+than one owner -- or have otherwise `unusual` ownership requirements -- cannot
 be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
 statically checked by the compiler). Instead, one must resort to indirect
 and/or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workarounds.
 
-Perhaps the most widely used workaround is to use the reference counting type
+Perhaps the most widely used workaround is the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
 data-structures reference counting is a reasonable solution, but using it for
 cyclic data-structures requires juggling strong and weak counts, which makes
 it easy for values to live for shorter or longer than required. Another solution are
 arenas which, having accumulated multiple values, free all of them at once: values
 can no longer be reclaimed too early, but nor can they be freed early if they are
-no longer needed. A type-based approach are \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+no longer needed. A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
 which allow cyclic data-structures to be built by statically guaranteeing that
 there is a single owner for the entire data-structure at any point in the
 program. However, this prevents use cases where multiple owners (possibly,
@@ -161,6 +163,7 @@ collector does stuff at the same time as the mutator threads. Alloy is
 therefore never concurrent.}
 \jake{Use parallel to refer to multiple mutator threads or multiple collector threads}.
 \jake{Gc'd language vs non-GC'd language (instead of managed / unmanaged)}.
+\laurie{all fine with me: why don't you draft definitions and i'll tweak them as necessary}
 
 
 \section{Destructors vs.~Finalisers}
@@ -168,9 +171,8 @@ therefore never concurrent.}
 
 In this section we look at the challenge of destructors for a GC for Rust.
 Rust uses destructors pervasively in the form of \emph{drop methods}.
-When the owner of a value goes out of scope, or if the value is explicitly
-passed to the \lstinline{std::mem::drop} function, then the value's drop
-method is called.\jake{This is just an empty method which makes the value go out of scope, so really it's the same as the first point. There's nothing special about this function. The interesting one is \lstinline{drop_in_place} that takes a non-owned pointer, but this will complicate things in this paragraph. I suggest removing the bit about \lstinline{std::mem::drop} entirely.} For example, suitably simplified (e.g.~ignoring weak
+When the owner of a value goes out of scope, the value's drop
+method is called. For example, suitably simplified (e.g.~ignoring weak
 counts), \lstinline{Rc<T>} has the following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
@@ -192,8 +194,8 @@ type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
 first decrements the reference count. If that count
 goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
 (with \lstinline{from_raw}), and immediately goes out of scope, implicitly
-calling \lstinline{Box<T>}'s drop method. This will then \jake{recursively?} call \lstinline{T}'s
-drop method and then deallocate the underlying heap memory.
+calling \lstinline{Box<T>}'s drop method. This will then recursively call \lstinline{T}'s
+drop method and then free its backing memory.
 
 Rust has simple, well-defined rules that allow programmers to accurately reason
 about when destructors are called\footnote{There are some exceptions: for
@@ -208,8 +210,8 @@ For example, Rust's standard \lstinline{Mutex} type has a method
 a predictable point, without having to explicitly call an unlock
 method.
 
-At first destructors can appear identical to GC finalisers: both concepts run user code
-just before the memory a value occupies can be reused by the wider system.
+At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
+being run just before a value's backing memory is freed.
 However, there is one obvious difference between the two: while Rust defines precisely
 when a destructor will be run, GC finalisers are
 only run at some unspecified point in time after the last
@@ -226,20 +228,27 @@ then the finaliser can cause a deadlock if it tries to access a resource that
 the normal code holds (see~\cref{finaliser_thread} for more details). However,
 not all \lstinline{drop} methods can safely be run on another thread.
 
-In addition to `when' and `where', finalisers have other subtle
-issues~\cite{boehm03destructors}. For example, what should we do with finalisers
+None of these issues is unique to GC in Rust: indeed, the wider challenges that
+finalisers cause are now well known (see~\cite{boehm03destructors} for an
+overview of these issues). For example, what should we do with finalisers
 in values that form a cycle? In such a situation, a finaliser can reference
 values that are partly, or wholly, `finalised'. Other issues include the
 ability of finalisers to `resurrect' values by
-copying their GC reference to the main part of a program.
+copying the reference passed to the finaliser somewhere where the rest of
+the program can now see it.
 
 Over time
 finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
-\laurie{we need to briefly talk about how a couple of other rust gcs handle (or
-presumably don't) finalisation}
+
+One of the fundamental assumptions underlying our work is that a usable GC for
+Rust has no choice but to make use of finalisers and, in particular, to map
+Rust's destructors to finalisers. Without doing so, users are either forced
+to write finalisers in addition to destructors for each type they place into a
+\lstinline{Gc<T>}. \laurie{jake: talk briefly about other rust gcs and their
+approach to finalisation}
 
 
 \section{\ourgc: Basic Design Choices and Implementation Approach}
@@ -269,8 +278,7 @@ standard Rust types (e.g.~\lstinline{Mutex<T>}) that enable \emph{interior mutab
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
 back (\lstinline{from_raw}). These functions have a number of uses, ranging
-from pointer tagging (frequently used in GCing language VMs \laurie{find a citation}\jake{Are you looking for a paper? Something like this? \lstinline{https://v8.dev/blog/pointer-compression}?})
-to passing values to foreign code. However, these features have
+from pointer tagging to passing values to foreign code. However, these features have
 a profound impact because Rust allows
 raw pointers to be converted to the integer type \lstinline{usize} and
 back. In other words, if \ourgc wants to allow GCed values to be converted
