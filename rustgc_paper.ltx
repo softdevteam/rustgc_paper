@@ -2925,567 +2925,6 @@ After this pass, we call the Rust compiler's existing \emph{simplify mir} pass,
 which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
 
-\section{\ourgc performance evaluation}
-\label{ch:perf}
-
-This section examines the performance characteristics of \ourgc. To do this, I
-present five performance studies:
-
-\begin{enumerate}
-    \item An evaluation of the wall-clock time and memory usage of \ourgc as a
-        candidate for use in a single-threaded VM. This compares \ourgc with
-        Rust's single-threaded reference counting library on the SOM benchmark
-        suite~\citep{marr16cross} when used to manage objects in the \somrs VM (\autoref{somstudy}).
-    \item An evaluation of the wall-clock time and memory usage of \ourgc as a
-        candidate for use in a multi-threaded VM. This compares \ourgc with
-        Rust's atomic reference counting library using the \wlambda VM
-        (\autoref{wlambdastudy}).
-    \item An evaluation of the effectiveness of the finaliser elision
-        optimisation. This uses two configurations of the \yksom VM -- with and
-        without finaliser elision -- to measure its performance impact using the
-        SOM benchmark suite (\autoref{finoverhead}).
-    \item An evaluation of the slowdown introduced by the early finaliser
-        prevention mechanism in \ourgc (\autoref{fincost}).
-    \item A comparison between \ourgc and other GC implementations in Rust on
-        the Binary Trees benchmark (\autoref{othergcs}).
-\end{enumerate}
-
-\subsection{Generic benchmarking methodology}
-
-The four performance studies share a common benchmarking methodology. All
-experiments were run on a Xeon E3-1240v6 3.7GHz with 4 CPU cores. Each core has
-an L1 and L2 cache size of 256KB and 1MB respectively. The 8MB L3 cache is shared
-between cores. The benchmarking machine has 32GB of RAM and runs Debian 8. I
-disabled turbo boost and hyper-threading in the BIOS and set Linux's CPU
-governor to \emph{performance} mode. I observed the \texttt{dmesg} after each
-experiment and did not observe any oddities such as the machine overheating.
-
-For \ourgc I use an initial heapsize of 64KB and the heap is always expanded
-when the collector encounters insufficient space for an allocation. A collection
-is triggered whenever more than \lstinline{heap_size / 6} bytes of allocation
-have taken place. This is the default behaviour in the \boehm.
-
-\subsection{\ourgc for language implementation}
-
-One of \ourgc's main goals is to be usable for implementing other languages VMs.
-In order to evaluate the effectiveness of this, this section aims to answer the
-following two questions:
-
-\begin{enumerate}
-    \item How much slower is a language VM written in Rust when using \ourgc
-        compared to Rust's reference counting library?
-    \item How much memory does a language VM written in Rust when using \ourgc
-        use when compared to Rust's reference counting library?
-\end{enumerate}
-
-To answer these questions I conduct two studies, where I retrofit \ourgc to two
-separate language VMs:
-
-\begin{description}
-    \item[\somrs] A VM written in Rust for the SOM language (a cut down
-        Smalltalk language) which uses Rust's single threaded reference counting
-        library (\lstinline{Rc}) to manage SOM objects.
-    \item[WLambda] A VM written in Rust for the WLambda language: a
-        multi-threaded JavaScript-like scripting language which uses Rust's
-        atomic reference counting library (\lstinline{Arc}) to manage SOM
-        objects.
-\end{description}
-
-This allows a performance comparison between VMs which use \ourgc and both forms
-of reference counting in otherwise identical language implementations. The
-following subsections outline the methodology and results of each experiment.
-
-\subsection{First study: the \somrs VM}
-\label{somstudy}
-
-
-\subsubsection{Methodology}
-
-The first study is a performance and memory comparison using \somrs~\citep{somrs}
--- a Rust implementation for the SOM language (a cut down version of Smalltalk).
-\somrs does not support Just-in-Time (JIT) compilation and is a medium sized
-interpreter with roughly 10KLoC. I build two configurations of \somrs as
-follows:
-
-\begin{description}
-    \item[\somrsrc] the standard implementation, where SOM objects are managed using \lstinline{Rc} (Rust's
-        single-threaded reference counting mechanism).
-    \item[\somrsgc] where \somrs is modified so that SOM objects are managed
-        using \ourgc. This required changing 62 lines of code, most of which was
-        replacing instances of \lstinline{Rc} with \ourgc's \lstinline{Gc}. Both
-        configurations are otherwise identical.
-\end{description}
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/som_bar.pdf}
-    \caption{Results from the \perf experiment, where the SOM benchmark suite is
-    run with both configurations: \somrsrc, and \somrsgc. The vertical bars
-    represent the wall-clock time of \somrsgc, normalised to the wall-clock time
-    of \somrsrc. The dashed grey line shows the geometric mean of the slowdown
-    of \somrsgc across all benchmarks (1.12$\times$). Each benchmark is run for
-    30 process executions, where the error bars represent 99\% confidence
-    intervals.}
-\label{graph:som_bar}
-\end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/som_bar_new.pdf}
-    \caption{Results from the \perf experiment, where the SOM benchmark suite is
-    run with both configurations: \somrsrc, and \somrsgc. The vertical bars
-    represent the wall-clock time of \somrsgc, normalised to the wall-clock time
-    of \somrsrc.}
-\label{graph:som_bar_new}
-\end{figure}
-
-I use the SOM language's existing suite of synthetic benchmarks, adapted from
-the \emph{are-we-fast-yet} benchmark suite~\citep{marr16cross}. The benchmarks are
-written using idiomatic SOM code.
-
-The study is divided into two sub-experiments which measure performance and
-memory separately:
-
-\begin{description}
-    \item[\perf] In the performance experiment, I compare the performance
-        between \somrsrc, and \somrsgc using the Rebench benchmarking
-        suite~\citep{rebench18marr}. Each SOM benchmark is run for 30
-        \emph{process executions}, where each VM is closed down and started
-        again. Rebench randomises the order in which each VM implementation is
-        run after each process execution and records wall-clock times using
-        Python's \texttt{time()} function.
-
-    \item[\mem] In the memory experiment, memory usage from both
-        configurations is measured by running each benchmark individually while
-        sampling the process's \emph{resident set size} every 10 milliseconds as
-        this was the smallest value where there were noticable differences
-        between samples. From this, I present the peak and average real (~i.e.
-        physical, not virtual) memory usage for each benchmark as well as
-        plotting the usage over time.
-\end{description}
-
-\subsubsection{Results}
-
-\makeatletter
-\newcommand*\ExpandableInputSomrsMemory[1]{\@@input#1 }
-\makeatother
- \begin{table*}[t!]
-     \centering
-     \begin{tabular}{lllll}
- \toprule
-         \multirow{2}{*}{Benchmark} & \multicolumn{2}{c}{Peak memory usage (MB)} & \multicolumn{2}{c}{Average memory usage (MB)} \\
-\cmidrule(l){2-3} \cmidrule(l){4-5}
-         & Reference Counting & \ourgc & Reference Counting & \ourgc \\
- \midrule
-\ExpandableInputSomrsMemory{./somrs_memory_table.tex}
- \bottomrule
-     \end{tabular}
- \vspace{6pt}
-         \caption{Peak and average memory usage (in megabytes) of each SOM
-         benchmark for both som-rs configurations.}
-         \label{somrs_memory_table}
-\end{table*}
-
-\autoref{graph:som_bar} shows the performance results for the \perf experiment.
-On average, \somrsgc performs 12\% worse, when taking the geometric mean across
-all benchmarks. The worst performing benchmarks are \emph{Loop},
-\emph{Recurse}, and \emph{Richards} which each have a slowdown of
-1.24$\times$. One possible explanation for this is that for these benchmarks in
-particular, many of the allocated objects have a lifetime which extends for the
-duration of the benchmark. This means that frequent GC pauses by \ourgc free
-little memory but end up increasing the total wall-clock time of the benchmark.
-For example, during the Richards benchmark, a GC collection cycle was scheduled
-an average of 24,800 times for each iteration.
-
-\autoref{somrs_memory_table} shows the memory usage results from the \mem
-experiment. For most benchmarks, \somrsgc consumes slightly more memory. Though
-\ourgc will use additional memory for its internal data structures for
-bookkeeping and during collection, this does not sufficiently account for the
-additional memory used by \somrsgc. It is more likely that objects in \somrsgc
-are being retained for longer than in \somrsrc. It is not clear why this is the
-case, but one possible reason is that \somrs uses a third party hash map
-implementation internally for locals and method storage, and once references are
-removed, they may not be properly zeroed, causing stale pointers to keep objects
-alive. \autoref{fig:somrs_gc_high} highlights two cases in particular,
-\emph{PageRank} and \emph{GraphSearch}, where memory usage in \somrsgc is
-unusually high. The graphs showing memory usage over time for all benchmarks can
-be found in \autoref{allgraphs}.
-
-\begin{figure}[t]
-    \centering
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/pagerank_memory.pdf}}
-    \hfill
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/graphsearch_memory.pdf}}
-     \caption{Real memory usage of the PageRank and GraphSearch benchmarks over
-     time. In both of these benchmarks, \somrsgc uses significantly more memory.
-     While this suggests there is a memory leak somewhere in \somrsgc, it is not
-     yet clear why. One likely explanation which I have come across before
-     during development is that during allocation heavy tight loops, stale
-     references to heap objects may still exist in not-yet-overwritten stack
-     slots which are then traced conservatively during marking.}
-     \label{fig:somrs_gc_high}
-\end{figure}
-
-\begin{figure}[t]
-    \centering
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/deltablue_memory.pdf}}
-    \hfill
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/jsonsmall_memory.pdf}}
-     \caption{Real memory usage of the DeltaBlue and
-     JsonSmall benchmarks over time. Both of these benchmarks allocate objects
-     containing reference cycles, which \somrsrc is unable to free due to its
-     use of reference counting. The resulting leak causes \somrsrc's real memory
-     usage to grow continously over time. \somrsgc does not have this problem
-     because \ourgc is a tracing garbage collector.}
-         \label{fig:somrs_rc_leak}
-\end{figure}
-
-However, \ourgc's advantage of being able to cope with objects with cyclic
-references is shown clearly in \autoref{fig:somrs_rc_leak}. \emph{DeltaBlue} and
-\emph{JsonSmall} when run with \somrsrc leak memory because these benchmarks
-contain objects with cycles. For these benchmarks, \somrsrc leaks memory so
-severely that they would cause cause out-of-memory errors if ran for just a few
-minutes, while \somrsgc maintains a steady heap profile over time.
-
-\clearpage
-
-\subsection{Second study: the \wlambda VM}
-\label{wlambdastudy}
-
-\subsubsection{Methodology}
-
-The second study is a performance and memory comparison using
-\wlambda~\citep{wlambda} -- a Rust VM for an embeddable perl-like scripting language.
-\wlambda is a medium-sized VM with approximately 30KLoC. It supports prototype
-based object orientation, and most \wlambda objects are built upon vector and
-map data structures. Unlike \somrs, \wlambda is multi-threaded, so it allows for
-a comparison of a VM using \ourgc and atomic reference counting. I build two
-configurations of \wlambda as follows:
-
-\begin{description}
-    \item[\wlambdaarc] the standard implementation, where VM objects are managed
-        using \lstinline{Arc} (Rust's atomic reference counting mechanism).
-    \item[\wlambdaalloy] where \wlambda is modified so that VM objects are managed
-        using \ourgc. This required changing roughly 700 lines of code, most of which was
-        replacing instances of \lstinline{Rc} with \ourgc's \lstinline{Gc}.
-        \wlambda makes use of Rust's trait-based dynamic dispatch, so each trait
-        was manually audited to see whether it could be marked
-        \lstinline{FinalizerSafe} to satisfy FSA (\autoref{fsa}), or
-        \lstinline{FinalizerOptional} to use finaliser elision
-        (\autoref{finaliser_elision}). Both
-        configurations are otherwise identical.
-\end{description}
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/wlambda_bar.pdf}
-    \caption{Results from the \perf experiment, where the \wlambda benchmarks
-    are run with both configurations: \wlambdaarc, and \wlambdaalloy. The
-    vertical bars
-    represent the wall-clock time of \wlambdaalloy, normalised to the wall-clock time
-    of \wlambdaarc. The dashed grey line shows the geometric mean of the slowdown
-    of \wlambdaalloy across all benchmarks (1.14$\times$). Each benchmark is run for
-    30 process executions, where the error bars represent 99\% confidence
-    intervals.}
-\label{graph:wlambda_bar}
-\end{figure}
-
-
-\wlambda comes with four benchmarks which I use to test each configuration:
-\emph{Pattern Matching}, which stresses comparisons performed on objects;
-\emph{Fibonacci}, which stresses function call overhead and recursion; \emph{Vec
-Iter}, which creates and manipulates large lists and maps; and \emph{Box}, which
-allocates many objects and stresses read and write operations.
-
-Like the first \somrs study, this study is also divided into two sub-experiments
-to measure performance and memory separately:
-
-\begin{description}
-    \item[\perf] In the performance experiment, I compare the performance
-        between \wlambdaarc, and \wlambdaalloy using the \emph{multitime} tool:
-        a Unix \emph{time} utility extension which allows commands to be run
-        multiple times for comparison~\citep{multitime}. I run benchmarks for
-        each configuration for 30 process executions. multitime randomises the
-        order in which each benchmark and VM configuration is run, and records
-        wall-clock time. I report the mean wall-clock time of each benchmark
-        with 99\% confidence intervals.
-
-    \item[\mem] Similar to the \yksom experiment, the memory usage is of both
-        configurations is measured by running each benchmark individually while
-        sampling the process's \emph{resident set size} every 10 milliseconds as
-        this was the smallest value where there were noticable differences
-        between samples.
-\end{description}
-
-
-
-\subsubsection{Results}
-
-\autoref{graph:wlambda_bar} shows the performance results for the \perf
-experiment. The range in performance on this suite is large, with \wlambdaalloy
-performing 18\% better on \emph{Pattern Matching} but 45\% slower on \emph{Box}.
-On average, \wlambdaalloy performs 14\% worse, when taking the geometric mean
-across all benchmarks.
-
-\autoref{table:wlambda_memory} shows the memory usage results from the
-\mem experiment while \autoref{wlambda_over_time} shows the memory usage of each
-benchmark over time. In all benchmarks, \wlambdaalloy uses more memory. This is
-particularly apparent in the \emph{Box} benchmark, where on average
-\wlambdaalloy requires 4MB of additional memory suggesting that \wlambdaalloy
-has a prominent memory leak for this benchmark. In the \perf experiment, this is
-also the worst performing benchmark. \emph{Box} allocates a total of 450,027,871
-objects which results in 30\% of the runtime spent in marking when profiling the
-benchmark in perf.
-
-\makeatletter
-\newcommand*\ExpandableInputWLambdaMemory[1]{\@@input#1 }
-\makeatother
- \begin{table*}[t!]
-     \begin{center}
-     \begin{tabular}{lllll}
- \toprule
-         \multirow{2}{*}{Benchmark} & \multicolumn{2}{c}{Peak memory usage (MB)} & \multicolumn{2}{c}{Average memory usage (MB)} \\
-\cmidrule(l){2-3} \cmidrule(l){4-5}
-         & Atomic RC & \ourgc & Atomic RC & \ourgc \\
- \midrule
-\ExpandableInputWLambdaMemory{./wlambda_memory_table.tex}
- \bottomrule
-     \end{tabular}
- \vspace{6pt}
-         \caption{Peak and average memory usage (in megabytes) of each WLambda
-         benchmark for both configurations.}
-         \label{table:wlambda_memory}
-     \end{center}
-\end{table*}
-
-
-\begin{figure}[t!]
-    \centering
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/jmptbl_memory.pdf}}
-    \hfill
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/call_performance_memory.pdf}}
-    \vspace{30px}
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/nvec_memory.pdf}}
-    \hfill
-    \subfloat{\includegraphics[width=0.5\textwidth]{graphs/box_vs_rs_memory.pdf}}
-    \caption{Real memory usage of the \wlambda benchmarks over time.}
-     \label{wlambda_over_time}
-\end{figure}
-
-\subsection{Measuring finaliser overhead}
-\label{finoverhead}
-
-\subsubsection{Methodology}
-In my third study, I evaluate the effectiveness of \ourgc's finaliser elision
-with a straightforward comparison between \ourgc with and without finaliser
-elision. I use \yksom: a another SOM interpreter written in Rust which uses
-\ourgc to manage SOM objects. \yksom is a lightweight interpreter with
-approximately 5700KLoC. It is suitable for measuring the impact of finaliser
-overhead because it makes frequent use of \lstinline{drop} methods inside the
-VM. I build two configurations of \yksom as follows:
-
-\begin{description}
-    \item[\yksomelision] The standard \ourgc build which enables finaliser
-        elision optimisation (\autoref{finaliser_elision}).
-    \item[\yksomnaive] An otherwise identical build but with \ourgc's finaliser
-        elision optimisation disabled.
-\end{description}
-
-I use the SOM benchmark suite using Rebench benchmarking suite using two
-versions of \yksom for each \ourgc variant. I run each SOM
-benchmark for 30 \emph{process executions}, where each instance of yksom is
-closed down and started again. Rebench records wall-clock times using Python's
-\texttt{time()} function. I also run each SOM benchmark and record the number of
-finalisers that were executed for each \ourgc variant.
-
-\subsubsection{Results}
-
-\autoref{table:finaliser_elision} shows the performance results for this study.
-Finaliser elision is able to remove over 99\% of finalisers on every benchmark,
-leading to a 14.87\% improvement in runtime speed when taking the geometric mean
-across all benchmarks. Such an improvement is clear in part due to \yksom's
-internal VM object representation: \yksom objects use Strings and HashMaps
-internally, which are allocated on the Rust heap and thus, without finaliser
-elision, require tens of thousands of calls to drop in order to deallocate.
-
-However, despite significant improvements in wall-clock time on nearly every
-benchmark, \emph{FieldLoop} regresses by 10.59\%. The reason for this became
-clear once I recorded the peak memory usage of \yksomnaive (3.25MB) and
-\yksomelision (4.31MB). The finalisers for 606,385 objects are elided,
-meaning that those objects become the responsibility of \ourgc to GC. Therefore,
-based on the higher memory usage, the most likely reason for the resulting
-slowdown is that those objects are being erroneously kept alive. After analysing
-the program in perf, almost all the excess runtime is spent in marking.
-
-\makeatletter
-\newcommand*\ExpandableInputFinalisers[1]{\@@input#1 }
-\makeatother
-\begin{landscape}
- \begin{table*}[t]
-     \centering
-     \begin{tabular}{lllllrr}
- \toprule
-    \multirow{2}{*}{Benchmark} & \multicolumn{2}{c}{\yksomnaive} & \multicolumn{4}{c}{\yksomelision} \\
-\cmidrule(l){2-3} \cmidrule(l){4-7}
-         & Runtime (ms) & Finaliser count & Runtime (ms) & Finaliser
-         count & Runtime slowdown & Finalisers elided \\
- \midrule
-\ExpandableInputFinalisers{./table_finalizers}
- \bottomrule
-     \end{tabular}
- \vspace{6pt}
-     \caption{Results from my finaliser elision experiment, where I evaluate the
-     performance of yksom using two configurations: naive finalisation, and
-     \ourgc's finaliser elision optimisation. Each configuration is compared
-     using a subset of benchmarks on the Rebench benchmarking suite for 30
-     process executions, where I report 99\% confidence intervals. I also count
-     the number of finalisers which were run for each benchmark for a single
-     process execution.}
-\label{table:finaliser_elision}
-\end{table*}
-\end{landscape}
-
-
-\subsection{Early finaliser prevention}
-\label{fincost}
-
-\makeatletter
-\newcommand*\ExpandableInputBarriers[1]{\@@input#1 }
-\makeatother
- \begin{table*}[t!]
-     \centering
-\scalebox{0.8}{
-     \begin{tabular}{llllll}
- \toprule
-    \multirow{2}{*}{Benchmark} & \multicolumn{1}{c}{\yksomnobarriers} & \multicolumn{2}{c}{\yksomallbarriers} & \multicolumn{1}{c}{\yksomoptbarriers} \\
-\cmidrule(l){2-2} \cmidrule(l){3-4} \cmidrule(l){5-6}
-         & Runtime (ms) & Runtime (ms) & Slowdown & Runtime (ms) & Slowdown \\
- \midrule
-\ExpandableInputBarriers{./table_barriers.tex}
- \bottomrule
-     \end{tabular}
-     }
- \vspace{6pt}
-     \caption{Results from my early finaliser prevention experiment, where I
-     evaluate the performance of yksom using three configurations:
-     \yksomnobarriers, where there are no compiler barriers (which is unsound);
-     \yksomallbarriers, where every single \lstinline{Gc} reference has a
-     corresponding barrier; and \yksomoptbarriers, where barriers can be
-     optimised away where \ourgc is certain they are unnecessary. Each
-     configuration is compared using a subset of benchmarks on the Rebench
-     benchmarking suite for 30 process executions, where I report 99\%
-     confidence intervals.}
-     \label{table:barriers}
-\end{table*}
-
-\subsubsection{Methodology}
-
-My fourth study aims to understand the performance impact of the early
-finaliser prevention technique \ourgc uses to ensure finalisers are sound.
-I aim to answer two questions:
-
-\begin{enumerate}
-  \item What is
-the impact of the compiler barriers that \ourgc uses to prevent early
-finalisation?
-  \item How effective is the optimisation that alloy uses to
-remove barriers where it can guarantee they are unnecessary?
-\end{enumerate}
-
-As with the previous study in \autoref{finoverhead}, I use \yksom to perform
-this evaluation. I build three configurations of \yksom as follows:
-
-\begin{description}
-    \item[\yksomnobarriers] This compiles \yksom with a version of \ourgc with
-        no compiler barriers to prevent possible early finalisation. This is
-        unsound.
-    \item[\yksomallbarriers] This compiles \yksom with a version of \ourgc which
-        inserts a compiler barrier for every single \lstinline{Gc} reference.
-    \item[\yksomoptbarriers] This compiles \yksom with a version of \ourgc which
-        inserts a compiler barrier \lstinline{Gc} reference which cannot be
-        optimised away with the approach described in
-        \autoref{optimising_early_finalisers}.
-\end{description}
-
-I use the SOM benchmark suite using Rebench benchmarking suite using two
-versions of \yksom for each \ourgc variant. I run each SOM
-benchmark for 30 \emph{process executions}, where each instance of yksom is
-closed down and started again. Rebench records wall-clock times using Python's
-\texttt{time()} function. I also run each SOM benchmark and record the number of
-finalisers that were executed for each \ourgc variant.
-
-\subsubsection{Results}
-
-\autoref{table:barriers} shows the performance results for this study.
-As one would expect, inserting barriers for every GC reference causes a slowdown
-on every benchmark. However, perhaps surprsingly, \yksomoptbarriers is faster
-than \yksomnobarriers on the following benchmarks: Bounce, Fibonacci,
-IntegerLoop, List, Loop, PageRank, Storage, Sum, and TreeSort. While I am not
-certain why this is the case, I believe the most likely reason for this is that
-sometimes, barriers can be inserted in such a way that they keep GC objects
-alive for the duration of the shorter running benchmarks, thus preventing
-finalisation for those objects entirely. Furthermore, when I disable the
-scheduling of finalisers entirely for the \yksomoptbarriers configuration, each
-previously of these benchmarks regressed from between 0.83\% to 3.32\%
-
-\subsection{Comparison between other GCs}
-\label{othergcs}
-
-My fifth and final experiment aims to understand the performance costs of
-\ourgc against other garbage collected approaches in Rust.
-
-The overall question I would like this experiment to answer is: how fast is
-\ourgc when compared with the other garbage collected options available in Rust?
-While I have been able to provide a more detailed assessment of \ourgc's
-performance when used to implement other languages, I am only able to provide
-a limited comparison of \ourgc's performance relative to other collectors:
-converting benchmarks to Luster's unusual approach was prohibitively
-difficult; and Bronze crashed with many benchmarks. In addition, I had
-difficultly finding suitable Rust programs which were practical enough to modify
-to use the various tracing GC implementations while also performing enough heap
-allocations to be useful. Fortunately, and despite these restrictions, this
-experiment is still able to provide valuable insights.
-
-In this experiment, I compare the performance of \ourgc against three different
-approaches to managing memory: using a indexed-arena,
-\rustgc (\autoref{alloy_related}), and Rust's standard reference counting library. I
-run each configuration on the Binary Trees benchmark from the Computer Language
-Benchmark Game for 30 process executions. The wall-clock times are
-recorded before and after each process execution using the multitime tool.
-
-\makeatletter
-\newcommand*\ExpandableInputBinTrees[1]{\@@input#1 }
-\makeatother
- \begin{table*}[t]
-     \begin{center}
-     \begin{tabular}{llll}
- \toprule
-\ExpandableInputBinTrees{./table_binary_trees.tex}
- \bottomrule
-     \end{tabular}
- \vspace{6pt}
-     \caption{Results from my experiment comparing \ourgc against three other
-         garbage collection configurations on the Binary Trees benchmark for 30
-         process executions, where I report 99\% confidence intervals. This
-         clearly shows that except for the index-arena (which deallocates all
-         its memory at once) \ourgc is the fastest configuration.}
-         \label{table:binary_trees}
-     \end{center}
-\end{table*}
-
-\subsection{Results}
-
-\autoref{table:binary_trees} shows the results for this experiment. The results
-shows that for Binary Trees (an allocation heavy benchmark)
-\textsc{Typed-arena} was the fastest as it never performs any deallocation
-during the benchmark run, it simply deallocates all memory at the end.
-
-\rustgc performs poorly for two reasons. First, it uses a form of reference
-counting to track the roots for each garbage collected object. Second, it has a
-naive implementation of the mark-sweep algorithm and does not use parallel
-collector threads.
-
-
 \section{Related work}
 \label{sec:related_work}
 
@@ -3667,7 +3106,7 @@ chapter, it is difficult to compare it ergonomically to other approaches.
     \centering
     \includegraphics[width=1\textwidth]{graphs/som_rs_perf.pdf}
     \caption{Results from the \somrs micro-benchmark experiment, where the SOM
-    benchmark suite is run with both configurations: \somrsrc, and \somrsgc.
+    benchmark suite is run with three configurations: \somrsrc, \textit{som-rs + BDWGC allocator}, and \somrsgc.
     Each benchmark is run for 30 process executions, where the error bars
     represent 99\% confidence intervals.}
 \label{graph:som_rs_finalisers}
@@ -3712,6 +3151,65 @@ chapter, it is difficult to compare it ergonomically to other approaches.
      executions, where I report 99\% confidence intervals.}
 \label{graph:yksom_finalisers}
 \end{figure}
+
+\subsection{Comparison between other GCs}
+\label{othergcs}
+
+My fifth and final experiment aims to understand the performance costs of
+\ourgc against other garbage collected approaches in Rust.
+
+The overall question I would like this experiment to answer is: how fast is
+\ourgc when compared with the other garbage collected options available in Rust?
+While I have been able to provide a more detailed assessment of \ourgc's
+performance when used to implement other languages, I am only able to provide
+a limited comparison of \ourgc's performance relative to other collectors:
+converting benchmarks to Luster's unusual approach was prohibitively
+difficult; and Bronze crashed with many benchmarks. In addition, I had
+difficultly finding suitable Rust programs which were practical enough to modify
+to use the various tracing GC implementations while also performing enough heap
+allocations to be useful. Fortunately, and despite these restrictions, this
+experiment is still able to provide valuable insights.
+
+In this experiment, I compare the performance of \ourgc against three different
+approaches to managing memory: using a indexed-arena,
+\rustgc (\autoref{alloy_related}), and Rust's standard reference counting library. I
+run each configuration on the Binary Trees benchmark from the Computer Language
+Benchmark Game for 30 process executions. The wall-clock times are
+recorded before and after each process execution using the multitime tool.
+
+\makeatletter
+\newcommand*\ExpandableInputBinTrees[1]{\@@input#1 }
+\makeatother
+ \begin{table*}[t]
+     \begin{center}
+     \begin{tabular}{llll}
+ \toprule
+\ExpandableInputBinTrees{./table_binary_trees.tex}
+ \bottomrule
+     \end{tabular}
+ \vspace{6pt}
+     \caption{Results from my experiment comparing \ourgc against three other
+         garbage collection configurations on the Binary Trees benchmark for 30
+         process executions, where I report 99\% confidence intervals. This
+         clearly shows that except for the index-arena (which deallocates all
+         its memory at once) \ourgc is the fastest configuration.}
+         \label{table:binary_trees}
+     \end{center}
+\end{table*}
+
+\subsection{Results}
+
+\autoref{table:binary_trees} shows the results for this experiment. The results
+shows that for Binary Trees (an allocation heavy benchmark)
+\textsc{Typed-arena} was the fastest as it never performs any deallocation
+during the benchmark run, it simply deallocates all memory at the end.
+
+\rustgc performs poorly for two reasons. First, it uses a form of reference
+counting to track the roots for each garbage collected object. Second, it has a
+naive implementation of the mark-sweep algorithm and does not use parallel
+collector threads.
+
+
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
