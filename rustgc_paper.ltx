@@ -3112,7 +3112,7 @@ chapter, it is difficult to compare it ergonomically to other approaches.
     \centering
     \includegraphics[width=1\textwidth]{graphs/som_rs_perf.pdf}
     \caption{Results from the \somrs micro-benchmark experiment, where the SOM
-    benchmark suite is run to compare three configurations of \somrs: \somrsrc, where SOM objects are managed with Rust's RC library and use \textit{jemalloc} for allocation; \somrsrcbdwgc, where SOM objects are also managed with RC but use the BDWGC's allocator with GC disabled; and \somrsgc, where SOM objects are managed using \ourgc's GC library, which uses the BDWGC's allocator. Each benchmark is run for 10 process
+    benchmark suite is run to compare two configurations of \somrs: \somrsrcbdwgc, where SOM objects are managed with RC but use the BDWGC's allocator with GC disabled; and \somrsgc, where SOM objects are managed using \ourgc's GC library, which uses the BDWGC's allocator. Each benchmark is run for 100 process
     executions, where the error bars represent 99\% confidence intervals.}
 \label{graph:som_rs_finalisers}
 \end{figure}
