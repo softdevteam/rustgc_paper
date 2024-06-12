@@ -5,10 +5,10 @@
 
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
-makes expressing data-structures whose values have multiple owners awkward or inefficient.
+makes expressing data-structures whose values have multiple owners awkward and/or inefficient.
 In this paper we explore a new design for GC in Rust, identifying
 the major challenge as finalisers: mapping existing Rust destructors
-to GC finalisers seems natural but introduces soundness,significant
+to GC finalisers seems natural but introduces soundness,
 performance, and ergonomic issues. In this paper we introduce \ourgc, a new GC for Rust,
 which provides solutions for each of these issues.
 \end{abstract}
@@ -26,41 +26,36 @@ fit within this classification: it is not GCed but it has implicit memory manage
 Most portions of most Rust programs are as
 succinct as a GCed equivalent but ownership is too inflexible to express
 data-structures that require multiple owners (e.g.~linked lists).
-Workarounds have many downsides, from memory leaks, inflexibility, or complexity.
+Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
+are easier to make mistakes with, and often come with a performance penalty.
 
 There have thus been a number of attempts to add GC to Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
-type \lstinline{T} to the GC heap and then wraps a pointer to that.
+type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
-program's \emph{roots} (e.g.~global variables, variables on the stack, etc.) to
-the underlying value, then the value's backing memory is reclaimed.
+program's \emph{roots} (e.g.~global variables, variables on the stack, etc.),
+then the value's backing memory is reclaimed.
 
 Unfortunately, it has proven hard to find a satisfying design for a GC for
-Rust. Existing attempts have sacrificed at least least one of soundness (e.g.~the
-Bronze GC~\cite{coblenz21bronze} cannot
-track indirect references, so seemingly safe programs can fail due to
-use-after-frees etc.), performance (\laurie{use a sensible figure from the
-perf section}), or ergonomics (e.g.~requiring drop methods to be duplicated
-as finalisers).
+Rust. Although there are many minor issues, we identify two fundamental
+challenges for GC for Rust: enabling a familiar, idiomatic API for
+\lstinline{Gc<T>}; and allowing Rust's existing destructors to be used
+as finalisers. As we shall see, the former is relatively easily
+addressed, but the latter is more difficult.
 
-In this paper we introduce \ourgc, a new GC for Rust, that addresses most of
-the shortcomings of previous approaches. \ourgc exposes a similar
-\lstinline{Gc<T>} type to other GCs for Rust, but after that diverges.
-In particular, \ourgc allows Rust \emph{destructors} (i.e.~code
+In essence, it is natural for Rust programmers to want its standard \emph{destructors} (i.e.~code
 which is run just before a value is freed by Rust's implicit memory management)
 to be used as GC \emph{finalisers} (i.e.~code which is run just before a value
-is collected by the GC).
-
-Mapping destructors to finalisers introduces three fundamental problems which
-are at the heart of \ourgc and this paper:
+is collected by the GC). However, naively mapping destructors to finalisers
+introduces three fundamental problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
 and (3) finalisers are prohibitively slower than destructors. These are
 classical GC problems, but all are exacerbated in some way by Rust.
 
-We introduce solutions for each problem, each of which makes use,
+In this paper we introduce solutions for each problem, each of which makes use,
 at least in part, of Rust's static guarantees:
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
@@ -71,20 +66,7 @@ the GC into collecting values before they are dead;
 and (3) \emph{finaliser elision} statically optimises away finalisers if
 the destructor that is their basis simply frees heap memory.
 
-\ourgc also shows that, by extending the language and compiler, it is possible
-to make GC for Rust more ergonomic than in user-level libraries. For example,
-GCed values can, like reference counted values in Rust, be converted into
-pointers and back again. However, pointers in Rust can be converted to pointers
-and back again at will. This requires us to use \emph{conservative} GC
-(i.e.~treating all words in memory as possible pointers to GCed values) to
-achieve our goals. Although conservative GC is used in widespread
-programs such as Chrome and Safari, it is unsound in most languages
-and compilers: thus \ourgc is sound only to the extent that
-conservative GCs in general are sound (see~\cref{conservative_gc}). Since
-conservative GC is widely used, we consider this a pragmatic trade-off
-in general, and specifically in Rust where some language design decisions
-make it impossible to have flexible and precise GC together.
-
+These solutions are implemented as part of \ourgc, a new GC for Rust.
 We evaluate \ourgc on a number of benchmarks against non-GCed alternatives.
 Overall \laurie{performance is XYZ}.
 
