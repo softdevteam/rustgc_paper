@@ -161,95 +161,7 @@ therefore never concurrent.}
 \laurie{all fine with me: why don't you draft definitions and i'll tweak them as necessary}
 
 
-\section{Destructors vs.~Finalisers}
-\label{sec:finaliser_issues}
-
-In this section we look at the challenge of using destructors for a GC for Rust.
-Rust uses destructors pervasively in the form of \emph{drop methods}.
-When the owner of a value goes out of scope, the value's drop
-method is called. For example, eliding details such as weak counts,
-\lstinline{Rc<T>} has the following drop method:
-
-\begin{lstlisting}[language=Rust,numbers=left]
-impl<T> Drop for Rc<T> {
-  fn drop(&must self) {
-    self.inner.count -= 1;
-    if self.inner.count == 0 {
-      unsafe { Box::from_raw(self.inner.block);
-    }
-  }
-}
-\end{lstlisting}
-
-\noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop} trait
-which then requires implementing a \lstinline{drop} method. \lstinline{Rc<T>}
-contains a (nested) reference count and a pointer to
-a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
-type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
-first decrements the reference count. If that count
-goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
-(with \lstinline{from_raw}), and immediately goes out of scope, implicitly
-calling \lstinline{Box<T>}'s drop method. This then recursively calls \lstinline{T}'s
-drop method and frees its backing memory.
-
-Rust defines when destructors are called so that programmers can statically
-reason about when a value's destructor will be called\footnote{There are some exceptions: for
-example Rust's `temporary lifetime extension' can delay destruction, but how
-long temporary values are kept alive for is currently unspecified.}. This leads
-to a style of programming that originated in C++ called RAII (Resource
-Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
-For example, Rust's standard \lstinline{Mutex} type has a method
-\lstinline{lock} which returns a \lstinline{MutexGuard} value;
-\lstinline{MutexGuard}'s drop method automatically unlocks the
-\lstinline{Mutex}; and so a programmer can rely on a locked mutex being unlocked at
-a predictable point, without having to explicitly call an unlock
-method.
-
-At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
-being run just before a value's backing memory is freed.
-However, there is an important difference between the two: while Rust defines precisely
-when a destructor will be run, GC finalisers are
-only run at some unspecified point in time after the last
-reference to a GCed value is dropped.
-
-If we assume the existence in Rust of a `fully' GCed type \lstinline{Gc<T>}
-this immediately raises an important question: when are \lstinline{Gc<T>}
-finalisers run? When the reference count in an \lstinline{Rc<T>} goes to 0, \lstinline{T}'s
-drop method is called immediately. But when the last reference to an \lstinline{Gc<T>}
-is lost, \lstinline{T}'s drop method may not be called for some time.
-
-A more subtle issue is: where are finalisers run? Running
-finalisers on the same thread as mutator code can cause deadlocks if a finaliser
-tries to access a resource that the mutator has locked
-(see~\cref{finaliser_thread} for more details). However, not all Rust destructors
-are safe to run on another thread.
-
-None of these issues are unique to GC in Rust: indeed, the wider challenges that
-finalisers cause are now well known (see~\cite{boehm03destructors} for an
-overview of these issues). For example, what should we do with finalisers
-in values that form a cycle? In such a situation, a finaliser can reference
-values that are partly, or wholly, `finalised'. Other issues include the
-ability of finalisers to `resurrect' values by
-copying the reference passed to the finaliser somewhere where the rest of
-the program can now see it.
-
-Over time finalisers have come to be viewed with increasing suspicion. Java,
-for example, has deprecated, and intends eventually removing, per-type
-finalisers, in favour of mechanisms such as per-object `cleaners', whose API
-prevents problems such as object resurrection~\cite{goetz21deprecated}.
-
-\laurie{jake: we need to quickly survey existing rust gcs. i think they either
-don't allow finalisers or require users to write their own i.e.~duplicating
-drop methods. but maybe there are exceptions!}
-
-One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.} for
-Rust has no choice but to make use of finalisers and, in particular, to map
-Rust's destructors to finalisers whenever possible. Without doing so, users are either forced
-to write finalisers in addition to destructors for each type they place into a
-\lstinline{Gc<T>}.
-
-
-\section{\ourgc: Basic Design Choices and Implementation Approach}
+\section{\ourgc: Design Choices}
 
 In this section we outline \ourgc's basic design choices
 and implementation approach -- the rest of the paper then goes into detail on the more
@@ -257,11 +169,6 @@ advanced aspects.
 
 
 \subsection{Basic Design Choices}
-
-
-\jake{This feels obvious but only because I think we've worked on it for so long. I think we must justify why we want this and why they might not just want to introduce a separate finaliser trait. So in essence it's because: a) excess code duplication / boilerplate. b) most third-party crates just work without needing modification c) trait coherence -- you can't implement Finalize on a type in a crate you don't own.}
-
-
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
 reference counting type \lstinline{Rc<T>} from Rust's standard library, because
@@ -328,6 +235,63 @@ semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler op
 than duplicating an \lstinline{Rc<T>}.
 
 
+\subsection{Using Destructors as Finalisers}
+\label{sec:finaliser_issues}
+
+Rust uses destructors pervasively in the form of \emph{drop methods}.
+When the owner of a value goes out of scope, the value's drop
+method is called. For example, eliding details such as weak counts,
+\lstinline{Rc<T>} has the following drop method:
+
+\laurie{in retrospect, using Rc is going to confuse readers here. can we find
+another type which has a useful, understandable drop method? preferably one
+that doesn't called `free'}
+
+\begin{lstlisting}[language=Rust,numbers=left]
+impl<T> Drop for Rc<T> {
+  fn drop(&must self) {
+    self.inner.count -= 1;
+    if self.inner.count == 0 {
+      unsafe { Box::from_raw(self.inner.block);
+    }
+  }
+}
+\end{lstlisting}
+
+\noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop} trait
+which then requires implementing a \lstinline{drop} method. \lstinline{Rc<T>}
+contains a (nested) reference count and a pointer to
+a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
+type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
+first decrements the reference count. If that count
+goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
+(with \lstinline{from_raw}), and immediately goes out of scope, implicitly
+calling \lstinline{Box<T>}'s drop method. This then recursively calls \lstinline{T}'s
+drop method and frees its backing memory.
+
+Rust defines when destructors are called so that programmers can statically
+reason about when a value's destructor will be called\footnote{There are some exceptions: for
+example Rust's `temporary lifetime extension' can delay destruction, but how
+long temporary values are kept alive for is currently unspecified.}. This leads
+to a style of programming that originated in C++ called RAII (Resource
+Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
+For example, Rust's standard \lstinline{Mutex} type has a method
+\lstinline{lock} which returns a \lstinline{MutexGuard} value;
+\lstinline{MutexGuard}'s drop method automatically unlocks the
+\lstinline{Mutex}; and so a programmer can rely on a locked mutex being unlocked at
+a predictable point, without having to explicitly call an unlock
+method.
+
+Although some drop methods in Rust simply free backing memory, and thus would
+not do useful work in a GC, many drop methods, such as that of
+\lstinline{MutexGuard}, are vital for semantic correctness. Existing GCs for
+Rust thus tend to introduce a new \lstinline{Finaliser} trait as an analogue of
+the \lstinline{Drop} trait. If a user wants a type \lstinline{T} to have a
+finaliser when used in \lstinline{Gc<T>}, they must manually implement the
+\lstinline{Finaliser} trait.
+
+
+
 \subsection{Implementation Approach}
 
 \laurie{rustc fork, BDWGC, GcBox, etc.}
@@ -336,6 +300,55 @@ Currently, \ourgc uses the well-known
 Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
 challenges we tackle in this paper will remain the same no matter what
 underlying conservative GC is used.
+
+
+\subsubsection{The Challenges of Using Destructors as Finalisers}
+
+At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
+being run just before a value's backing memory is freed.
+However, there is an important difference between the two: while Rust defines precisely
+when a destructor will be run, GC finalisers are
+only run at some unspecified point in time after the last
+reference to a GCed value is dropped.
+
+If we assume the existence in Rust of a `fully' GCed type \lstinline{Gc<T>}
+this immediately raises an important question: when are \lstinline{Gc<T>}
+finalisers run? When the reference count in an \lstinline{Rc<T>} goes to 0, \lstinline{T}'s
+drop method is called immediately. But when the last reference to an \lstinline{Gc<T>}
+is lost, \lstinline{T}'s drop method may not be called for some time.
+
+A more subtle issue is: where are finalisers run? Running
+finalisers on the same thread as mutator code can cause deadlocks if a finaliser
+tries to access a resource that the mutator has locked
+(see~\cref{finaliser_thread} for more details). However, not all Rust destructors
+are safe to run on another thread.
+
+None of these issues are unique to GC in Rust: indeed, the wider challenges that
+finalisers cause are now well known (see~\cite{boehm03destructors} for an
+overview of these issues). For example, what should we do with finalisers
+in values that form a cycle? In such a situation, a finaliser can reference
+values that are partly, or wholly, `finalised'. Other issues include the
+ability of finalisers to `resurrect' values by
+copying the reference passed to the finaliser somewhere where the rest of
+the program can now see it.
+
+Over time finalisers have come to be viewed with increasing suspicion. Java,
+for example, has deprecated, and intends eventually removing, per-type
+finalisers, in favour of mechanisms such as per-object `cleaners', whose API
+prevents problems such as object resurrection~\cite{goetz21deprecated}.
+
+\laurie{jake: we need to quickly survey existing rust gcs. i think they either
+don't allow finalisers or require users to write their own i.e.~duplicating
+drop methods. but maybe there are exceptions!}
+
+One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.} for
+Rust has no choice but to make use of finalisers and, in particular, to map
+Rust's destructors to finalisers whenever possible. Without doing so, users are either forced
+to write finalisers in addition to destructors for each type they place into a
+\lstinline{Gc<T>}.
+
+
+\subsection{Lots of stuff}
 
 \ourgc introduces a new smart pointer type, \lstinline{Gc<T>}, which provides
 shared ownership of a value of type \lstinline{T} allocated in the heap and
