@@ -40,16 +40,24 @@ then the value on the GC heap can reclaimed.
 
 Unfortunately, it has proven hard to find a satisfying design for a GC for
 Rust. Although there are many minor issues, we identify two fundamental
-challenges for GC for Rust: enabling a familiar, idiomatic API for
-\lstinline{Gc<T>}; and allowing Rust's existing destructors to be used
-as finalisers\jake{I think the challenge is more about how the API for finalisers looks in general. Using destructors as finalisers is one such solution that we try, but it is not fundamentally necessary}. As we shall see, the former is relatively easily
-addressed, but the latter is more difficult.
+challenges for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic
+API; and how to make finalisation (i.e.~the code that is run just before a
+value is collected by the GC) ergonomic, safe, and
+performant. As we shall see, the former is relatively easily addressed, but the
+latter is more difficult.
 
-In essence, it is natural for programmers to want Rust's normal \emph{destructors} \jake{This feels obvious but only because I think we've worked on it for so long. I think we must justify why we want this and why they might not just want to introduce a separate finaliser trait. So in essence it's because: a) excess code duplication / boilerplate. b) most third-party crates just work without needing modification c) trait coherence -- you can't implement Finalize on a type in a crate you don't own.} (i.e.~code
-which is run just before a value is freed by Rust's implicit memory management)
-to be used as GC \emph{finalisers} (i.e.~code which is run just before a value
-is collected by the GC). However, naively mapping destructors to finalisers
-introduces three fundamental problems:
+The most common solution to finalisation in a GC for Rust is to introduce a
+\lstinline{Finalisation} \emph{trait} (roughly equivalent to a Java interface)
+that can be implemented by types that can be
+placed in \lstinline{Gc<T>}. This not only forces the programmer to duplicate
+existing \emph{destructors} (i.e.~code which is run just before a value is
+freed by Rust's implicit memory management) but prevents prevents types in
+external libraries from being used with \lstinline{Gc<T>} entirely (see
+\laurie{sec xyz}).
+
+In this paper we aim to allow programmers to use Rust's standard destructors
+automatically as finalisers in the vast majority of cases. However, naively
+mapping destructors to finalisers introduces three fundamental problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
 and (3) finalisers are prohibitively slower than destructors. These are
@@ -156,7 +164,7 @@ therefore never concurrent.}
 \section{Destructors vs.~Finalisers}
 \label{sec:finaliser_issues}
 
-In this section we look at the challenge of destructors for a GC for Rust.
+In this section we look at the challenge of using destructors for a GC for Rust.
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, the value's drop
 method is called. For example, eliding details such as weak counts,
@@ -173,9 +181,9 @@ impl<T> Drop for Rc<T> {
 }
 \end{lstlisting}
 
-\noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
-\emph{trait} (roughly equivalent to a Java interface) which then requires
-implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a reference count \jake{Not quite right, RC is the smart pointer, the count is stored inside the underlying box} and a pointer to
+\noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop} trait
+which then requires implementing a \lstinline{drop} method. \lstinline{Rc<T>}
+contains a (nested) reference count and a pointer to
 a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
 type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
 first decrements the reference count. If that count
@@ -184,11 +192,11 @@ goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its ra
 calling \lstinline{Box<T>}'s drop method. This then recursively calls \lstinline{T}'s
 drop method and frees its backing memory.
 
-Rust has simple, \jake{splitting hairs but maybe remove simple, the drop flag stuff is a bit complex} well-defined rules that allow programmers to accurately reason
-about when destructors are called\footnote{There are some exceptions: for
+Rust defines when destructors are called so that programmers can statically
+reason about when a value's destructor will be called\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
-long temporary values are kept alive for is currently unspecified.}. This then
-enables a style of programming that originated in C++ called RAII (Resource
+long temporary values are kept alive for is currently unspecified.}. This leads
+to a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}.
 For example, Rust's standard \lstinline{Mutex} type has a method
 \lstinline{lock} which returns a \lstinline{MutexGuard} value;
@@ -249,6 +257,11 @@ advanced aspects.
 
 
 \subsection{Basic Design Choices}
+
+
+\jake{This feels obvious but only because I think we've worked on it for so long. I think we must justify why we want this and why they might not just want to introduce a separate finaliser trait. So in essence it's because: a) excess code duplication / boilerplate. b) most third-party crates just work without needing modification c) trait coherence -- you can't implement Finalize on a type in a crate you don't own.}
+
+
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
 reference counting type \lstinline{Rc<T>} from Rust's standard library, because
