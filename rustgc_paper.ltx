@@ -235,8 +235,8 @@ semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler op
 than duplicating an \lstinline{Rc<T>}.
 
 
-\subsection{Using Destructors as Finalisers}
-\label{sec:finaliser_issues}
+\subsection{Why \ourgc Allows Destructors to be Used as Finalisers}
+\label{sec:why we use destructors as finalisers}
 
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, the value's drop
@@ -284,12 +284,24 @@ method.
 
 Although some drop methods in Rust simply free backing memory, and thus would
 not do useful work in a GC, many drop methods, such as that of
-\lstinline{MutexGuard}, are vital for semantic correctness. Existing GCs for
+\lstinline{MutexGuard}, are vital for semantic correctness. Existing GCs (e.g.~\laurie{xyz}) for
 Rust thus tend to introduce a new \lstinline{Finaliser} trait as an analogue of
 the \lstinline{Drop} trait. If a user wants a type \lstinline{T} to have a
 finaliser when used in \lstinline{Gc<T>}, they must manually implement the
-\lstinline{Finaliser} trait.
+\lstinline{Finaliser} trait. This has three problems: (1) most such finalisers
+largely or wholly duplicate their existing drop method; (2) external libraries
+are unlikely to provide such finalisers; (3) Rust's \emph{orphan rule}
+\laurie{jake: is https://rust-lang.github.io/chalk/book/clauses/coherence.html
+the best reference for this?} prevents one implementing traits for types
+defined in external libraries. In other words, it is impossible to provide a
+finaliser for a type \lstinline{T} from a library unless that library has
+existing, specific, support for the particular Rust GC one is using.
 
+Because destructors are used pervasively in Rust, we believe that a viable GC
+for Rust has no choice but to make use of Rust's existing support for
+destructors. \ourgc thus allows most drop methods to be automatically used as
+finalisers. Doing so naively, however, introduces a number of challenges
+which we will go into in more detail in \cref{sec:destructor challenges}.
 
 
 \subsection{Implementation Approach}
@@ -302,7 +314,22 @@ challenges we tackle in this paper will remain the same no matter what
 underlying conservative GC is used.
 
 
-\subsubsection{The Challenges of Using Destructors as Finalisers}
+\section{Destructors as Finalisers: Challenges and Solutions}
+\label{sec:destructor challenges}
+
+In \cref{sec:why we use destructors as finalisers} we explained why \ourgc uses
+Rust's existing destructors as finalisers. As we briefly hinted there, though,
+this introduces a number of challenges. In this section we first give an
+overview of these challenges before explaining \ourgc's solutions to these
+challenges.
+
+
+\subsection{Challenges}
+
+\laurie{(1) some safe destructors are not safe finalisers;
+(2) finalisers can be run too early;
+and (3) finalisers are prohibitively slower than destructors. These are
+classical GC problems, but all are exacerbated in some way by Rust.}
 
 At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
 being run just before a value's backing memory is freed.
@@ -348,7 +375,28 @@ to write finalisers in addition to destructors for each type they place into a
 \lstinline{Gc<T>}.
 
 
-\subsection{Lots of stuff}
+\subsection{Solutions}
+
+\subsubsection{Finaliser Safety Analysis}
+
+Extends Rust's type system to reject programs whose destructors are not
+provably safe to be used as finalisers.
+
+
+\subsubsection{Early Finaliser Prevention}
+
+Inserts barriers that prevent optimisations or register allocation from
+`tricking' the GC into collecting values before they are dead, but does so in a
+way that obviously pointless barriers are elided.
+
+
+\subsubsection{Finaliser Elision}
+
+Statically optimises away finalisers if the destructor that is their basis
+simply frees heap memory.
+
+
+\section{Lots of stuff}
 
 \ourgc introduces a new smart pointer type, \lstinline{Gc<T>}, which provides
 shared ownership of a value of type \lstinline{T} allocated in the heap and
