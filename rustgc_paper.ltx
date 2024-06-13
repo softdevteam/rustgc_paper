@@ -36,16 +36,16 @@ type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~global variables, variables on the stack, etc.),
-then the value's backing memory on the GC heap can reclaimed.
+then the value on the GC heap can reclaimed.
 
 Unfortunately, it has proven hard to find a satisfying design for a GC for
 Rust. Although there are many minor issues, we identify two fundamental
 challenges for GC for Rust: enabling a familiar, idiomatic API for
 \lstinline{Gc<T>}; and allowing Rust's existing destructors to be used
-as finalisers. As we shall see, the former is relatively easily
+as finalisers\jake{I think the challenge is more about how the API for finalisers looks in general. Using destructors as finalisers is one such solution that we try, but it is not fundamentally necessary}. As we shall see, the former is relatively easily
 addressed, but the latter is more difficult.
 
-In essence, it is natural for programmers to want Rust's normal \emph{destructors} (i.e.~code
+In essence, it is natural for programmers to want Rust's normal \emph{destructors} \jake{This feels obvious but only because I think we've worked on it for so long. I think we must justify why we want this and why they might not just want to introduce a separate finaliser trait. So in essence it's because: a) excess code duplication / boilerplate. b) most third-party crates just work without needing modification c) trait coherence -- you can't implement Finalize on a type in a crate you don't own.} (i.e.~code
 which is run just before a value is freed by Rust's implicit memory management)
 to be used as GC \emph{finalisers} (i.e.~code which is run just before a value
 is collected by the GC). However, naively mapping destructors to finalisers
@@ -175,7 +175,7 @@ impl<T> Drop for Rc<T> {
 
 \noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop}
 \emph{trait} (roughly equivalent to a Java interface) which then requires
-implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a reference count and a pointer to
+implementing a \lstinline{drop} method. \lstinline{Rc<T>} itself contains a reference count \jake{Not quite right, RC is the smart pointer, the count is stored inside the underlying box} and a pointer to
 a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
 type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
 first decrements the reference count. If that count
@@ -184,7 +184,7 @@ goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its ra
 calling \lstinline{Box<T>}'s drop method. This then recursively calls \lstinline{T}'s
 drop method and frees its backing memory.
 
-Rust has simple, well-defined rules that allow programmers to accurately reason
+Rust has simple, \jake{splitting hairs but maybe remove simple, the drop flag stuff is a bit complex} well-defined rules that allow programmers to accurately reason
 about when destructors are called\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
 long temporary values are kept alive for is currently unspecified.}. This then
@@ -216,7 +216,7 @@ tries to access a resource that the mutator has locked
 (see~\cref{finaliser_thread} for more details). However, not all Rust destructors
 are safe to run on another thread.
 
-None of these issues is unique to GC in Rust: indeed, the wider challenges that
+None of these issues are unique to GC in Rust: indeed, the wider challenges that
 finalisers cause are now well known (see~\cite{boehm03destructors} for an
 overview of these issues). For example, what should we do with finalisers
 in values that form a cycle? In such a situation, a finaliser can reference
@@ -234,7 +234,7 @@ prevents problems such as object resurrection~\cite{goetz21deprecated}.
 don't allow finalisers or require users to write their own i.e.~duplicating
 drop methods. but maybe there are exceptions!}
 
-One of the fundamental assumptions underlying our work is that a usable GC for
+One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.} for
 Rust has no choice but to make use of finalisers and, in particular, to map
 Rust's destructors to finalisers whenever possible. Without doing so, users are either forced
 to write finalisers in addition to destructors for each type they place into a
@@ -259,7 +259,7 @@ need from such a type.
 
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to \lstinline{v} on the GC heap. Dereferencing
+simple wrapper around a pointer to \lstinline{v} on the GC heap \jake{The GC heap is conceptual only -- it's really the same heap. Does this need mentioning here?}. Dereferencing
 a \lstinline{Gc<T>} produces an immutable Rust reference to the underlying
 value: there is no way to directly mutate GCed values and users must use other
 standard Rust types (e.g.~\lstinline{Mutex<T>}) that enable \emph{interior mutability}.
