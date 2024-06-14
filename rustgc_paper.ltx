@@ -147,18 +147,21 @@ rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
 
 \subsection{GC terminology}
 
-\laurie{tracing vs.non-tracing}
-\laurie{mutator vs.~non-mutator}
+GC is a venerable field and has accumulated terminology that can seem
+unfamiliar or unintuitive. Taking our lead from~\cite{jones16garbage}, we
+briefly define the terminology we will use throughout
+this paper.
 
-\jake{My preferences on terminology are as follows:}
-\jake{Tracing vs Reference Counting.}
-\jake{Mutator vs.~collector (when talking about threads)}
-\jake{The term 'concurrent' should only be used when referring to, whether the
-collector does stuff at the same time as the mutator threads. Alloy is
-therefore never concurrent.}
-\jake{Use parallel to refer to multiple mutator threads or multiple collector threads}.
-\jake{Gc'd language vs non-GC'd language (instead of managed / unmanaged)}.
-\laurie{all fine with me: why don't you draft definitions and i'll tweak them as necessary}
+A program which uses GC is split into \emph{mutator} (the user's program) and
+\emph{collector} (the GC itself) code. At any given point, a thread is either
+running as a mutator or a collector, though some threads may be given over
+entirely to the collector. A \emph{tracing} GC is one that scans memory looking
+for reachable objects from a program's roots: objects that are not reachable
+from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
+not scan memory, and thus cannot free objects that form a cycle. Tracing and
+reclamation is performed during a \emph{collection} phase. In the context of
+this paper collections are \emph{stop-the-world}, that is all mutator threads
+are paused while collection occurs.
 
 
 \section{\ourgc: Design Choices}
