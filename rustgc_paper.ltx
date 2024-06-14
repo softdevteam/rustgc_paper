@@ -5,10 +5,10 @@
 
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
-makes expressing data-structures whose values have multiple owners awkward and/or inefficient.
+makes expressing data-structures whose values have multiple owners awkward, inefficient, or both.
 In this paper we explore a new design for GC in Rust, identifying
 the major challenge as finalisers: mapping existing Rust destructors
-to GC finalisers seems natural but introduces soundness,
+to GC finalisers seems natural, but introduces soundness,
 performance, and ergonomic issues. In this paper we introduce \ourgc, a new GC for Rust,
 which provides solutions for each of these issues.
 \end{abstract}
@@ -29,7 +29,7 @@ data-structures that require multiple owners (e.g.~linked lists).
 Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
 are easier to make mistakes with, and often come with a performance penalty.
 
-There have thus been a number of attempts to add GC to Rust. Typically these
+To solve this, there are now a number of GCs for Rust. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
 type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
@@ -38,25 +38,26 @@ type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
 program's \emph{roots} (e.g.~global variables, variables on the stack, etc.),
 then the value on the GC heap can reclaimed.
 
-Unfortunately, it has proven hard to find a satisfying design for a GC for
-Rust. Although there are many minor issues, we identify two fundamental
+However, as perhaps suggested by the number of GCs for Rust, it has
+proven hard to find a satisfying design and implementation. Although there are
+many minor issues, we identify two fundamental
 challenges for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic
 API; and how to make finalisation (i.e.~the code that is run just before a
-value is collected by the GC) ergonomic, safe, and
-performant. As we shall see, the former is relatively easily addressed, but the
-latter is more difficult.
+value is collected by the GC) safe, performant, and ergonomic. As we shall see,
+the API challenge is relatively easily addressed, but the finalisation
+challenge is more difficult.
 
-The most common solution to finalisation in a GC for Rust is to introduce a
+The most common solution to finalisation GCs for Rust is to introduce a
 \lstinline{Finalisation} \emph{trait} (roughly equivalent to a Java interface)
 that can be implemented by types that can be
 placed in \lstinline{Gc<T>}. This not only forces the programmer to duplicate
 existing \emph{destructors} (i.e.~code which is run just before a value is
 freed by Rust's implicit memory management) but prevents prevents types in
 external libraries from being used with \lstinline{Gc<T>} entirely (see
-\laurie{sec xyz}).
+\cref{sec:why we use destructors as finalisers}).
 
-In this paper we aim to allow programmers to use Rust's standard destructors
-automatically as finalisers in the vast majority of cases. However, naively
+In this paper we instead aim to allow Rust's standard destructors to be used
+as finalisers automatically. However, naively
 mapping destructors to finalisers introduces three fundamental problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
@@ -103,8 +104,11 @@ fn main() {
 
 \section{Background}
 
+\subsection{Does Rust need a GC?}
+
 In this section we briefly show why some data structures that are easy to
-write in GCed languages are challenging in Rust.
+write in GCed languages are challenging in Rust. This provides the core
+motivation for GC in Rust.
 
 Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} has a
@@ -143,6 +147,8 @@ one, but they're too complicated i think: we can at least reference
 maybe the bronze GC paper has some good examples. otherwise, maybe we just
 introduce a type `S' which can reference other `S`s and show the problems with
 rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
+\laurie{maybe? until we flesh that example out and use it in other parts of
+the paper, we won't know}
 
 
 \subsection{GC terminology}
