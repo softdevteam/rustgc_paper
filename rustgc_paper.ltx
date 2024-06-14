@@ -167,7 +167,9 @@ from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. Tracing and
 reclamation is performed during a \emph{collection} phase. In the context of
 this paper collections are \emph{stop-the-world}, that is all mutator threads
-are paused while collection occurs.
+are paused while collection occurs. We refer to memory which is solely under
+the control of the GC as the \emph{GC heap}, though this may in practise be
+intermingled with non-GCed memory.
 
 
 \section{\ourgc: Design Choices}
