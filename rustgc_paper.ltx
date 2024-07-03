@@ -25,11 +25,11 @@ non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lsti
 fit within this classification: it is not GCed but it has implicit memory management.
 Most portions of most Rust programs are as
 succinct as a GCed equivalent but ownership is too inflexible to express
-data-structures that require multiple owners (e.g.~linked lists).
+data-structures that require multiple owners (e.g.~doubly linked lists).
 Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
 are easier to make mistakes with, and often come with a performance penalty.
 
-To solve this, there are now a number of GCs for Rust. Typically these
+To solve this, there are now a number of GCs for Rust~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which moves values of
 type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
@@ -48,9 +48,9 @@ the API challenge is relatively easily addressed, but the finalisation
 challenge is more difficult.
 
 The most common solution to finalisation GCs for Rust is to introduce a
-\lstinline{Finalisation} \emph{trait} (roughly equivalent to a Java interface)
+\lstinline{Finalize} \emph{trait} (roughly equivalent to a Java interface)
 that can be implemented by types that can be
-placed in \lstinline{Gc<T>}. This not only forces the programmer to duplicate
+placed in \lstinline{Gc<T>}~\cite{manish15rustgc}. This not only forces the programmer to duplicate
 existing \emph{destructors} (i.e.~code which is run just before a value is
 freed by Rust's implicit memory management) but prevents prevents types in
 external libraries from being used with \lstinline{Gc<T>} entirely (see
@@ -62,14 +62,14 @@ mapping destructors to finalisers introduces three fundamental problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
 and (3) finalisers are prohibitively slower than destructors. These are
-classical GC problems, but all are exacerbated in some way by Rust.
+classical GC problems, but all are exacerbated in some way by Rust. \jake{Not sure about this. Only (1) is a direct consequence of mapping destructors to finalisers. The other could also be a problem with the separate finalise trait mechanism. I do think they are worth mentioning here as they set the story up nicely, but I think we should weaken the link between (2-3) and our approach.}
 
 In this paper we introduce novel solutions for each problem, each of which makes use,
 at least in part, of Rust's static guarantees:
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers;
-(2) \emph{early finaliser prevention} inserts barriers that prevent
+(2) \emph{early finaliser prevention} automatically inserts barriers that prevent
 optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead, but does so in a way that
 obviously pointless barriers are elided;
@@ -112,8 +112,7 @@ motivation for GC in Rust.
 
 Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} has a
-single owner (e.g.~a variable): an owner can \emph{move} a value to another owner
-at which point the original owner no longer has access to the value; and once
+single owner (e.g.~a variable); an owner can \emph{move} a value to another owner
 a value's owner goes out of scope, the value's \lstinline{drop} method (its destructor)
 is run and its backing memory freed. An owner can pass \emph{references} to a value
 to other code, subject to the following static restrictions: there can be
@@ -163,7 +162,7 @@ A program which uses GC is split into \emph{mutator} (the user's program) and
 running as a mutator or a collector, though some threads may be given over
 entirely to the collector. A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
-from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
+from the roots are \emph{reclaimed}. \jake{Maybe a footnote that, in convention with other GC literature, all mentions of GC on its own in this paper refer to tracing GC unless otherwise stated.} In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. Tracing and
 reclamation is performed during a \emph{collection} phase. In the context of
 this paper collections are \emph{stop-the-world}, that is all mutator threads
@@ -221,10 +220,9 @@ Conservative GC occupies a grey zone in programming language semantics. In
 most languages (including the semantics of most compiler IRs) conservative GC
 relies on undefined behaviour. \ourgc's use of conservative GC means \ourgc
 is, formally speaking, unsound. However, conservative GC is widely used,
-including in the two most widespread web browsers: Chrome uses it in its rendering
-engine~\citep{ager13oilpan} and WebKit uses it in its JavaScript
-VM~\citep{pizlo17riptide}. Even in 2024, we lack good
-alternatives: there is no cross-platform API for precise GC; and while some
+including in the two most widespread web browsers: Chrome uses it in its Blink rendering
+engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM -- JavaScriptCore~\citep{pizlo17riptide}.
+Even in 2024, we lack good alternatives: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
 incomplete and buggy. Practically speaking, despite the potential soundness
 worries, conservative GC remains a widely used technique.
@@ -256,7 +254,7 @@ method is called. For example, eliding details such as weak counts,
 
 \laurie{in retrospect, using Rc is going to confuse readers here. can we find
 another type which has a useful, understandable drop method? preferably one
-that doesn't called `free'}
+that doesn't called `free'} \jake{The only good non-freeing example I can think of in the standard library is Mutex/MutexGuard. Perhaps even Box would be an appropriate starting point. Why do you want one that doesn't call `free'?}
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
