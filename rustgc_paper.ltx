@@ -101,6 +101,174 @@ fn main() {
 \end{lstlisting}
 \end{figure}
 
+\section{Running example}
+
+\jake{This section will probably want deleting, but it serves as a place for me to build up a running example and show the various extensions of it for later on in the paper.}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of GC in Rust. \laurie{we need a good example here,
+    ideally one that we can build upon later in the paper}},
+  label={fig:first_example}]
+struct Node<T> {
+    data: T
+}
+
+fn main() {
+    let gc1 = Gc::new("hello world!");
+    {
+        let gc2 = Gc::new(Node { data: 123 });
+    }
+
+    force_gc();   // `gc2` may be collected!
+    foo(gc1);     // move `gc1` into `foo`.
+    println!(gc1) // still  usable from `main` -- was copied!
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of finalisation in Rust.},
+  label={fig:second_example}]
+impl<T> Drop for Node<T> {
+    fn drop(&mut self) {
+        println!("Dropping {}", self.data);
+    }
+}
+
+fn main() {
+    ...
+    {
+        let gc3 = Gc::new(Node { data: 2 });
+    }
+
+    force_gc();   // `gc3` collected!
+                  // finaliser runs
+
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={Dangling reference example from a finalisation.},
+  label={fig:third_example}]
+fn main() {
+    {
+        let b = Box::new(123);
+        let gc1 = Gc::new(Node{data: &*b});
+    } // b is dropped
+
+    // causes `S::drop` finaliser to run.
+    force_gc();
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={Second dangling reference example from a finalisation.},
+  label={fig:fourth_example}]
+fn main() {
+    {
+        let val = 0;
+        let a = Arc::new(&val);              // Arc ref count = 1
+        let gc = Gc::new(Node{Arc::clone(&a)}); // Arc ref count = 2
+    }                                        // `a` dropped, Arc ref count = 1
+
+    // causes `S::drop` finaliser to run.
+    // This is unsound, because `Gc<S>` keeps the `&u64` alive,
+    // but not the data (u64) it points to.
+    force_gc();
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={Interior mutability example},
+  label={fig:fifth_example}]
+struct Node<T> {
+    data: Mutex<T>,
+}
+
+let gc1 = Gc::new(Node { data: Mutex::new(1) });
+*gc1.lock().unwrap() = 2;
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={Mutex finaliser same thread bug},
+  label={fig:sixth_example}]
+impl<T> Drop for Node<T> {
+    fn drop(&mut self) {
+        let d = self.data.lock().unwrap();
+        println!("Dropping {}", self.d);
+    } // d is dropped
+}
+...
+fn main() {
+    // Create a reference counted counter object protected by a mutex.
+    let counter = Rc::new(Mutex::new(0));
+
+    {
+        let gc = Gc::new(Node { data: Rc::clone(&counter) });
+    }
+
+    force_gc();
+
+    // If the finalizer for the `Gc<Node>` is asynchronously called
+    // while `counter.lock()` below is already acquired, a deadlock will occur.
+    let lock = counter.lock().unwrap();
+    ...
+
+    assert_eq!(*counter, 0);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={Finaliser cyclic bug},
+  label={fig:seventh_example}]
+struct Node<T> {
+    ...
+    next: Option<Gc<Mutex<Node>>>,
+}
+
+impl Drop for Node {
+    fn drop(&mut self) {
+        ...
+        println!("Points to {}", self.next);
+    }
+}
+
+fn main() {
+    let n1 = Gc::new(Mutex::new(Node {
+        data: 1,
+        next: None,
+    }));
+
+    let n2 = Gc::new(Mutex::new(Node {
+        data: 2,
+        next: None,
+    }));
+
+    n1.lock().unwrap().next.insert(b);
+}
+\end{lstlisting}
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of unsoundness caused by a finaliser running earlier than expected.},
+  label={fig:early_finaliser_unsoundness_example}]
+fn main()  {
+    let root = Gc::new(Box::new(123));
+    let inner: &usize = &**root;
+
+    GcAllocator::force_gc();
+    thread::sleep(time::Duration::from_secs(1));
+
+    // Invalid read
+    read(inner);
+}
+\end{lstlisting}
 
 \section{Background}
 
