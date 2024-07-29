@@ -89,6 +89,17 @@ although \ourgc is necessarily tied to Rust, we believe that most of the
 techniques in this paper, particularly those related to finalisation, will generalise to other
 ownership-based languages.
 
+This paper's high-level structure is: background (\cref{sec:background});
+Alloy's design (\cref{sec:alloy_design}); destructor and finaliser challenges
+and solutions (\cref{sec:destructor challenges}); and evaluation
+(\laurie{XYZ}). The first three of these parts have the challenge that our work
+straddles two areas that seem almost mutually exclusive: GC and Rust. We have
+tried our best to make readers already expert in one of these areas adequately
+familiar with the other, without talking down to either group or trying their
+patience with prolixity, but we are aware that perfection is beyond our meagre
+grasp: we encourage readers to skip ahead if they reach points that seem
+obvious to them.
+
 \begin{figure}
 \begin{lstlisting}[
   language=Rust,
@@ -275,6 +286,7 @@ fn main()  {
 \end{lstlisting}
 
 \section{Background}
+\label{sec:background}
 
 \subsection{Does Rust need a GC?}
 
@@ -349,6 +361,7 @@ intermingled with non-GCed memory.
 
 
 \section{\ourgc: Design Choices}
+\label{sec:alloy_design}
 
 In this section we outline \ourgc's basic design choices
 and implementation approach -- the rest of the paper then goes into detail on the more
@@ -566,6 +579,7 @@ to write finalisers in addition to destructors for each type they place into a
 
 
 \subsection{Solutions}
+\label{sec:solutions}
 
 \subsubsection{Finaliser Safety Analysis}
 
