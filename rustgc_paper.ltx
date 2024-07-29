@@ -30,9 +30,9 @@ Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
 are easier to make mistakes with, and often come with a performance penalty.
 
 To solve this, there are now a number of GCs for Rust~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}. Typically these
-introduce a user-visible type \lstinline{Gc<T>} which moves values of
-type \lstinline{T} to the GC heap and wraps a pointer to the moved value.
-\lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
+introduce a user-visible type \lstinline{Gc<T>} which: takes a value
+of type \lstinline{T} and moves it to the GC heap; and returns a wrapper around
+a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~global variables, variables on the stack, etc.),
@@ -366,10 +366,10 @@ need from such a type.
 
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to \lstinline{v} on the GC heap \jake{The GC heap is conceptual only -- it's really the same heap. Does this need mentioning here?}. Dereferencing
+simple wrapper around a pointer to \lstinline{v}'s new address. Dereferencing
 a \lstinline{Gc<T>} produces an immutable Rust reference to the underlying
 value: there is no way to directly mutate GCed values and users must use other
-standard Rust types (e.g.~\lstinline{Mutex<T>}) that enable \emph{interior mutability}.
+standard Rust types that enable \emph{interior mutability} (e.g.~\lstinline{Mutex<T>}).
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
@@ -377,16 +377,20 @@ back (\lstinline{from_raw}). These functions have a number of uses, ranging
 from pointer tagging to passing values to foreign code. However, these features have
 a profound impact because Rust allows
 raw pointers to be converted to the integer type \lstinline{usize} and
-back. In other words, if \ourgc wants to allow GCed values to be converted
+back\footnote{Although it is outside the scope of this paper, it would arguably
+be preferable for Rust to have different integer types for `data width' and
+`address'. Modern C, for example, does this with the \lstinline{size_t} and
+\lstinline{uintptr_t} types respectively.} In other words, if \ourgc wants to
+allow GCed values to be converted
 into pointers and back again, it must be able to track
 pointers to GC values that are stored in Rust \lstinline{usize} values.
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a \emph{conservative} GC. In essence, such GCs,
-starting from the roots, treat machine words as possible pointers: if
-a word does point into a GCed block of memory, then that block itself is also
-conservatively scanned. Since a conservative GC doesn't know if a word is a
+starting from the roots, treat each reachable machine word as a possible pointer: if,
+when considered as a pointer, a word's address falls within a GCed block of memory,
+then that block itself is considered reachable. Since a conservative GC can't know if a word is a
 pointer from the program's perspective, or just happens to be a sequence of
 bits that also happens to make it a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
@@ -396,7 +400,7 @@ programs is under 0.01\% of live objects~\cite{shahriyar14fast}.
 Conservative GC occupies a grey zone in programming language semantics. In
 most languages (including the semantics of most compiler IRs) conservative GC
 relies on undefined behaviour. \ourgc's use of conservative GC means \ourgc
-is, formally speaking, unsound. However, conservative GC is widely used,
+is thus, formally speaking, unsound. However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink rendering
 engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM -- JavaScriptCore~\citep{pizlo17riptide}.
 Even in 2024, we lack good alternatives: there is no cross-platform API for precise GC; and while some
@@ -431,7 +435,7 @@ method is called. For example, eliding details such as weak counts,
 
 \laurie{in retrospect, using Rc is going to confuse readers here. can we find
 another type which has a useful, understandable drop method? preferably one
-that doesn't called `free'} \jake{The only good non-freeing example I can think of in the standard library is Mutex/MutexGuard. Perhaps even Box would be an appropriate starting point. Why do you want one that doesn't call `free'?}
+that doesn't called `free'} \jake{The only good non-freeing example I can think of in the standard library is Mutex/MutexGuard. Perhaps even Box would be an appropriate starting point. Why do you want one that doesn't call `free'?}\laurie{i more meant ``preferably an example that isn't a one-liner `free'''}
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
