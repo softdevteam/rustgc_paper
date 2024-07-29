@@ -334,11 +334,11 @@ running as a mutator or a collector, though some threads may be given over
 entirely to the collector. A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
 from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
-not scan memory, and thus cannot free objects that form a cycle.
+not scan memory, and thus cannot free objects that form a cycle. As is common
+in most GC literature, henceforth we use `GC' to mean `tracing GC' unless
+explicitly stated otherwise.
 
-As is common in most GC literature, henceforth we use `GC' to mean `tracing GC'
-unless explicitly stated otherwise. Tracing and
-reclamation is performed during a \emph{collection} phase. In the context of
+Tracing and reclamation is performed during a \emph{collection} phase. In the context of
 this paper collections are \emph{stop-the-world}, where all mutator threads
 are paused while collection occurs. We refer to memory which is solely under
 the control of the GC as the \emph{GC heap}, though this may in practise be
