@@ -160,20 +160,20 @@ fn main() {
     {
         let b = Box::new(123);
         let gc1 = Gc::new(Node{data: &*b});
-    } // b is dropped
+    } // b is dropped and its memory deallocated
 
-    // causes `S::drop` finaliser to run.
+    // causes `gc::drop` finaliser to run which holds a reference to `b`.
     force_gc();
 }
 \end{lstlisting}
 
 \begin{lstlisting}[
   language=Rust,
-  caption={Second dangling reference example from a finalisation.},
+  caption={Second dangling reference example from a finalisation. \laurie{I'm not sure this shows anything new over the previous example?}},
   label={fig:fourth_example}]
 fn main() {
     {
-        let val = 0;
+        let val: u64 = 0;
         let a = Arc::new(&val);              // Arc ref count = 1
         let gc = Gc::new(Node{Arc::clone(&a)}); // Arc ref count = 2
     }                                        // `a` dropped, Arc ref count = 1
@@ -187,7 +187,7 @@ fn main() {
 
 \begin{lstlisting}[
   language=Rust,
-  caption={Interior mutability example},
+  caption={Interior mutability example \laurie{is this showing a problem? i think it's showing `something that words as expected'?}},
   label={fig:fifth_example}]
 struct Node<T> {
     data: Mutex<T>,
