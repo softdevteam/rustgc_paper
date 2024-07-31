@@ -577,14 +577,247 @@ Rust's destructors to finalisers whenever possible. Without doing so, users are 
 to write finalisers in addition to destructors for each type they place into a
 \lstinline{Gc<T>}.
 
+\subsection{Restrictions on finalisers}
 
-\subsection{Solutions}
+Like other smart pointers in Rust, \ourgc's \lstinline{Gc} container can store
+ordinary Rust references. Without finalisers, this is perfectly safe, because
+Rust's borrow rules prevent the references from outliving their referent.
+Consider the following Rust program:
+
+\begin{lstrustsmall}
+fn main() {
+    let b = Box::new(123);
+    let gc1: Gc<&u64> = Gc::new(b.as_ref());
+
+    foo(b);
+    // println!("Boxed value: {}" gc1); // ERROR: use-after-move
+}
+
+fn foo(b: Box<u64>) {}
+\end{lstrustsmall}
+
+A \lstinline{u64} is boxed on the heap, and an immutable reference to it is
+stored in a \lstinline{Gc}. This is valid as long as \lstinline{gc1} does not
+outlive \lstinline{b}. If line 6 is uncommented, this program would not compile,
+because Rust identifies that printing the \lstinline{gc1} would try to
+dereference the boxed \lstinline{u64} after it has been moved (line 5). This
+would seem to suggest that Rust's borrow rules are enough to allow references to
+be used inside \lstinline{Gc} soundly.
+
+Unfortunately, using references stored in a \lstinline{Gc} from a finaliser can
+be unsound. The collector is free to schedule a finaliser to run at any point
+after a garbage collected object is unreachable, which could mean running after
+a value it references is dropped. \autoref{lst:refwrapper} shows how a program
+which uses a Rust reference can cause a use-after-free.
+
+
+To make matters worse, even references reachable from other shared ownership
+types are unsafe to access from a finaliser. Consider a slightly modified
+example in \autoref{arcbor}, where instead of storing a \lstinline{&u64}
+reference directly, the \lstinline{Gc} contains an atomic reference counted
+field (\lstinline{Arc}), which stores a \lstinline{&u64} reference.
+
+\begin{figure}
+\begin{lstrustsmall}
+use std::gc::Gc;
+use std::sync::Arc;
+
+struct Wrapper<'a>(Arc<&'a u64>);
+
+impl<'a> Drop for Wrapper<'a> {
+    fn drop(&mut self) {
+        println!("Dropping {}", self.0);
+    }
+}
+
+fn main() {
+
+    {
+        let val = 0;
+        let a = Arc::new(&val);                    // Arc ref count = 1
+        let gc = Gc::new(Wrapper(Arc::clone(&a))); // Arc ref count = 2
+    } // `a` dropped, Arc ref count = 1
+
+    // GC happens here, calling `Wrapper::drop` as a finaliser.
+    // This is unsound, because `Wrapper`'s `Arc` keeps the `&'a u64` alive,
+    // but not the data it points to.
+
+}
+\end{lstrustsmall}
+    \caption{A reference to \lstinline{val} is stored in an \lstinline{Arc},
+    which is then shared inside a \lstinline{Gc}. While both the \lstinline{Gc}
+    and \lstinline{Arc} go out of scope at the same time as the referent
+    \lstinline{val}, the finaliser for \lstinline{Wrapper} can be called at some
+    pointer later, each in lines commented below (20-22), causing a dangling pointer dereference when \lstinline{&u64}
+    is invalid.}
+    \label{arcbor}
+\end{figure}
+
+
+\subsection{Solution}
 \label{sec:solutions}
 
 \subsubsection{Finaliser Safety Analysis}
+\label{sec:fsa}
 
 Extends Rust's type system to reject programs whose destructors are not
-provably safe to be used as finalisers.
+provably safe to be used as finalisers. The basic idea is to encode
+finalisation rules into Rust's type system, and then perform a conservative
+static analysis to ensure a type's drop method does not use any types which
+would be non-thread safe in a finaliser. \autoref{fig:fsa_example} shows how
+this can prevent a potential race condition due to thread-unsafety.
+
+Finaliser safety analysis is performed automatically without the user needing
+to do anything manually. The Rust compiler is then extended to perform FSA. The
+basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
+drop method needs to be checked to ensure it doesn't access a field which is
+not \lstinline{FinalizerSafe}. Performing this check only when such types are
+used in \lstinline{Gc} is important as it prevents FSA from breaking existing
+Rust programs: drop methods with unsound finalisation behaviour are not a
+problem if they are never used in a \lstinline{Gc}.
+
+\begin{figure}[t]
+% Hack to get the listing in the figure
+\newsavebox{\fsaalisting}
+\begin{lrbox}{\fsaalisting}
+\begin{lstrustsmall}
+use std::rc::Rc;
+use std::gc::Gc;
+
+fn main() {
+    let rc1 = Rc::new(123);
+    let rc2 = Rc::clone(&rc1);
+    let gc1 = Gc::new(rc2);
+}
+\end{lstrustsmall}
+\end{lrbox}
+
+\newsavebox{\fsablisting}
+\begin{lrbox}{\fsablisting}
+\begin{lstrustsmallnonums}
+error: `rc2` cannot be safely finalized.
+    --> src/main.rs:9:22
+     |
+9    |     let gc = Gc::new(rc2);
+     |                      ^^^ has a drop method
+     |                          which cannot be
+     |                          safely finalized.
+     |
+    ::: /rust/library/alloc/src/rc.rs:1559:13
+     |
+1559 |             self.inner().dec_strong();
+     |             ------------
+     |             |
+     |             caused by the expression in
+     |             `fn drop(&mut)` here because
+     |             it uses a type which is not
+     |             safe to use in a finalizer.
+     |
+     = help: `Gc` runs finalizers on a separate
+     | thread, so drop methods must only use values
+     | whose types implement `FinalizerSafe`.
+
+\end{lstrustsmallnonums}
+\end{lrbox}
+    \centering
+    \subfloat{\usebox{\fsaalisting}}
+    % \hfill
+    \subfloat{\usebox{\fsablisting}}
+    \caption{A \lstinline{Gc} object stores a reference counted integer
+(\lstinline{Rc<u64>}). The drop method of an \lstinline{Rc} decrements the
+underlying object's reference count, which is called as a finaliser before
+collecting the \lstinline{Gc<Rc<u64>>} object. This is not thread-safe because
+decrementing a reference count in \lstinline{Rc} is non-atomic, and the
+finaliser will be run on a separate thread, which would race if the finaliser
+ran while the mutator also updated the count. FSA detects this, and prevent the program from compiling, with the error message
+in \textbf{(b)} displaying the exact line of code that FSA rejected. In this
+example, as is often the case in practise, the offending line is not \emph{in}
+the finaliser but is \emph{called} by the finaliser.
+}
+\label{fig:fsa_example}
+\end{figure}
+
+FSA permits a \lstinline{Gc} to contain values with non-thread-safe fields
+provided they are not used in the drop method. Consider the following example:
+
+\begin{lstrustsmall}
+struct Wrapper(RefCell<String>);
+
+impl Drop for Wrapper {
+    fn drop(&mut self) {
+        println!("Dropping Wrapper");
+    }
+}
+
+impl Wrapper {
+    fn swap_string(&self) {
+        *self.0.borrow_mut() = String::from("b");
+    }
+}
+
+fn main() {
+    let gc = Gc::new(Wrapper(RefCell::new(String::from("a"))));
+    gc.swap_string();
+}
+\end{lstrustsmall}
+
+The \lstinline{Wrapper} uses a \lstinline{RefCell} to swap the value of
+underlying string (line 11). A \lstinline{RefCell} provides a form of interior
+mutability which is not thread-safe (because its \lstinline{borrow()} /
+\lstinline{borrow_mut()} methods are non-atomic). In this example, a
+\lstinline{Wrapper} can safely be placed inside a \lstinline{Gc}, because the
+\lstinline{RefCell} is not used in \lstinline{Wrapper}'s finaliser (line 4).
+This is checked by FSA at compile-time.
+
+As with any static analysis, FSA is inherently conservative: some drop methods
+are impossible to analyse at compile-time so in these cases \ourgc will err on
+the side of caution and reject potentially safe programs. This is most likely
+to happen in two situations.
+
+First, a drop method may contain a call to an opaque (i.e. externally linked)
+function for which the compiler does not have the MIR. If a reference to a field
+which would be unsafe to use in a finaliser is passed to this function, then FSA
+would reject the program. This function call \emph{could} be safe, but FSA has
+no way of knowing, and will reject it.
+
+Second, if a finaliser is used on a trait object which is called using dynamic
+dispatch in Rust. At compile-time, it is not possible to know the concrete type
+of a trait object, so FSA does not know which drop method to check.
+
+In both cases, the user has the option of explicitly informing the compiler a
+particular drop method is safe to use as a finaliser. We observe that this is
+rare in practice.
+
+\begin{figure}[!t]
+\begin{lstrustsmall}
+struct Wrapper<'a>(&'a u64);
+
+impl<'a> Drop for Wrapper<'a> {
+    fn drop(&mut self) {
+        println!("Dropping {}", self.0);
+    }
+}
+
+fn main() {
+    {
+        let b = Box::new(123);
+        let gc1 = Gc::new(Wrapper(b.as_ref()));
+    } // b is dropped
+
+    // GC happens here, calling `Wrapper::drop` as a finaliser.
+    // This causes a use-after-free.
+}
+\end{lstrustsmall}
+    \caption{The \lstinline{Gc} now stores a reference to the boxed
+    \lstinline{u64} using an intermediate \lstinline{Wrapper} struct which has a
+    drop method which will be run as a finaliser (line 4). The boxed
+    \lstinline{u64}, and the \lstinline{Gc} are created in an inner scope. At
+    the end of this scope, \lstinline{b} is dropped. Later, when the
+    \lstinline{Gc<Wrapper>} is collected (e.g.~at line 16) a use-after-free will
+    occur because its finaliser (line 4) dereferences a reference to a value
+    which was already dropped (at line 14).}
+    \label{lst:refwrapper}
+\end{figure}
 
 
 \subsubsection{Early Finaliser Prevention}
@@ -598,6 +831,101 @@ way that obviously pointless barriers are elided.
 
 Statically optimises away finalisers if the destructor that is their basis
 simply frees heap memory.
+
+\section{Implementation of solutions}
+
+\jake{I can't find a good place for this, but it's worth breaking it away from
+the rest of the Alloy implementation stuff}
+
+\subsection{Finaliser safety analysis implementation}
+
+The first stage of FSA is to identify calls to \lstinline{Gc::new}\footnote{In
+\ourgc, a \lstinline{Gc} object can only be created through the
+\lstinline{Gc::new} constructor. We mark the definition of this function with a
+special label, known as a \emph{diagnostic label}, so that it can be easily
+referred to during the FSA phase of Rust compilation.}:
+
+\begin{algorithm}
+\begin{algorithmic}
+\Function{FinaliserSafetyAnalysis}{$prog$}
+    \ForEach {$mir\_body \in prog$}
+        \ForEach {$basic\_blocks \in mir\_body$}
+            \ForEach {$block \in basic\_blocks$}
+                \If {\Call{IsCallToGcConstructor}{$block.terminator$}}
+                    \State \Call{CheckCallsiteForDropImpl}{$block.terminator$}
+                \EndIf
+            \EndFor
+        \EndFor
+    \EndFor
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+This checks every statement in the MIR for a call to \lstinline{Gc<T>::new}
+constructor. If found, we check if \lstinline{T} implements \lstinline{Drop}. If
+it does, then \lstinline{Gc<T>} needs finalising, so the MIR body for
+\lstinline{T}'s drop method is checked for soundness violations. FSA only
+considers a drop method sound if fields which are dereferenced implement the
+\lstinline{FinalizerSafe} trait. In Rust's MIR terminology,
+such a field access would constitute a \emph{place projection}, where a place is
+a memory location (or lvalue), and a projection is a field access. A single MIR
+statement can contain more than one field projection
+(e.g.~\lstinline{self.foo.bar.baz}).
+
+This part of the analysis happens in the \lstinline{CheckCallsite} function:
+
+\begin{algorithm}
+\begin{algorithmic}
+\Function{CheckCallsiteForDropImpl}{$callsite$}
+    % \If {\Call{NumArgs}{$callsite$} != 1}
+    \State $arg\_ty \gets$ \Call{GetTypeOfFirstArg}{$callsite$}
+    \If { \NOT \Call{Impls}{$arg\_ty$, $Drop$}}
+        \State \Return
+    \EndIf
+    \State $drop\_body \gets$ \Call{GetDropMirBody}{$arg\_ty$}
+    \ForEach {$basic\_blocks \in drop\_body$}
+        \ForEach {$block \in basic\_blocks$}
+            \ForEach {$statement \in block$}
+                \If {\Call{HasPlaceProjection}{$statement$}}
+                    \ForEach {$projection \in statement$}
+                        \State \Call{CheckProjection}{$projection$}
+                    \EndFor
+                \EndIf
+            \EndFor
+        \EndFor
+    \EndFor
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+If a projection is found, its type is checked for an implementation of the
+\lstinline{FinalizerSafe} trait:
+
+\begin{algorithm}
+\begin{algorithmic}
+\Function{CheckProjection}{$projection$}
+    \Comment{A projection elem is the RHS of a field access.}
+    % \If {\Call{NumArgs}{$callsite$} != 1}
+    \State $projection\_ty \gets$ \Call{GetType}{$projection.elem$}
+    \If{ \NOT \Call{Impls}{$arg\_ty$, $FinalizerSafe$}}
+        \State \Return{\Call{Error}{}}
+    \EndIf
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+% \begin{lstlisting}
+% CheckProjection(projection)
+%     // A projection element is the RHS of a field access. E.g. `foo.bar`
+%     let projection_ty = GetType(projection.elem)
+%     if not TypeImplementsTrait(projection_ty, FinalizerSafe):
+%         throw error
+
+% \end{lstlisting}
+
+If \lstinline{CheckProjection} discovers a field access of a field which does
+not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
+does not halt the analysis, so multiple lines in drop methods which perform
+unsound field accesses will be caught in a single FSA pass.
 
 
 \section{Lots of stuff}
@@ -1057,149 +1385,6 @@ of boilerplate code.
 \subsection{Which drop methods are safe finalisers?}
 \label{finaliser_thread}
 
-A fundamental property of finalisers is that they are run at some unspecified
-point in time after the last \lstinline{Gc<T>} reference to a GCed value is
-dropped. If we assume a \emph{stop-the-world} GC (i.e.~a GC which periodically
-pauses all mutator threads while GC actions are performed) then it may seem logical
-to run finalisers during GC pauses. However this causes similar challenges to
-Unix signal handlers (where only `async-signal-safe' functions should be run):
-if a mutator holds a resource (e.g.~a mutex), and is then interrupted by a
-finaliser which tries to acquire that same resource, then the program has
-deadlocked. Most GCs, including BDWGC and thus \ourgc, run finalisers on a
-separate `finalisers only' thread to avoid this problem.
-
-For it to be safe to run finalisers on a separate thread, those finalisers
-must be thread safe.
-
-
-\subsection{Finaliser safety analysis}
-\label{fsa}
-
-\ourgc uses a novel technique to ensure that finalisers are sound called
-\emph{Finaliser Safety Analysis} (FSA). The basic idea is to encode finalisation
-rules into Rust's type system, and then perform a conservative static analysis
-to ensure a type's drop method does not use any types which would be non-thread
-safe in a finaliser. \autoref{fig:fsa_example} shows how this can
-prevent a potential race condition due to thread-unsafety.
-
-\begin{figure}[t]
-% Hack to get the listing in the figure
-\newsavebox{\fsaalisting}
-\begin{lrbox}{\fsaalisting}
-\begin{lstrustsmall}
-use std::rc::Rc;
-use std::gc::Gc;
-
-fn main() {
-    let rc1 = Rc::new(123);
-    let rc2 = Rc::clone(&rc1);
-    let gc1 = Gc::new(rc2);
-}
-\end{lstrustsmall}
-\end{lrbox}
-
-\newsavebox{\fsablisting}
-\begin{lrbox}{\fsablisting}
-\begin{lstrustsmallnonums}
-error: `rc2` cannot be safely finalized.
-    --> src/main.rs:9:22
-     |
-9    |     let gc = Gc::new(rc2);
-     |                      ^^^ has a drop method
-     |                          which cannot be
-     |                          safely finalized.
-     |
-    ::: /rust/library/alloc/src/rc.rs:1559:13
-     |
-1559 |             self.inner().dec_strong();
-     |             ------------
-     |             |
-     |             caused by the expression in
-     |             `fn drop(&mut)` here because
-     |             it uses a type which is not
-     |             safe to use in a finalizer.
-     |
-     = help: `Gc` runs finalizers on a separate
-     | thread, so drop methods must only use values
-     | whose types implement `FinalizerSafe`.
-
-\end{lstrustsmallnonums}
-\end{lrbox}
-    \centering
-    \subfloat{\usebox{\fsaalisting}}
-    % \hfill
-    \subfloat{\usebox{\fsablisting}}
-    \caption{A \lstinline{Gc} object stores a reference counted integer
-(\lstinline{Rc<u64>}). The drop method of an \lstinline{Rc} decrements the
-underlying object's reference count, which is called as a finaliser before
-collecting the \lstinline{Gc<Rc<u64>>} object. This is not thread-safe because
-decrementing a reference count in \lstinline{Rc} is non-atomic, and the
-finaliser will be run on a separate thread, which would race if the finaliser
-ran while the mutator also updated the count. FSA detects this, and prevent the program from compiling, with the error message
-in \textbf{(b)} displaying the exact line of code that FSA rejected. In this
-example, as is often the case in practise, the offending line is not \emph{in}
-the finaliser but is \emph{called} by the finaliser.
-}
-\label{fig:fsa_example}
-\end{figure}
-
-
-% \begin{lstrustsmall}
-% use std::rc::Rc;
-% use std::gc::Gc;
-
-% fn main() {
-%     let rc1 = Rc::new(123);
-%     let rc2 = Rc::clone(&rc1);
-%     let gc1 = Gc::new(rc2);
-% }
-% \end{lstrustsmall}
-
-% A \lstinline{Gc} object stores a reference counted integer
-% (\lstinline{Rc<u64>}). The drop method of an \lstinline{Rc} decrements the
-% underlying object's reference count, which is called as a finaliser before
-% collecting the \lstinline{Gc<Rc<u64>>} object. This is not thread-safe because
-% decrementing a reference count in \lstinline{Rc} is non-atomic, and the
-% finaliser will be run on a separate thread, which would race if the finaliser
-% ran while the mutator also updated the count.
-
-% FSA detects this, and prevent the program from compiling, with the error message
-% in \textbf{(b)} displaying the exact line of code that FSA rejected. In this
-% example, as is often the case in practise, the offending line is not \emph{in}
-% the finaliser but is \emph{called} by the finaliser.
-
-
-FSA permits a \lstinline{Gc} to contain values with non-thread-safe fields
-provided they are not used in the drop method. Consider the following example:
-
-\begin{lstrustsmall}
-struct Wrapper(RefCell<String>);
-
-impl Drop for Wrapper {
-    fn drop(&mut self) {
-        println!("Dropping Wrapper");
-    }
-}
-
-impl Wrapper {
-    fn swap_string(&self) {
-        *self.0.borrow_mut() = String::from("b");
-    }
-}
-
-fn main() {
-    let gc = Gc::new(Wrapper(RefCell::new(String::from("a"))));
-    gc.swap_string();
-}
-\end{lstrustsmall}
-
-The \lstinline{Wrapper} uses a \lstinline{RefCell} to swap the value of
-underlying string (line 11). A \lstinline{RefCell} provides a form of interior
-mutability which is not thread-safe (because its \lstinline{borrow()} /
-\lstinline{borrow_mut()} methods are non-atomic). In this example, a
-\lstinline{Wrapper} can safely be placed inside a \lstinline{Gc}, because the
-\lstinline{RefCell} is not used in \lstinline{Wrapper}'s finaliser (line 4).
-This is checked by FSA at compile-time.
 
 \subsubsection{Automating finaliser safety analysis}
 
@@ -1219,269 +1404,8 @@ in \lstinline{Gc} is important as it prevents FSA from breaking existing Rust
 programs: drop methods with unsound finalisation behaviour are not a problem if
 they are never used in a \lstinline{Gc}.
 
-
-\subsubsection{Implementation}
-
-The Rust compiler pipeline lowers a Rust program into various different
-intermediate representations (IR) which it performs its analysis on. FSA is
-performed on Rust's mid-level IR (MIR), which represents a control-flow graph of
-a Rust program. MIR represents a Rust program as a collection of \emph{MIR
-bodies}, which map to a single Rust function. A \emph{MIR body} consists of a
-set of \emph{basic blocks} connected by edges known as \emph{terminators}. Basic
-blocks represent a list of straight-line statements, where terminators represent
-the control flow in the program.
-
-FSA is a flow-sensitive analysis, so MIR is the most natural representation of a
-Rust program to perform its analysis on. FSA is implemented as a new \emph{MIR
-pass} -- a traversal over the MIR where each MIR body can be individually
-processed. We describe the algorithm for FSA in stages using pseudocode as
-follows.
-
-The first stage of FSA is to identify calls to \lstinline{Gc::new}\footnote{In
-\ourgc, a \lstinline{Gc} object can only be created through the
-\lstinline{Gc::new} constructor. We mark the definition of this function with a
-special label, known as a \emph{diagnostic label}, so that it can be easily
-referred to during the FSA phase of Rust compilation.}:
-
-\begin{algorithm}
-\begin{algorithmic}
-\Function{FinaliserSafetyAnalysis}{$prog$}
-    \ForEach {$mir\_body \in prog$}
-        \ForEach {$basic\_blocks \in mir\_body$}
-            \ForEach {$block \in basic\_blocks$}
-                \If {\Call{IsCallToGcConstructor}{$block.terminator$}}
-                    \State \Call{CheckCallsiteForDropImpl}{$block.terminator$}
-                \EndIf
-            \EndFor
-        \EndFor
-    \EndFor
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-% \begin{lstlisting}
-% DropSafetyAnalysis(prog):
-%     for mir_body in prog:
-%         for basic_blocks in mir_body:
-%             for statement in basic_blocks
-%                 where statement is Call:
-%                     if statement.call_id == GC_CTOR
-%                         CheckCallsite(statement);
-% \end{lstlisting}
-
-This checks every statement in the MIR for a call to \lstinline{Gc<T>::new}
-constructor. If found, we check if \lstinline{T} implements \lstinline{Drop}. If
-it does, then \lstinline{Gc<T>} needs finalising, so the MIR body for
-\lstinline{T}'s drop method is checked for soundness violations. FSA only
-considers a drop method sound if fields which are dereferenced implement the
-\lstinline{FinalizerSafe} trait. In Rust's MIR terminology,
-such a field access would constitute a \emph{place projection}, where a place is
-a memory location (or lvalue), and a projection is a field access. A single MIR
-statement can contain more than one field projection
-(e.g.~\lstinline{self.foo.bar.baz}).
-
-This part of the analysis happens in the \lstinline{CheckCallsite} function:
-
-% \begin{lstlisting}
-% CheckCallsite(call_site):
-%     assert call_site.args.length() == 1
-%     let arg_ty = GetType(call_site.args.first())
-%     let drop_body = GetDropMirBody(arg_ty)
-%     if !drop_body:
-%         return
-%     for basic_blocks in drop_body:
-%         for statement in basic_blocks:
-%             if statement == PlaceProjection:
-%                 for projection in statement:
-%                     CheckProjection(statement.projection)
-% \end{lstlisting}
-
-\begin{algorithm}
-\begin{algorithmic}
-\Function{CheckCallsiteForDropImpl}{$callsite$}
-    % \If {\Call{NumArgs}{$callsite$} != 1}
-    \State $arg\_ty \gets$ \Call{GetTypeOfFirstArg}{$callsite$}
-    \If { \NOT \Call{Impls}{$arg\_ty$, $Drop$}}
-        \State \Return
-    \EndIf
-    \State $drop\_body \gets$ \Call{GetDropMirBody}{$arg\_ty$}
-    \ForEach {$basic\_blocks \in drop\_body$}
-        \ForEach {$block \in basic\_blocks$}
-            \ForEach {$statement \in block$}
-                \If {\Call{HasPlaceProjection}{$statement$}}
-                    \ForEach {$projection \in statement$}
-                        \State \Call{CheckProjection}{$projection$}
-                    \EndFor
-                \EndIf
-            \EndFor
-        \EndFor
-    \EndFor
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-If a projection is found, its type is checked for an implementation of the
-\lstinline{FinalizerSafe} trait:
-
-\begin{algorithm}
-\begin{algorithmic}
-\Function{CheckProjection}{$projection$}
-    \Comment{A projection elem is the RHS of a field access.}
-    % \If {\Call{NumArgs}{$callsite$} != 1}
-    \State $projection\_ty \gets$ \Call{GetType}{$projection.elem$}
-    \If{ \NOT \Call{Impls}{$arg\_ty$, $FinalizerSafe$}}
-        \State \Return{\Call{Error}{}}
-    \EndIf
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
-% \begin{lstlisting}
-% CheckProjection(projection)
-%     // A projection element is the RHS of a field access. E.g. `foo.bar`
-%     let projection_ty = GetType(projection.elem)
-%     if not TypeImplementsTrait(projection_ty, FinalizerSafe):
-%         throw error
-
-% \end{lstlisting}
-
-If \lstinline{CheckProjection} discovers a field access of a field which does
-not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
-does not halt the analysis, so multiple lines in drop methods which perform
-unsound field accesses will be caught in a single FSA pass.
-
-% What is MIR?
-% How does it identify call sites
-% MIR pass
-% Place projection
-% Thread_local fix
-
-\subsubsection{Limitations}
-
-As with any static analysis, FSA is inherently conservative: some drop methods
-are impossible to analyse at compile-time so in these cases \ourgc will err on
-the side of caution and reject potentially safe programs. This is most likely
-to happen in two situations.
-
-First, a drop method may contain a call to an opaque (i.e. externally linked)
-function for which the compiler does not have the MIR. If a reference to a field
-which would be unsafe to use in a finaliser is passed to this function, then FSA
-would reject the program. This function call \emph{could} be safe, but FSA has
-no way of knowing, and will reject it.
-
-Second, if a finaliser is used on a trait object which is called using dynamic
-dispatch in Rust. At compile-time, it is not possible to know the concrete type
-of a trait object, so FSA does not know which drop method to check.
-
-In both cases, the user has the option of explicitly informing the compiler a
-particular drop method is safe to use as a finaliser. We observe that this is
-rare in practice.
-
-\begin{figure}[!t]
-\begin{lstrustsmall}
-struct Wrapper<'a>(&'a u64);
-
-impl<'a> Drop for Wrapper<'a> {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.0);
-    }
-}
-
-fn main() {
-    {
-        let b = Box::new(123);
-        let gc1 = Gc::new(Wrapper(b.as_ref()));
-    } // b is dropped
-
-    // GC happens here, calling `Wrapper::drop` as a finaliser.
-    // This causes a use-after-free.
-}
-\end{lstrustsmall}
-    \caption{The \lstinline{Gc} now stores a reference to the boxed
-    \lstinline{u64} using an intermediate \lstinline{Wrapper} struct which has a
-    drop method which will be run as a finaliser (line 4). The boxed
-    \lstinline{u64}, and the \lstinline{Gc} are created in an inner scope. At
-    the end of this scope, \lstinline{b} is dropped. Later, when the
-    \lstinline{Gc<Wrapper>} is collected (e.g.~at line 16) a use-after-free will
-    occur because its finaliser (line 4) dereferences a reference to a value
-    which was already dropped (at line 14).}
-    \label{lst:refwrapper}
-\end{figure}
-
 \section{Finalisers and Rust references}
 
-Like other smart pointers in Rust, \ourgc's \lstinline{Gc} container can store
-ordinary Rust references. Without finalisers, this is
-perfectly safe, because Rust's borrow rules prevent the references from
-outliving their referent. Consider the following Rust program:
-
-\begin{lstrustsmall}
-fn main() {
-    let b = Box::new(123);
-    let gc1: Gc<&u64> = Gc::new(b.as_ref());
-
-    foo(b);
-    // println!("Boxed value: {}" gc1); // ERROR: use-after-move
-}
-
-fn foo(b: Box<u64>) {}
-\end{lstrustsmall}
-
-A \lstinline{u64} is boxed on the heap, and an immutable reference to it is
-stored in a \lstinline{Gc}. This is valid as long as \lstinline{gc1} does not
-outlive \lstinline{b}. If line 6 is uncommented, this program would not compile,
-because Rust identifies that printing the \lstinline{gc1} would try to
-dereference the boxed \lstinline{u64} after it has been moved (line 5). This
-would seem to suggest that Rust's borrow rules are enough to allow references to
-be used inside \lstinline{Gc} soundly.
-
-Unfortunately, using references stored in a \lstinline{Gc} from a finaliser can
-be unsound. The collector is free to schedule a finaliser to run at any point
-after a garbage collected object is unreachable, which could mean running after
-a value it references is dropped. \autoref{lst:refwrapper} shows how a program
-which uses a Rust reference can cause a use-after-free.
-
-
-To make matters worse, even references reachable from other shared ownership
-types are unsafe to access from a finaliser. Consider a slightly modified
-example in \autoref{arcbor}, where instead of storing a \lstinline{&u64}
-reference directly, the \lstinline{Gc} contains an atomic reference counted
-field (\lstinline{Arc}), which stores a \lstinline{&u64} reference.
-
-\begin{figure}
-\begin{lstrustsmall}
-use std::gc::Gc;
-use std::sync::Arc;
-
-struct Wrapper<'a>(Arc<&'a u64>);
-
-impl<'a> Drop for Wrapper<'a> {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.0);
-    }
-}
-
-fn main() {
-
-    {
-        let val = 0;
-        let a = Arc::new(&val);                    // Arc ref count = 1
-        let gc = Gc::new(Wrapper(Arc::clone(&a))); // Arc ref count = 2
-    } // `a` dropped, Arc ref count = 1
-
-    // GC happens here, calling `Wrapper::drop` as a finaliser.
-    // This is unsound, because `Wrapper`'s `Arc` keeps the `&'a u64` alive,
-    // but not the data it points to.
-
-}
-\end{lstrustsmall}
-    \caption{A reference to \lstinline{val} is stored in an \lstinline{Arc},
-    which is then shared inside a \lstinline{Gc}. While both the \lstinline{Gc}
-    and \lstinline{Arc} go out of scope at the same time as the referent
-    \lstinline{val}, the finaliser for \lstinline{Wrapper} can be called at some
-    pointer later, each in lines commented below (20-22), causing a dangling pointer dereference when \lstinline{&u64}
-    is invalid.}
-    \label{arcbor}
-\end{figure}
 
 
 \subsection{Preventing dangling references with the \bor}
