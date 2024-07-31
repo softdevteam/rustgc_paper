@@ -427,6 +427,11 @@ allow GCed values to be converted
 into pointers and back again, it must be able to track
 pointers to GC values that are stored in Rust \lstinline{usize} values.
 
+\jake{I'm not sure we give enough of a convincing motivation as to why these conversion
+to raw pointer APIs are needed. Is it for symmetry with Rc? Is it to enable GC to be used for
+pointer tagging in VMs etc. These are valid reasons, but we could equally say we won't support
+them and then is it still true that conservative GC is required.}
+
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a \emph{conservative} GC. In essence, such GCs,
@@ -478,6 +483,11 @@ method is called. For example, eliding details such as weak counts,
 \laurie{in retrospect, using Rc is going to confuse readers here. can we find
 another type which has a useful, understandable drop method? preferably one
 that doesn't called `free'} \jake{The only good non-freeing example I can think of in the standard library is Mutex/MutexGuard. Perhaps even Box would be an appropriate starting point. Why do you want one that doesn't call `free'?}\laurie{i more meant ``preferably an example that isn't a one-liner `free'''}
+
+\jake{Thinking about this, I don't think it's a good idea to use MutexGuard instead of Rc.
+We would never want that to be used as a finaliser because it would never be guaranteed to
+be unlocked. There are no other standard library types that I'm aware of which would better
+illustrate the issue than Rc IMO.}
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
