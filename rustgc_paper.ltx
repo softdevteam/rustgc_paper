@@ -285,6 +285,11 @@ fn main()  {
 }
 \end{lstlisting}
 
+\laurie{the `running examples' you've drafted are good
+for showing problems, but none of them really shows what a GC for Rust can give
+you that you can't easily do otherwise. perhaps we need a cyclic data-structure
+or ...?}
+
 \section{Background}
 \label{sec:background}
 
@@ -329,12 +334,36 @@ one, but they're too complicated i think: we can at least reference
 \lstinline{https://rust-unofficial.github.io/too-many-lists/} as proof of that.
 maybe the bronze GC paper has some good examples. otherwise, maybe we just
 introduce a type `S' which can reference other `S`s and show the problems with
-rc and rc/refcell?}\jake{How about the one in \autoref{fig:first_example}?}
-\laurie{maybe? until we flesh that example out and use it in other parts of
-the paper, we won't know}\laurie{the `running examples' you've drafted are good
-for showing problems, but none of them really shows what a GC for Rust can give
-you that you can't easily do otherwise. perhaps we need a cyclic data-structure
-or ...?}
+rc and rc/refcell?}
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of Rc. \jake{This is probably too complex, but it highlights the boilerplate needed to do the strong / weak count dance for cycles.}},
+  label={fig:rc_example}]
+struct Node {
+    name: String,
+    strong_next: Option<Rc<RefCell<Node>>>,
+    weak_next: Option<Weak<RefCell<Node>>>,
+}
+
+fn main() {
+    let a = Rc::new(RefCell::new(Node {
+        name: String::from("a"),
+        strong_next: None,
+        weak_next: None,
+    }));
+
+    let b = Rc::new(RefCell::new(Node {
+        name: String::from("b"),
+        strong_next: None,
+        weak_next: None,
+    }));
+
+    a.borrow_mut().strong_next.insert(Rc::clone(&b));
+    b.borrow_mut()
+        .weak_next
+        .insert(Rc::downgrade(&Rc::clone(&a)));
+}
+\end{lstlisting}
 
 
 \subsection{GC terminology}
