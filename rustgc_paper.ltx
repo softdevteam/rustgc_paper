@@ -387,6 +387,11 @@ pointers to GC values that are stored in Rust \lstinline{usize} values.
 to raw pointer APIs are needed. Is it for symmetry with Rc? Is it to enable GC to be used for
 pointer tagging in VMs etc. These are valid reasons, but we could equally say we won't support
 them and then is it still true that conservative GC is required.}
+\laurie{good question. we do say ``These functions have a number of uses, ranging
+from pointer tagging to passing values to foreign code.`` but perhaps (a)
+that's not verbose enough (b) there are other reasons too. fwiw, those two
+reasons are the major ones I can think of. i wonder if we can find a reference
+to a conservative GC paper that explains why conservative GC is necessary?}
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
@@ -444,6 +449,7 @@ that doesn't called `free'} \jake{The only good non-freeing example I can think 
 We would never want that to be used as a finaliser because it would never be guaranteed to
 be unlocked. There are no other standard library types that I'm aware of which would better
 illustrate the issue than Rc IMO.}
+\laurie{good point. it might be that we should define a custom destructor/finaliser in our running example and use that.}
 
 \begin{lstlisting}[language=Rust,numbers=left]
 impl<T> Drop for Rc<T> {
