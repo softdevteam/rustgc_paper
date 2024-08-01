@@ -572,7 +572,7 @@ prevents problems such as object resurrection~\cite{goetz21deprecated}.
 don't allow finalisers or require users to write their own i.e.~duplicating
 drop methods. but maybe there are exceptions!}
 
-One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.} for
+One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.}\laurie{is that true? i don't think our ability to span the ``two heaps'' is very relevant here: even with a single heap we'd need to think about things like on- or off-thread AFAICS?} for
 Rust has no choice but to make use of finalisers and, in particular, to map
 Rust's destructors to finalisers whenever possible. Without doing so, users are either forced
 to write finalisers in addition to destructors for each type they place into a
