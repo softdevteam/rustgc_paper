@@ -27,10 +27,12 @@
 \usetikzlibrary{automata, positioning, arrows}
 
 \lstset{
+    language=Rust,
+    style=colouredRust,
     xleftmargin=0pt,
     numbersep=.8em,
-    numberstyle=\scriptsize\tiny,
-    basicstyle=\ttfamily\small,
+    numberstyle=\scriptsize\tiny\color{gray},
+    basicstyle=\ttfamily\lst@ifdisplaystyle\tiny\fi,
     captionpos=b,
     escapeinside={{<!}{!>}},
     numbers=left,
