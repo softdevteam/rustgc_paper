@@ -165,24 +165,6 @@ fn main() {
 
 \begin{lstlisting}[
   language=Rust,
-  caption={Second dangling reference example from a finalisation. \laurie{I'm not sure this shows anything new over the previous example?}},
-  label={fig:fourth_example}]
-fn main() {
-    {
-        let val: u64 = 0;
-        let a = Arc::new(&val);              // Arc ref count = 1
-        let gc = Gc::new(Node{Arc::clone(&a)}); // Arc ref count = 2
-    }                                        // `a` dropped, Arc ref count = 1
-
-    // causes `S::drop` finaliser to run.
-    // This is unsound, because `Gc<S>` keeps the `&u64` alive,
-    // but not the data (u64) it points to.
-    force_gc();
-}
-\end{lstlisting}
-
-\begin{lstlisting}[
-  language=Rust,
   caption={Interior mutability example \laurie{is this showing a problem? i think it's showing `something that words as expected'?}},
   label={fig:fifth_example}]
 struct Node<T> {
@@ -192,59 +174,6 @@ struct Node<T> {
 let gc1 = Gc::new(Node { data: Mutex::new(1) });
 *gc1.lock().unwrap() = 2;
 \end{lstlisting}
-
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={Finaliser cyclic bug},
-  label={fig:seventh_example}]
-struct Node<T> {
-    ...
-    next: Option<Gc<Mutex<Node>>>,
-}
-
-impl Drop for Node {
-    fn drop(&mut self) {
-        ...
-        println!("Points to {}", self.next);
-    }
-}
-
-fn main() {
-    let n1 = Gc::new(Mutex::new(Node {
-        data: 1,
-        next: None,
-    }));
-
-    let n2 = Gc::new(Mutex::new(Node {
-        data: 2,
-        next: None,
-    }));
-
-    n1.lock().unwrap().next.insert(b);
-}
-\end{lstlisting}
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example of unsoundness caused by a finaliser running earlier than expected.},
-  label={fig:early_finaliser_unsoundness_example}]
-fn main()  {
-    let root = Gc::new(Box::new(123));
-    let inner: &usize = &**root;
-
-    GcAllocator::force_gc();
-    thread::sleep(time::Duration::from_secs(1));
-
-    // Invalid read
-    read(inner);
-}
-\end{lstlisting}
-
-\laurie{the `running examples' you've drafted are good
-for showing problems, but none of them really shows what a GC for Rust can give
-you that you can't easily do otherwise. perhaps we need a cyclic data-structure
-or ...?}
 
 \section{Background}
 \label{sec:background}
@@ -581,7 +510,7 @@ to write finalisers in addition to destructors for each type they place into a
 The rest of this section will look in more detail at how specific examples of
 these issues can be a challenge for a GC in Rust.
 
-\subsection{Restrictions for sound finalisation}
+\subsection{Challenge (1): Sound finalisation}
 
 \subsubsection{Rust references}
 
@@ -597,12 +526,11 @@ unreachable, when the reference would no longer be valid.
 \autoref{fig:dangling_reference} shows how a \lstinline{Gc} which dereferences
 a standard Rust reference inside a finaliser can cause a use-after-free.
 
+\begin{figure}[t]
+\centering
+\begin{minipage}{0.50\textwidth}
 \begin{lstlisting}[
   language=Rust,
-  caption={Dangling reference example from a finalisation. A
-  \lstinline{u64} is boxed on the heap, and an immutable reference to it is
-  stored in a \lstinline{Gc}.
-  },
   label={fig:dangling_reference}]
 impl<T> Drop for Node<T> {
     fn drop(&mut self) {
@@ -616,10 +544,18 @@ fn main() {
         let gc1 = Gc::new(Node{data: &*b});
     } // b is dropped and its memory deallocated
 
-    // causes `gc::drop` finaliser to run which holds a reference to `b`.
+    // causes `gc::drop` finaliser to run which
+    // holds a reference to `b`.
     force_gc();
 }
 \end{lstlisting}
+\end{minipage}%
+\begin{minipage}{0.50\textwidth}
+\includegraphics[width=\textwidth]{images/invalid_reference_finaliser}
+\end{minipage}
+\caption{An example of unsoundness with cyclic finalisation.}
+\label{fig:dangling_reference}
+\end{figure}
 
 \subsubsection{Thread-safety}
 
@@ -628,15 +564,16 @@ objects or even global state. Since an object's finaliser is run at some unknown
 point in time once it is considered unreachable by the collector, it must be
 able to safely access such state without racing with the mutator.
 
-As with any GC, \ourgc can finalise objects at its leisure, with no way for the
-programmer to know when this will happen. Rust does not prevent users
-from writing code which deadlocks, but it does not make the situation worse.
-However, if \ourgc were to perform on-thread finalisation, it would open
-the possibility of previously non-deadlocking code deadlocking.
-
 One possible solution might seem to be to prohibit finalisers from acquiring
-locks, however this can cause race-like bugs because of how finalisers can
+locks, however this can still cause race-like bugs because of how finalisers can
 interleave asynchronously with the mutator~\citep{niko13destructors}.
+
+In addition, \ourgc schedules all finalisers to run on a separate thread to the
+mutator. As with any GC, \ourgc can finalise objects at its leisure, with no
+way for the programmer to know when this will happen. Rust does not prevent
+users from writing code which deadlocks, but it does not make the situation
+worse. However, if \ourgc were to perform on-thread finalisation, it would open
+the possibility of previously non-deadlocking code deadlocking.
 
 \begin{lstlisting}[
   language=Rust,
@@ -665,127 +602,60 @@ fn main() {
     let counter = Rc::new(Mutex::new(0));
 
     {
-        let gc = Gc::new(Node { data: Rc::clone(&counter) });
+        let gc1 = Gc::new(Node { data: Rc::clone(&counter) });
     }
 
     force_gc();
 
     // If the finalizer for the `Gc<Node>` is asynchronously called
     // while `counter.lock()` below is already acquired, a deadlock will occur.
-    let lock = counter.lock().unwrap();
+    let r1 = counter.lock().unwrap();
     ...
 
-    assert_eq!(*counter, 0);
+    assert_eq!(*r1, 0);
 }
 \end{lstlisting}
 
-\ourgc finalises unreachable objects on a separate finalisation thread.
-This means that finalisers cannot deadlock simply by acquiring a
-lock held by the mutator: the finalisation thread will simply wait and attempt
-to re-acquire the lock later. However, this now means that shared data, or other
+Unfortunately, finalising objects off-thread now means that shared data, or other
 objects accessed from a finaliser must be done in a thread-safe way. The problem
 with this is that in \ourgc, a finaliser calls a type's existing drop methods.
 Since \lstinline{Drop} was not originally defined in expectation of being
 called on a separate thread, it does not guarantee thread safety.
 
-\subsubsection{Ordering}
+\subsubsection{Finalisation order}
 
-A language implementation has a choice as to whether to guarantee that
-finalisers will run in a certain order. Some GCs implementations guarantee a
-finalisation order, because for some applications, this is important if one
-resource must be cleaned up before another.
-
-For example, consider the objects in~\autoref{fig:ordered_finalisation}. The
-finalisers for the ``outer'' objects all reference the object in the layer
-to the right of them, so they must be finalised ``outside-in''.
+Some GCs implementations guarantee a finalisation order, because for some
+applications, this is important if one resource must be cleaned up before
+another.
 
 However, this guaranteed finalisation order has two disadvantages. First,
 finalising all the objects in a chain of floating garbage happens over multiple
-finalisation cycles because an object can only be finalised if it is not reachable
-from other unreachable objects. In~\autoref{fig:ordered_finalisation}, this
-would require four finalisation cycles before the floating garbage is reclaimed.
-Such a delay in the eventual reclamation of objects can cause \emph{heap drag},
-where unreachable objects are kept alive longer than necessary.
+finalisation cycles because an object can only be finalised if it is not
+reachable from other unreachable objects. Such a delay in the eventual
+reclamation of objects can cause \emph{heap drag}, where unreachable objects
+are kept alive longer than necessary.
 
 Second, and most significantly, this approach is not able to finalise cycles of
 objects where more than one object needs finalising, which can lead to resource
 leaks. This is because the collector cannot know which (if any) object is safe
-to finalise first: if an object references another object which has already been
-finalised, this is unsound. Boehm proposes a workaround for this where
+to finalise first: if an object references another object which has already
+been finalised, this is unsound. Boehm proposes a workaround for this where
 programmers can refactor the objects in order to break the finalisation
-cycle~\citep{boehm03destructors} (\autoref{fig:finaliser_cycles} from
-\citet[p.~218]{jones16garbage}). Another workaround is to allow users to use weak
-references to break cycles (similar to breaking reference count cycles).
+cycle~\citep{boehm03destructors}. Another workaround is to allow users to use
+weak references to break cycles (similar to breaking reference count cycles).
 Unfortunately this is often difficult to implement
 correctly~\citep{jones16garbage}.
 
-Some GCs such as Blink's Oilpan GC~\citep{ager13oilpan} do not specify a finalisation order. This
-permits the GC to finalise cycles of objects where more than one object needs
-finalising with an important restriction placed on the programmer: an object's finaliser must not reference
-any other object. This caveat is necessary to prevent dereferencing an already
-finalised object. This approach is used in V8: finalisers are not able to
-dereference through to other JavaScript objects. In the rare cases where this is
-too restrictive, Oilpan also has pre-finalisers, which are run during the GC's
-stop-the-world pause, and allow object fields to be
-dereferenced~\citep{ager13oilpan}. The compromise here is performance:
-pre-finalisers increase the mutator pause time and cannot be enqueued to run
-later.
-
-
-In \autoref{bg:finaliser_order} I explained how a GC can guarantee ordering on
-finalising floating garbage. The main disadvantage of this approach is that
-objects with finalisation cycles will not be finalised. The alternative is for
-the collector to not specify any order. This allows objects with cycles to be
-finalised but with a heavy constraint: they must not reference other objects
-from inside their finalisers. For many GCs, this is too restrictive.
-\citet{boehm03destructors} makes the case that in languages such as Java, the usefulness
-of finalisers depends on them being able to interact with other objects. As
-such, it is common to see VMs for managed languages such as Java and .NET
-specify an ordering for finalisers.
-
-However, our requirements for GC are unique in this respect: \ourgc is not
-intended to replace Rust's RAII approach to memory management, instead, it
-provides optional GC for objects where the RAII approach is difficult or
-impossible. It is not uncommon to see Rust programs which use \ourgc with a mix
-of GC'd and non-GC'd objects. In such cases, it is safe for a finaliser to access
-a field of a non-GC'd object because there is no danger of them being finalised
-already. \autoref{orderunsound} shows an example of how dereferencing another
-\lstinline{Gc} can be unsound, with \autoref{orderunsoundmemory} showing its
-representation in memory.
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-impl Drop for Node {
-    fn drop(&mut self) {
-        // println!("Dropping {}", self.a) // Unsound when `Node` used in Gc!
-        println!("Dropping {}", self.b)
-    }
-}
-
-struct Node {
-    a: Gc<u64>,
-    b: Box<u64>,
-}
-
-let gc1 = Gc::new(Node{ a: Gc::new(1), b: Box::new(2) });
-\end{lstrustsmall}
-    \caption{Here, it's safe for \lstinline{Node}'s finaliser to reference its field
-\lstinline{a} (line 4) because it points to an non-GC'd object. In contrast, if
-line 3 was uncommented this program would be unsound. Unlike in languages such
-as Java, where every object is managed, the restriction of dereferencing through
-fields of other GC'd objects is less of an issue because non-GC'd objects can
-    still be accessed.}
-    \label{orderunsound}
-\end{figure}
-
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/alloy_inner_gc}
-\end{center}
-    \caption{\autoref{orderunsound} representation in memory.}
-    \label{orderunsoundmemory}
-\end{figure}
-
+\ourgc uses an alternative approach where it does not specify any finalisation
+order. This allows objects with cycles to be finalised but with a heavy
+constraint: they must not reference other objects from inside their finalisers.
+However, this restriction is not so bad for us because our requirements for GC
+are unique in this respect: \ourgc is not intended to replace Rust's RAII
+approach to memory management, instead, it provides optional GC for objects
+where the RAII approach is difficult or impossible. It is not uncommon to see
+Rust programs which use \ourgc with a mix of GC'd and non-GC'd objects. In such
+cases, it is safe for a finaliser to access a field of a non-GC'd object
+because there is no danger of them being finalised already.
 
 In addition, one of \ourgc's main goals is to make it easier to work with data
 structures that have cycles in Rust. It is suggested that finalisation cycles
@@ -793,75 +663,6 @@ are rare in GC'd languages~\citep{jones16garbage}. However, this is different fo
 \ourgc, since destructors in Rust are common, and mapping them to finalisers
 means that it is not uncommon to see finalisation cycles in Rust programs using
 \ourgc.
-
-For these reasons, I decided that by default, \ourgc does not guarantee a
-finalisation order. This allows cyclic data managed by \ourgc to be finalised,
-preventing potential resource leaks. In \autoref{sound_unordered_finalisation} I
-describe how this is made sound by preventing a \lstinline{Gc}'s finaliser from
-dereferencing a field to another \lstinline{Gc}.
-
-\subsubsection{Forcing ordered finalisation}
-
-If users find the constraint this imposes on finalisers too
-restrictive, they may instead choose to build \ourgc with ordered finalisation.
-This can be done with the \lstinline{-DENABLE_TOPOLOGICAL_FINALIZATION} build
-flag, which uses the BDWGC's topological finalisation order. In this configuration,
-cyclic data structures such as that shown in
-\autoref{fig:ordered_finalisation_alloy} would not finalise, leading to a memory
-leak.
-
-While ordered finalisation would allow finalisers to dereference
-fields to other \lstinline{Gc}'s, they must still only access fields which use
-the \lstinline{FinalizerSafe} trait for the soundness reasons explained in
-\autoref{alloy_off_thread}.
-
-\begin{figure}[t]
-\begin{lstrustsmall}
-use std::gc::Gc;
-use std::sync::Mutex;
-
-struct Node {
-    name: String,
-    next: Option<Gc<Mutex<Node>>>,
-}
-
-impl Drop for Node {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.name);
-    }
-}
-
-fn main() {
-    let a = Gc::new(Mutex::new(Node {
-        name: String::from("a"),
-        next: None,
-    }));
-
-    let b = Gc::new(Mutex::new(Node {
-        name: String::from("b"),
-        next: None,
-    }));
-
-    a.lock().unwrap().next.insert(b);
-    b.lock().unwrap().next.insert(a);
-}
-\end{lstrustsmall}
-    \caption{An example of a small cyclic graph using \ourgc. This example
-    creates two nodes, \lstinline{a} and \lstinline{b}, before creating cyclic
-    references between them (lines 26-27). If \ourgc used ordered finalization,
-    then neither \lstinline{a} nor \lstinline{b} would be finalised. This would
-    cause a memory leak, because \lstinline{Node.name} contains an owned
-    \lstinline{String}. A \lstinline{String}'s drop method is used to deallocate
-    its backing store, which never be called. \\\\
-    \ourgc can therefore only represent this cyclic data structure without
-    memory leaks if it runs finalisers without a specified ordering. This way,
-    the collector can decide at its leisure whether to finalise \lstinline{a} or
-    \lstinline{b} first.}
-    \label{fig:ordered_finalisation_alloy}
-\end{figure}
-
-\subsubsection{Soundness issues with unordered finalisation}
-\label{unordered_finalisation_soundness}
 
 The problem with finalising \lstinline{Gc}s in an unspecified order is that any
 other \lstinline{Gc} object which they reference may have already been freed.
@@ -872,144 +673,45 @@ this one will always lead to unsoundess with finalisers which access other
 \ourgc's non-ordered configuration as there is no guarantee that non-cyclic data
 structures will be finalised `outside-in'.
 
+\autoref{fig:unsound_cycle} shows an example of how dereferencing another
+\lstinline{Gc} can be unsound.
+
 \begin{figure}[t]
-\begin{lstrustsmall}
-struct Node {
-    name: String,
+\centering
+\begin{minipage}{0.50\textwidth}
+\begin{lstlisting}[language=Rust]
+struct Node<T> {
+    ...
     next: Option<Gc<Mutex<Node>>>,
 }
 
-impl Drop for Node {
-    fn drop(&mut self) {
-        match self.next {
-            Some(n) => {
-                println!("The next node is {}", self.next.unwrap());
-            },
-            None => println!("No next node!"),
-        }
-        println!("Dropping {:?}", self.next);
-    }
-}
-
 fn main() {
-    let a = Gc::new(Mutex::new(Node {
-        name: String::from("a"),
+    let n1 = Gc::new(Mutex::new(Node {
+        data: 1,
         next: None,
     }));
 
-    let b = Gc::new(Mutex::new(Node {
-        name: String::from("a"),
+    let n2 = Gc::new(Mutex::new(Node {
+        data: 2,
         next: None,
     }));
 
-    a.lock().unwrap().next.insert(b);
+    n1.lock().unwrap().next.insert(b);
 }
-\end{lstrustsmall}
-    \caption{An example of a potentially unsound Rust program. Two
-    \lstinline{Gc<Mutex<Node>>} objects (\lstinline{a} and \lstinline{b}) are
-    created where \lstinline{a} contains a reference to \lstinline{b}. When
-    these objects are garbage collected, \ourgc will schedule their finalisers
-    to run in a non-specified order. If \lstinline{b} is finalised before
-    \lstinline{a}, then \lstinline{a}'s drop method will access a dropped
-    value.}
-    \label{fig:unsound_finalisation_cycle}
+\end{lstlisting}
+\end{minipage}%
+\begin{minipage}{0.50\textwidth}
+\includegraphics[width=\textwidth]{images/finaliser_cycle_unsound}
+\end{minipage}
+\caption{A \lstinline{u64} is placed on the heap using a \lstinline{Box}, and
+  an immutable reference to it is stored inside the \lstinline{Gc<Node>}.
+  Without finalisation, this is valid as long as \lstinline{gc1} does not
+  outlive \lstinline{b}. However, the use of the references from the
+  \lstinline{drop} method is unsound. This is because the collector is likely
+  to schedule the finaliser to run after the \lstinline{Box<u64>} is freed when
+  \lstinline{b} goes out of scope. The dereference on line 3 would thus access a dangling reference causing a use-after-free.}
+\label{fig:dangling_reference}
 \end{figure}
-
-\subsection{Finalisers may run earlier than expected}
-
-Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
-are called by a garbage collector non-deterministically. They can run at the
-collector's leisure; often this means that they run later than desired, however,
-in rare cases, an object can be finalised while it is still being used by the
-mutator! This is because compiler optimisations -- unaware of the presence of a
-GC -- can remove the single reference to an object which is keeping it alive. An
-outer object can therefore be considered unreachable while its inner object is
-still in use. An unfortunately timed GC cycle could  end up finalising the outer
-object, and run its finaliser. This can lead to subtle races in programs where
-the finaliser interleaves execution with the mutator.
-
-For this reason, VM specifications do not commit to running finalisers at a
-specific time. This includes allowing an object's finaliser to be run while the
-mutator is potentially still using it. For the reasons outlined in
-\autoref{bg:synchronisation}, GC implementations must synchronise access to
-objects inside a finaliser. \citet[p~.218]{jones16garbage} suggests this can be
-used to defer finalisation until later if a finaliser attempts to acquire an
-object lock which is already held by the mutator.
-
-More generally, however, the fundamental problem is that the compiler optimises
-away the reference to the object too soon. C\#'s .NET runtime
-provides a \lstinline{gc.KeepAlive} function as a solution to this.
-\lstinline{gc.KeepAlive} is an opaque empty function which the compiler cannot
-optimise away. The idea is that a reference to an object can be passed to
-\lstinline{gc.KeepAlive}, ensuring it lives long enough so that the collector
-does not deem it unreachable and finalise it too soon. This mitigation is
-limited, however, as it is up to the user to call \lstinline{gc.KeepAlive} when
-they require it.
-
-A fundamental assumption in Rust's destructor semantics is that dropping a value
-is the last thing to happen to it. The Rust compiler prevents using a value
-after it has been dropped as this would cause unsoundness. For \lstinline{Gc}
-values in \ourgc, the same must be true for finalisers. If a finaliser is able
-to run before the mutator has finished using it, this would also be
-unsound.
-
-In \autoref{bg:early_finalisation}, I explain how finalisers can run earlier
-than expected because compiler optimisations -- unaware of the presence of a GC
--- can cause GC objects to become unreachable earlier than expected. If this is
-paired with an unfortunately timed GC cycle, the object's finaliser could run
-while the object is still in use by the mutator. Rust and \ourgc is no
-different: the Rust compiler is allowed to perform any optimisation that does
-not change the observable behaviour of the program, and such optimisations are
-not aware of the retro-fitted collector.
-
-A finaliser which runs early can cause finalisation code to interleave
-unexpectedly with the mutator~\citep{boehm03destructors}. But, even worse, in \ourgc early
-finalisation can even lead to a memory safety violation. Consider the following
-example, which shows how a finaliser which runs early could cause a
-use-after-free:
-
-\begin{lstrustsmall}
-fn main() {
-    let a = Gc::new(Box::new(123));
-    let ref box_ptr = &*a;
-
-    ...
-
-    // Gc happens here causing
-    // a's finaliser to drop the box.
-
-    println!("{}", box_ptr); // Potential use-after-free!
-}
-\end{lstrustsmall}
-
-Assuming that the compiler clobbers the reference the \lstinline{Gc} stored in
-variable \lstinline{a}, this program can be represented as follows:
-
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/early_finalisation}
-\end{center}
-
-In this program, semantically, both \lstinline{a} and \lstinline{box_ptr} live
-until the end of \lstinline{main}. However, the compiler may decide to reuse the
-register holding the reference at \lstinline{a} any time after line 3 as it is
-no longer used. An unfortunately timed GC cycle which happens immediately
-afterwards would consider the \lstinline{Gc} object unreachable. Its finaliser
-will then be run, freeing the Box. This would happen even though there is still
-a reference (\lstinline{box_ptr}) to the inner \lstinline{Box} value. This
-reference is now a dangling reference, and its use on line 10 would constitute a
-use-after-free.
-
-The possibility of early finalisation has led many VMs to specify that finalisers
-can happen at any time -- even earlier than when an object becomes unreachable
-(see \autoref{bg:early_finalisation}). One way of preventing early
-finalisation in \ourgc would be to prevent \lstinline{Gc}
-objects from owning non garbage collected objects, but this would render
-\ourgc almost unusable. Fortunately, we can do better.
-
-\subsection{Too many finalisers}
-
-\jake{todo}
-
 
 \subsection{Solution (1): Finaliser Safety Analysis}
 \label{sec:fsa}
@@ -1018,55 +720,121 @@ Extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers. At compile-time, a static analysis is
 performed over the drop methods of each value used in a \lstinline{Gc}.
 
-which
-would be non-thread safe in a finaliser. One such example of provable unsafety
-is using  \autoref{fig:fsa_example} shows how this can prevent a potential race
-condition due to thread-unsafety.
-
 \subsubsection{Preventing dangling references}
 
-\subsubsection{Need to introduce concurrency}
-\label{sendsync}
+For a \lstinline{Gc<T>} with a finaliser to be sound, it cannot be used with an
+object which contains ordinary Rust references. To guarantee this, \ourgc imposes a
+restriction called the \emph{\bor}. This rule states that that a type
+\lstinline{T} cannot be placed in a \lstinline{Gc} if both of the
+following definitions are true:
 
-The Rust type system is able to guarantee statically that values are being used
-in a thread-safe way. It does this with the use of two special "marker" traits:
-\lstinline{Send} and \lstinline{Sync}.
+\begin{definition}
+    \lstinline{T} (or any component type of \lstinline{T}) is of some type
+        \lstinline{&U} or \lstinline{&mut U}.
+\end{definition}
+\begin{definition}
 
-A value whose type implements the \lstinline{Send} trait can be transferred to
-other threads. Almost all types in Rust implement the \lstinline{Send} trait
-save for a few exceptions. One such exception is the \lstinline{Rc<T>}
-(reference counting) type. This does \emph{not} implement \lstinline{Send}
-because it does not perform count operations on its underlying contents
-atomically. If it were sent to another thread, it could race if both threads
-tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
-type (an atomic implementation of \lstinline{Rc<T>}) does implement
-\lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
+    \lstinline{T} has a finaliser. In other words, \lstinline{T} (or
+      any component type of \lstinline{T}) has a drop method.
+\end{definition}
 
-The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
-implemented on types whose values perform mutation in a thread-safe manner. For
-example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
-exclusive access to its underlying data atomically. On the other hand, a
-\lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
-\lstinline{Sync} because it only provides single-threaded interior
-mutability. This is because its underlying mechanism to increment and decrement
-borrow counts are not performed atomically.
+As with references, this same unsoundness can be caused by storing raw pointers
+inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
+\lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
+is sound even without enforcing this rule for raw pointers because dereferencing raw pointers
+is already not possible in safe Rust code, and programmers must ensure the
+reference is valid for each dereference anyway.
 
-The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
-trait known as \emph{auto traits}. This means that they are automatically
-implemented for every type, unless the type, or a type it contains, has
-explicitly opted out. Types can be opted out via a \emph{negative impl}:
+\ourgc checks that programs adhere to the \bor at compile-time, throwing an
+error for those programs which violate it.
 
-\begin{lstrustsmall}
-    impl !Send for T {}
-\end{lstrustsmall}
 
-If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
-from the example above, then the entire struct \lstinline{S} will also not
-implement \lstinline{Send}.
+% To check whether a type passed to \lstinline{Gc} contains a reference, \ourgc
+% defines a marker trait with no methods called \lstinline{ReferenceFree} which is
+% used by the compiler to indicate that a value of a type does not contain
+% references.
+%
+% \lstinline{ReferenceFree} is defined as an \emph{auto trait} (see
+% \autoref{sendsync}), so it's implemented on every type in Rust by default.
+% \ourgc then explicitly unimplements \lstinline{ReferenceFree} on all reference
+% types:
+%
+% \begin{lstrustsmall}
+% impl !ReferenceFree for &T {}
+% impl !ReferenceFree for &mut T {}
+% \end{lstrustsmall}
+%
+% This means that if a type contains a \lstinline{&T} or a \lstinline{&mut T} for
+% any \lstinline{T} in
+% one of its component types, then it will not implement \lstinline{ReferenceFree}
+% either.
+%
+% Whether or not a type implements \lstinline{ReferenceFree} can then be checked
+% at compile-time: if \lstinline{T} implements \lstinline{ReferenceFree}, then
+% it's safe to use inside a \lstinline{Gc}. If \lstinline{T} does not implement
+% \lstinline{ReferenceFree}, and \lstinline{T} has a drop method, then it cannot
+% be used inside a \lstinline{Gc}. This is implemented with an extension to
+% finaliser safety analysis, where the type of \lstinline{T} is checked for an
+% implementation of \lstinline{ReferenceFree} if it has a finaliser during the
+% \lstinline{CheckCallsite} phase.
 
-\lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
-doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
-is safe to use in a multi-threaded context.
+% The \bor can be restrictive: in particular, a
+% \lstinline{Gc<T>} object which both contains references and has a finaliser, but
+% where the finaliser never uses the reference would be deemed invalid, even
+% though it is sound. \autoref{borsound} shows an example program which is sound, but fails to
+% compile due to the \bor.
+%
+% To allow the program in \autoref{borsound} to compile, one can explicitly
+% implement \lstinline{ReferenceFree} on \lstinline{Wrapper}:
+
+% \begin{lstrustsmall}
+% unsafe impl<'a> ReferenceFree for Wrapper<'a> {}
+% \end{lstrustsmall}
+
+% \subsubsection{Need to introduce concurrency}
+% \label{sendsync}
+%
+% The Rust type system is able to guarantee statically that values are being used
+% in a thread-safe way. It does this with the use of two special "marker" traits:
+% \lstinline{Send} and \lstinline{Sync}.
+%
+% A value whose type implements the \lstinline{Send} trait can be transferred to
+% other threads. Almost all types in Rust implement the \lstinline{Send} trait
+% save for a few exceptions. One such exception is the \lstinline{Rc<T>}
+% (reference counting) type. This does \emph{not} implement \lstinline{Send}
+% because it does not perform count operations on its underlying contents
+% atomically. If it were sent to another thread, it could race if both threads
+% tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
+% type (an atomic implementation of \lstinline{Rc<T>}) does implement
+% \lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
+%
+% The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
+% implemented on types whose values perform mutation in a thread-safe manner. For
+% example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
+% exclusive access to its underlying data atomically. On the other hand, a
+% \lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
+% \lstinline{Sync} because it only provides single-threaded interior
+% mutability. This is because its underlying mechanism to increment and decrement
+% borrow counts are not performed atomically.
+%
+% The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
+% trait known as \emph{auto traits}. This means that they are automatically
+% implemented for every type, unless the type, or a type it contains, has
+% explicitly opted out. Types can be opted out via a \emph{negative impl}:
+
+% \begin{lstrustsmall}
+%     impl !Send for T {}
+% \end{lstrustsmall}
+
+% If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
+% from the example above, then the entire struct \lstinline{S} will also not
+% implement \lstinline{Send}.
+%
+% \lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
+% doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
+% is safe to use in a multi-threaded context.
+
+\subsubsection{Ensuring thread-safety}
 
 \ourgc's \lstinline{Gc} reference is fundamentally thread-safe: if \lstinline{T}
 implements \lstinline{Send} + \lstinline{Sync}, then \lstinline{Gc<T>} will too.
@@ -1198,36 +966,66 @@ In both cases, the user has the option of explicitly informing the compiler a
 particular drop method is safe to use as a finaliser. We observe that this is
 rare in practice.
 
-\begin{figure}[!t]
-\begin{lstrustsmall}
-struct Wrapper<'a>(&'a u64);
+\subsubsection{Making unordered finalisation sound}
+\label{sound_unordered_finalisation}
 
-impl<'a> Drop for Wrapper<'a> {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.0);
-    }
-}
+When \ourgc is compiled with unordered finalisation, it prevents drop methods
+from dereferencing fields which point to other \lstinline{Gc} objects.
+\autoref{fig:unsound_finalisation_cycle_error} shows the error message that is
+displayed when the example in \autoref{fig:unsound_finalisation_cycle} is
+compiled. It has identified that the user is trying to access field \lstinline{b},
+which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
+analysis} (described in \autoref{fsa}) to detect this.
 
-fn main() {
-    {
-        let b = Box::new(123);
-        let gc1 = Gc::new(Wrapper(b.as_ref()));
-    } // b is dropped
+\begin{figure}[t!]
+\begin{lstlisting}
+error: `Mutex::new(Node {
+               name: String::from("a"),
+               next: None,
+           })` cannot be safely finalized.
+  --> src/main.rs:30:21
+   |
+15 |               Some(n) => {
+   |                    -
+   |                    |
+   |                    caused by the expression here in `fn drop(&mut)` because
+   |                    it uses another `Gc` type.
+...
+30 |       let b = Gc::new(Mutex::new(Node {
+   |  _____________________^
+31 | |         name: String::from("a"),
+32 | |         next: None,
+33 | |     }));
+   | |______^ has a drop method which cannot be safely finalized.
+   |
+   = help: `Gc` finalizers are unordered, so this field may have already been dropped.
+     It is not safe to dereference.
 
-    // GC happens here, calling `Wrapper::drop` as a finaliser.
-    // This causes a use-after-free.
-}
-\end{lstrustsmall}
-    \caption{The \lstinline{Gc} now stores a reference to the boxed
-    \lstinline{u64} using an intermediate \lstinline{Wrapper} struct which has a
-    drop method which will be run as a finaliser (line 4). The boxed
-    \lstinline{u64}, and the \lstinline{Gc} are created in an inner scope. At
-    the end of this scope, \lstinline{b} is dropped. Later, when the
-    \lstinline{Gc<Wrapper>} is collected (e.g.~at line 16) a use-after-free will
-    occur because its finaliser (line 4) dereferences a reference to a value
-    which was already dropped (at line 14).}
-    \label{lst:refwrapper}
+\end{lstlisting}
+    \caption{\jake{todo, replace this example}The compile-time error message shown when attempting to compile the
+    example in \autoref{fig:unsound_finalisation_cycle}. FSA identifies that
+    another \lstinline{Gc} is being dereferenced inside a finaliser. This is
+    unsound when \ourgc does not use ordered finalisation as it may have already
+    been collected.}
+    \label{fig:unsound_finalisation_cycle_error}
 \end{figure}
+
+This is implemented by first adding a negative implementation of
+\lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
+
+\begin{lstrustsmall}
+impl<T> !FinalizerSafe for Gc<T> {}
+\end{lstrustsmall}
+
+FSA then uses this to identify the specific field which was unsafely
+dereferenced and will generates an error message different from those to do with
+thread-safety.
+
+However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
+a drop method could dereference a \lstinline{Gc} field in a way that FSA could
+not detect e.g.~by doing so behind an opaque function call. In such cases
+where the MIR for the entire drop method cannot be checked, FSA will err on the
+side of caution, favouring soundness by refusing to compile the program.
 
 \subsubsection{How it works}
 
@@ -1309,176 +1107,100 @@ not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
 does not halt the analysis, so multiple lines in drop methods which perform
 unsound field accesses will be caught in a single FSA pass.
 
-\subsubsection{Making unordered finalisation sound}
-\label{sound_unordered_finalisation}
 
-When \ourgc is compiled with unordered finalisation, it prevents drop methods
-from dereferencing fields which point to other \lstinline{Gc} objects.
-\autoref{fig:unsound_finalisation_cycle_error} shows the error message that is
-displayed when the example in \autoref{fig:unsound_finalisation_cycle} is
-compiled. It has identified that the user is trying to access field \lstinline{b},
-which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
-analysis} (described in \autoref{fsa}) to detect this.
 
-\begin{figure}[t!]
-\begin{lstlisting}
-error: `Mutex::new(Node {
-               name: String::from("a"),
-               next: None,
-           })` cannot be safely finalized.
-  --> src/main.rs:30:21
-   |
-15 |               Some(n) => {
-   |                    -
-   |                    |
-   |                    caused by the expression here in `fn drop(&mut)` because
-   |                    it uses another `Gc` type.
-...
-30 |       let b = Gc::new(Mutex::new(Node {
-   |  _____________________^
-31 | |         name: String::from("a"),
-32 | |         next: None,
-33 | |     }));
-   | |______^ has a drop method which cannot be safely finalized.
-   |
-   = help: `Gc` finalizers are unordered, so this field may have already been dropped.
-     It is not safe to dereference.
+\subsection{Challenge (2): Finalisers may run earlier than expected}
 
+Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
+are called by a garbage collector non-deterministically. They can run at the
+collector's leisure; often this means that they run later than desired, however,
+in rare cases, an object can be finalised while it is still being used by the
+mutator! This is because compiler optimisations -- unaware of the presence of a
+GC -- can remove the single reference to an object which is keeping it alive. An
+outer object can therefore be considered unreachable while its inner object is
+still in use. An unfortunately timed GC cycle could  end up finalising the outer
+object, and run its finaliser. This can lead to subtle races in programs where
+the finaliser interleaves execution with the mutator.
+
+For this reason, VM specifications do not commit to running finalisers at a
+specific time. This includes allowing an object's finaliser to be run while the
+mutator is potentially still using it. For the reasons outlined in
+\autoref{bg:synchronisation}, GC implementations must synchronise access to
+objects inside a finaliser. \citet[p~.218]{jones16garbage} suggests this can be
+used to defer finalisation until later if a finaliser attempts to acquire an
+object lock which is already held by the mutator.
+
+More generally, however, the fundamental problem is that the compiler optimises
+away the reference to the object too soon. C\#'s .NET runtime
+provides a \lstinline{gc.KeepAlive} function as a solution to this.
+\lstinline{gc.KeepAlive} is an opaque empty function which the compiler cannot
+optimise away. The idea is that a reference to an object can be passed to
+\lstinline{gc.KeepAlive}, ensuring it lives long enough so that the collector
+does not deem it unreachable and finalise it too soon. This mitigation is
+limited, however, as it is up to the user to call \lstinline{gc.KeepAlive} when
+they require it.
+
+A fundamental assumption in Rust's destructor semantics is that dropping a value
+is the last thing to happen to it. The Rust compiler prevents using a value
+after it has been dropped as this would cause unsoundness. For \lstinline{Gc}
+values in \ourgc, the same must be true for finalisers. If a finaliser is able
+to run before the mutator has finished using it, this would also be
+unsound.
+
+In \autoref{bg:early_finalisation}, I explain how finalisers can run earlier
+than expected because compiler optimisations -- unaware of the presence of a GC
+-- can cause GC objects to become unreachable earlier than expected. If this is
+paired with an unfortunately timed GC cycle, the object's finaliser could run
+while the object is still in use by the mutator. Rust and \ourgc is no
+different: the Rust compiler is allowed to perform any optimisation that does
+not change the observable behaviour of the program, and such optimisations are
+not aware of the retro-fitted collector.
+
+A finaliser which runs early can cause finalisation code to interleave
+unexpectedly with the mutator~\citep{boehm03destructors}. But, even worse, in \ourgc early
+finalisation can even lead to a memory safety violation. Consider the following
+example, which shows how a finaliser which runs early could cause a
+use-after-free:
+
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of unsoundness caused by a finaliser running earlier than expected.},
+  label={fig:early_finaliser_unsoundness_example}]
+fn main()  {
+    let root = Gc::new(Box::new(123));
+    let inner: &usize = &**root;
+
+    GcAllocator::force_gc();
+    thread::sleep(time::Duration::from_secs(1));
+
+    // Invalid read
+    read(inner);
+}
 \end{lstlisting}
-    \caption{The compile-time error message shown when attempting to compile the
-    example in \autoref{fig:unsound_finalisation_cycle}. FSA identifies that
-    another \lstinline{Gc} is being dereferenced inside a finaliser. This is
-    unsound when \ourgc does not use ordered finalisation as it may have already
-    been collected.}
-    \label{fig:unsound_finalisation_cycle_error}
-\end{figure}
 
-This is implemented by first adding a negative implementation of
-\lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
+Assuming that the compiler clobbers the reference the \lstinline{Gc} stored in
+variable \lstinline{a}, this program can be represented as follows:
 
-\begin{lstrustsmall}
-impl<T> !FinalizerSafe for Gc<T> {}
-\end{lstrustsmall}
+\begin{center}
+\includegraphics[width=0.75\textwidth]{images/early_finalisation}
+\end{center}
 
-FSA then uses this to identify the specific field which was unsafely
-dereferenced and will generates an error message different from those to do with
-thread-safety.
+In this program, semantically, both \lstinline{a} and \lstinline{box_ptr} live
+until the end of \lstinline{main}. However, the compiler may decide to reuse the
+register holding the reference at \lstinline{a} any time after line 3 as it is
+no longer used. An unfortunately timed GC cycle which happens immediately
+afterwards would consider the \lstinline{Gc} object unreachable. Its finaliser
+will then be run, freeing the Box. This would happen even though there is still
+a reference (\lstinline{box_ptr}) to the inner \lstinline{Box} value. This
+reference is now a dangling reference, and its use on line 10 would constitute a
+use-after-free.
 
-However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
-a drop method could dereference a \lstinline{Gc} field in a way that FSA could
-not detect e.g.~by doing so behind an opaque function call. In such cases
-where the MIR for the entire drop method cannot be checked, FSA will err on the
-side of caution, favouring soundness by refusing to compile the program.
-\autoref{fsa_external} shows an example of this in practice.
-
-\begin{figure}[t]
-\begin{lstrustsmall}
-use std::gc::Gc;
-
-extern "C" {
-    // A printer function written in "C" that is externally linked.
-    // The compiler cannot see the contents of this function.
-    fn node_printer(value: &Node);
-}
-
-struct Node {
-    name: String,
-    next: Option<Gc<Node>>,
-}
-
-impl Drop for Node {
-    fn drop(&mut self) {
-        unsafe {
-            node_printer(self);
-        }
-    }
-}
-
-fn main() {
-    let node = Gc::new(Node {
-        name: String::from("a"),
-        next: Some(Gc::new(Node {
-            name: String::from("b"),
-            next: None,
-        })),
-    });
-}
-\end{lstrustsmall}
-    \caption{An example program which is forbidden in \ourgc. The drop method
-    for \lstinline{Node} calls \lstinline{node_printer} on its value. This
-    function is written in C and is externally linked, so the Rust compiler is
-    unable to view its contents. Because of this, it cannot know whether or not
-    \lstinline{node_printer} accesses the \lstinline{next} field. \ourgc thus
-    conservatively rejects the program. If the user is certain that
-    \lstinline{node_printer} does not access the \lstinline{next} field, they
-    can inform \ourgc by implementing the \lstinline{FinalizerSafe} trait on
-    \lstinline{Node}. }
-    \label{fsa_external}
-\end{figure}
-
-
-\subsubsection{Unordered finalisation and the \bor}
-
-\ourgc's \lstinline{Gc<T>} type provides an \lstinline{as_ref} function for
-obtaining a reference to the underlying type (\lstinline{&T}). This allows the
-\lstinline{Gc<T>} to be used in Rust code which does not care about how the
-value is stored, but instead just expects a Rust reference to it
-(\lstinline{&T}). Unfortunately, this creates a backdoor where a reference
-to another \lstinline{Gc} object could be used in a finaliser. In such a case,
-FSA can not tell that dereferencing a \lstinline{&T} accesses memory in
-another \lstinline{Gc} object, because the ``\lstinline{Gc}'' part of the type
-has been omitted. \autoref{borpot} shows a potential example of a raw reference
-can leak into a finaliser.
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-use std::gc::Gc;
-use std::fmt::Debug;
-
-struct Wrapper<T: Debug>(T);
-
-impl<T: Debug> Drop for Wrapper<T> {
-    fn drop(&mut self) {
-        println!("Dropping {:?}", self.0);
-    }
-}
-
-fn main() {
-    let gc1 = Gc::new(123);
-    let r1 = gc1.as_ref();
-
-    // Pass a rust reference to `Wrapper`, hiding the fact that it points to
-    // another GC object, which would be unsound to deref in the finaliser.
-    let gc2 = Gc::new(Wrapper(r1));
-}
-\end{lstrustsmall}
-    \caption{A reference to the \lstinline{Gc} object on line 13 is passed as a
-    Rust reference to another \lstinline{Gc} (line 18). The drop method for
-    \lstinline{Wrapper} dereferences this, which is unsound because if the
-    finalisation order is unspecified.}
-    \label{borpot}
-\end{figure}
-
-Fortunately, this problem is solved by the \bor (\autoref{sec:bor}), and the
-example above would not compile with the error showing in \autoref{borwarn}
-
-\begin{figure}[t!]
-\begin{lstlisting}
-error: `Wrapper(r1)` cannot be safely constructed.
-  --> src/main.rs:18:23
-   |
-18 |     let gc2 = Gc::new(Wrapper(r1));
-   |               --------^^^^^^^^^^^-
-   |               |       |
-   |               |       contains a reference (&) which may no longer be
-   |               |       valid when it is finalized.
-   |               `Gc::new` requires that a type is reference free.
-
-error: could not compile `bin` due to previous error; 1 warning emitted
-\end{lstlisting}
-    \caption{Compiler error for \autoref{borpot} when run with \ourgc.}
-    \label{borwarn}
-\end{figure}
+The possibility of early finalisation has led many VMs to specify that finalisers
+can happen at any time -- even earlier than when an object becomes unreachable
+(see \autoref{bg:early_finalisation}). One way of preventing early
+finalisation in \ourgc would be to prevent \lstinline{Gc}
+objects from owning non garbage collected objects, but this would render
+\ourgc almost unusable. Fortunately, we can do better.
 
 \subsection{Solution (2): Early Finaliser Prevention}
 
@@ -1586,17 +1308,18 @@ After this pass, we call the Rust compiler's existing \emph{simplify mir} pass,
 which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
 
+\subsection{Challenge (3): Too many finalisers}
+
+For performance reasons, many GC'd languages discourage programmers from using finalisers.
+In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
+finalisers therefore have a high performance overhead.
 
 \subsection{Solution (3) Finaliser Elision}
 
 Statically optimises away finalisers if the destructor that is their basis
 simply frees heap memory.
 
-For performance reasons, many GC'd languages discourage programmers from using finalisers.
-In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
-finalisers therefore have a high performance overhead.
-
-To claw back this performance hit, I implement a new optimisation called
+To claw back this performance hit, we implement a new optimisation called
 \textit{finaliser elision}. This optimisation is based on the observation that
 sometimes only the top-most object in a \lstinline{Gc} graph needs to have a
 finaliser. Consider the following example:
@@ -2229,156 +1952,10 @@ they are never used in a \lstinline{Gc}.
 
 \label{sec:bor}
 
-For a \lstinline{Gc<T>} with a finaliser to be sound, it cannot be used with an
-object which contains ordinary Rust references. To guarantee this, \ourgc imposes a
-restriction called the \emph{\bor}. This rule states that that a type
-\lstinline{T} cannot be placed in a \lstinline{Gc} if both of the
-following definitions are true:
-
-\begin{definition}
-    \lstinline{T} (or any component type of \lstinline{T}) is of some type
-        \lstinline{&U} or \lstinline{&mut U}.
-\end{definition}
-\begin{definition}
-
-    \lstinline{T} has a finaliser. In other words, \lstinline{T} (or
-      any component type of \lstinline{T}) has a drop method.
-\end{definition}
-
-As with references, this same unsoundness can be caused by storing raw pointers
-inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
-\lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
-is sound even without enforcing this rule for raw pointers because dereferencing raw pointers
-is already not possible in safe Rust code, and programmers must ensure the
-reference is valid for each dereference anyway. \autoref{badbor} shows an example of
-some types which do not adhere to the \bor.
-
-
-\begin{figure}
-\begin{lstrustsmall}
-struct S<'a> {
-    a: &'a str
-}
-
-struct T<'a> {
-    a: u64,
-    b: S<'a>,
-}
-
-enum U<'a> {
-    A(u64),
-    B(String),
-    C(S<'a>)
-}
-\end{lstrustsmall}
-    \caption{We assume each definition has a drop implementation. Values of the
-    first struct \lstinline{S} cannot be passed to a \lstinline{Gc} because its
-    field, \lstinline{a} contains an immutable reference to a string literal
-    (\lstinline{&str}). The struct \lstinline{T} cannot be passed to a
-    \lstinline{Gc} either because it contains a transitive reference, through
-    field \lstinline{b}.\\\\ Finally, an object of type \lstinline{Gc<U>} is not
-    possible because the \lstinline{U::C} variant contains a reference. The
-    active variant cannot be known statically, so \ourgc disallows it entirely.}
-    \label{badbor}
-\end{figure}
-
-\subsubsection{Automating the \bor}
-
 \ourgc checks that programs adhere to the \bor at compile-time, throwing an
 error for those programs which violate it. Attempting to compile the earlier
 example would result in the following error message:
 
-\begin{lstlisting}
-error: `Wrapper(b.as_ref())` cannot be safely constructed.
-  --> src/main.rs:19:26
-   |
-19 |         let gc = Gc::new(Wrapper(b.as_ref()));
-   |                  --------^^^^^^^^^^^^^^^^^^^-
-   |                  |       |
-   |                  |       contains a reference (&) which may no longer 
-                              be valid when it is finalized.
-   |                  `Gc::new` requires that a type is reference free.
-
-warning: `ref_soundness` (bin "ref_soundness") generated 1 warning
-\end{lstlisting}
-
-\begin{figure}[t!]
-\begin{lstrustsmall}
-struct Wrapper<'a>(&'a u64);
-
-impl<'a> Drop for Wrapper<'a> {
-    fn drop(&mut self) {
-        println!("Dropping Wrapper");
-    }
-}
-
-fn main() {
-    {
-        let a = 123;
-        let gc = Gc::new(Wrapper(&a));
-    } // a is no longer in scope
-
-    // GC happens here, calling `Wrapper::drop` as a finaliser.
-    // `Wrapper`'s drop method does not deref the box pointer,
-    // so it does not violate the properties we care about,
-    // but it does violate the borrow-or-finalise rule.
-}
-\end{lstrustsmall}
-    \caption{A \lstinline{Gc} is created, storing a reference to \lstinline{a} inside a
-\lstinline{Wrapper} whose drop method gives it a finaliser. This does not
-compile, since it violates the \bor. However, the drop method for
-\lstinline{Wrapper} (line 4) does not use the reference \lstinline{&a} at all,
-    which makes it perfectly safe.}
-    \label{borsound}
-\end{figure}
-
-To check whether a type passed to \lstinline{Gc} contains a reference, \ourgc
-defines a marker trait with no methods called \lstinline{ReferenceFree} which is
-used by the compiler to indicate that a value of a type does not contain
-references.
-
-\lstinline{ReferenceFree} is defined as an \emph{auto trait} (see
-\autoref{sendsync}), so it's implemented on every type in Rust by default.
-\ourgc then explicitly unimplements \lstinline{ReferenceFree} on all reference
-types:
-
-\begin{lstrustsmall}
-impl !ReferenceFree for &T {}
-impl !ReferenceFree for &mut T {}
-\end{lstrustsmall}
-
-This means that if a type contains a \lstinline{&T} or a \lstinline{&mut T} for
-any \lstinline{T} in
-one of its component types, then it will not implement \lstinline{ReferenceFree}
-either.
-
-Whether or not a type implements \lstinline{ReferenceFree} can then be checked
-at compile-time: if \lstinline{T} implements \lstinline{ReferenceFree}, then
-it's safe to use inside a \lstinline{Gc}. If \lstinline{T} does not implement
-\lstinline{ReferenceFree}, and \lstinline{T} has a drop method, then it cannot
-be used inside a \lstinline{Gc}. This is implemented with an extension to
-finaliser safety analysis, where the type of \lstinline{T} is checked for an
-implementation of \lstinline{ReferenceFree} if it has a finaliser during the
-\lstinline{CheckCallsite} phase.
-
-\subsubsection{Limitations}
-
-The \bor can be restrictive: in particular, a
-\lstinline{Gc<T>} object which both contains references and has a finaliser, but
-where the finaliser never uses the reference would be deemed invalid, even
-though it is sound. \autoref{borsound} shows an example program which is sound, but fails to
-compile due to the \bor.
-
-To allow the program in \autoref{borsound} to compile, one can explicitly
-implement \lstinline{ReferenceFree} on \lstinline{Wrapper}:
-
-\begin{lstrustsmall}
-unsafe impl<'a> ReferenceFree for Wrapper<'a> {}
-\end{lstrustsmall}
-
-This will now compile and \lstinline{Gc<Wrapper>} will be finalised before
-collection. However, it is unsafe as the onus is now on the programmer to ensure
-\lstinline{Wrapper}'s drop method never uses \lstinline{&a}.
 
 \section{Rust destructors}
 
