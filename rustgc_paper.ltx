@@ -504,8 +504,14 @@ fn main() {
 \begin{minipage}{0.50\textwidth}
 \includegraphics[width=\textwidth]{images/invalid_reference_finaliser}
 \end{minipage}
-\caption{An example of unsoundness with cyclic finalisation.}
 \label{fig:dangling_reference}
+\caption{A \lstinline{u64} is placed on the heap using a \lstinline{Box}, and
+  an immutable reference to it is stored inside the \lstinline{Gc<Node>}.
+  Without finalisation, this is valid as long as \lstinline{gc1} does not
+  outlive \lstinline{b}. However, the use of the references from the
+  \lstinline{drop} method is unsound. This is because the collector is likely
+  to schedule the finaliser to run after the \lstinline{Box<u64>} is freed when
+  \lstinline{b} goes out of scope. The dereference on line 3 would thus access a dangling reference causing a use-after-free.}
 \end{figure}
 
 \subsubsection{Thread-safety}
@@ -654,13 +660,7 @@ fn main() {
 \begin{minipage}{0.50\textwidth}
 \includegraphics[width=\textwidth]{images/finaliser_cycle_unsound}
 \end{minipage}
-\caption{A \lstinline{u64} is placed on the heap using a \lstinline{Box}, and
-  an immutable reference to it is stored inside the \lstinline{Gc<Node>}.
-  Without finalisation, this is valid as long as \lstinline{gc1} does not
-  outlive \lstinline{b}. However, the use of the references from the
-  \lstinline{drop} method is unsound. This is because the collector is likely
-  to schedule the finaliser to run after the \lstinline{Box<u64>} is freed when
-  \lstinline{b} goes out of scope. The dereference on line 3 would thus access a dangling reference causing a use-after-free.}
+\caption{An example of unsoundness with cyclic finalisation.}
 \label{fig:dangling_reference}
 \end{figure}
 
