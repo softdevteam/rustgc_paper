@@ -102,15 +102,32 @@ obvious to them.
 \begin{figure}
 \begin{lstlisting}[
   language=Rust,
-  caption={An example of GC in Rust. \laurie{we need a good example here,
-    ideally one that we can build upon later in the paper}},
+  caption={An example of Alloy in use, showing use of the \lstinline{Gc<T>}
+  type, and the use of destructors as finalisers. We create a type
+  \lstinline{S<T>} which is a simple wrapper around data of any type (line 1)
+  and a normal Rust destructor which Alloy will also use as a finaliser when
+  \lstinline{S<T>} is used inside a \lstinline{Gc<T>} (lines 3--5). We then
+  create two GC values (lines 8 and 9), assigning the the second GC value to
+  the first (line 10): note that, unlike similar Rust types, normal assignment is sufficient
+  to copy the GC wrapper. For the sake of this example, we force a GC
+  which will detect that the \lstinline{S\{data: 2\}} value is unreachable, and
+  schedule its finaliser to run (line 11). The print statement will print
+  \lstinline{S\{data: 1\}} twice (line 12). Note that, unlike normal
+  destructors, finalisers are run at a non-deterministic point: \lstinline{drop
+  2} might be printed before or after the values in line 12.},
   label={fig:first_example}]
-struct Node {data: i32, next: Option<Gc<RefCell<Node>>>}
+struct S<T> {x: T}
+
+impl<T> Drop for S<T> {
+  fn drop(&mut self) { println!("drop {}", self.x); }
+}
 
 fn main() {
-    let b = Gc::new(RefCell::new(Node {data: 1, next: None}));
-    let a = Gc::new(RefCell::new(Node {data: 2, next: Some(b)}));
-    b.borrow_mut().next = Some(a);
+  let gc1 = Gc::new(S{data: 1});
+  let mut gc2 = Gc::new(S{data: 2});
+  gc2 = gc1;
+  force_gc();
+  println!("{} {}", gc1, gc2);
 }
 \end{lstlisting}
 \end{figure}
@@ -118,27 +135,6 @@ fn main() {
 \section{Running example}
 
 \jake{This section will probably want deleting, but it serves as a place for me to build up a running example and show the various extensions of it for later on in the paper.}
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example of GC in Rust. \laurie{we need a good example here,
-    ideally one that we can build upon later in the paper}},
-  label={fig:first_example}]
-struct Node<T> {
-    data: T
-}
-
-fn main() {
-    let gc1 = Gc::new("hello world!");
-    {
-        let gc2 = Gc::new(Node { data: 123 });
-    }
-
-    force_gc();   // `gc2` may be collected!
-    foo(gc1);     // move `gc1` into `foo`.
-    println!(gc1) // still  usable from `main` -- was copied!
-}
-\end{lstlisting}
 
 \begin{lstlisting}[
   language=Rust,
