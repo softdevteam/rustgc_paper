@@ -654,8 +654,7 @@ performed over the drop methods of each value used in a \lstinline{Gc}.
 \subsubsection{Preventing dangling references}
 
 For a \lstinline{Gc<T>} with a finaliser to be sound, it cannot be used with an
-object which contains ordinary Rust references. To guarantee this, \ourgc imposes a
-restriction called the \emph{\bor}. This rule states that that a type
+object which contains ordinary Rust references. To guarantee this, FSA imposes a new static rule on Rust programs which states that that a type
 \lstinline{T} cannot be placed in a \lstinline{Gc} if both of the
 following definitions are true:
 
@@ -665,7 +664,7 @@ following definitions are true:
 \end{definition}
 \begin{definition}
 
-    \lstinline{T} has a finaliser. In other words, \lstinline{T} (or
+    \lstinline{T} is finalisable. In other words, \lstinline{T} (or
       any component type of \lstinline{T}) has a drop method.
 \end{definition}
 
@@ -767,20 +766,8 @@ error for those programs which violate it.
 
 \subsubsection{Ensuring thread-safety}
 
-\ourgc's \lstinline{Gc} reference is fundamentally thread-safe: if \lstinline{T}
-implements \lstinline{Send} + \lstinline{Sync}, then \lstinline{Gc<T>} will too.
-The \lstinline{Gc<T>} type therefore conditionally implements \lstinline{Send} +
-\lstinline{Sync} depending on \lstinline{T}:
-
-\begin{lstrustsmall}
-unsafe impl<T: Send> Send for Gc<T> {}
-unsafe impl<T: Sync> Sync for Gc<T> {}
-\end{lstrustsmall}
-
-to do anything manually. The Rust compiler is then extended to perform FSA. The
-basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
-drop method needs to be checked to ensure it doesn't access a field which is
-not \lstinline{FinalizerSafe}. Performing this check only when such types are
+The basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
+drop method needs to be checked to ensure it only accesses fields which are safe to be used inside a finaliser. Performing this check only when such types are
 used in \lstinline{Gc} is important as it prevents FSA from breaking existing
 Rust programs: drop methods with unsound finalisation behaviour are not a
 problem if they are never used in a \lstinline{Gc}.
