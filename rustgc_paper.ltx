@@ -102,32 +102,43 @@ obvious to them.
 \begin{figure}
 \begin{lstlisting}[
   language=Rust,
-  caption={An example of Alloy in use, showing use of the \lstinline{Gc<T>}
-  type, and the use of destructors as finalisers. We create a type
-  \lstinline{S<T>} which is a simple wrapper around data of any type (line 1)
-  and a normal Rust destructor which Alloy will also use as a finaliser when
-  \lstinline{S<T>} is used inside a \lstinline{Gc<T>} (lines 3--5). We then
-  create two GC values (lines 8 and 9), assigning the the second GC value to
-  the first (line 10): note that, unlike similar Rust types, normal assignment is sufficient
-  to copy the GC wrapper. For the sake of this example, we force a GC
-  which will detect that the \lstinline{S\{data: 2\}} value is unreachable, and
-  schedule its finaliser to run (line 11). The print statement will print
-  \lstinline{S\{data: 1\}} twice (line 12). Note that, unlike normal
-  destructors, finalisers are run at a non-deterministic point: \lstinline{drop
-  2} might be printed before or after the values in line 12.},
-  label={fig:first_example}]
-struct S<T> {x: T}
+  caption={An Alloy example, showing use of the \lstinline{Gc<T>}
+  type and destructors as finalisers. We create a type
+  \lstinline{Node<T>} which models a simple graph: it stores an 8 bit integer
+  value and a reference (possibly null, via Rust's standard \lstinline{Option}
+  type) to the next node in the graph (line 1). We add a normal Rust destructor
+  which Alloy is able to use as a finaliser when \lstinline{Node} is used inside
+  a \lstinline{Gc<T>} (lines 3--5). Inside \lstinline{main} we create the first
+  GCed node in the graph, using Rust's normal \lstinline{RefCell} type to allow
+  the node to be mutated later (line 8). We then mutate (using
+  \lstinline{RefCell}'s \lstinline{borrow\_mut} method to detect unsafe
+  mutation at runtime) the node to point to itself (line 9): i.e.~we have
+  created a cycle using \lstinline{Gc<T>}, something that is not possible
+  in normal safe Rust. We
+  then create a second GCed node (line 10), immediately assigning it to the
+  variable that held the first GCed node (line 11). Note that, unlike similar
+  Rust types, \lstinline{Gc<T>} is copyable, so assigning it in this way does
+  not `move' the value: both the \lstinline{gc1} and \lstinline{gc2} variables
+  now point to the same underlying node. Doing so means that the
+  \lstinline{Node\{value: 1, ..\}} node is no longer reachable, so when we
+  force a collection the node will be recognised as such and its finaliser
+  scheduled to be run (line 12). The print statement will print \lstinline{2
+  2} line 13). Note that, unlike normal destructors, finalisers are run at a
+  non-deterministic point: \lstinline{drop 1} might be printed before or after
+  the values in line 12.}, label={fig:first_example}]
+struct Node {value: u8, next: Option<Gc<Node<T>>>}
 
-impl<T> Drop for S<T> {
-  fn drop(&mut self) { println!("drop {}", self.x); }
+impl<T> Drop for Node {
+  fn drop(&mut self) { println!("drop {}", self.value); }
 }
 
 fn main() {
-  let gc1 = Gc::new(S{data: 1});
-  let mut gc2 = Gc::new(S{data: 2});
-  gc2 = gc1;
+  let mut gc1 = Gc::new(RefCell::new(Node{value: 1, None}));
+  gc1.borrow_mut().next = Some(gc1);
+  let gc2 = Gc::new(RefCell::new(Node{value: 2, None}));
+  gc1 = gc2;
   force_gc();
-  println!("{} {}", gc1, gc2);
+  println!("{} {}", gc1.borrow().value, gc2.borrow().value);
 }
 \end{lstlisting}
 \end{figure}
