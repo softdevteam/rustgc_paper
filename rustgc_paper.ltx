@@ -251,7 +251,7 @@ and implementation approach -- the rest of the paper then goes into detail on th
 advanced aspects.
 
 
-\subsection{Basic Design Choices}
+\subsection{Basic Design and Implementation Choices}
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
 reference counting type \lstinline{Rc<T>} from Rust's standard library, because
@@ -269,27 +269,20 @@ standard Rust types that enable \emph{interior mutability} (e.g.~\lstinline{Mute
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
-back (\lstinline{from_raw}). These functions have a number of uses, ranging
-from pointer tagging to passing values to foreign code. However, these features have
-a profound impact because Rust allows
-raw pointers to be converted to the integer type \lstinline{usize} and
-back\footnote{Although it is outside the scope of this paper, it would arguably
+back (\lstinline{from_raw}). Though many programmers do not directly
+encounter these functions, they are widely used in enabling code,
+as they are a crucial link between Rust's high and low-level features. A
+common use is to pass raw pointers to C functions and later reconstitute the
+\lstinline{Rc<T>} (e.g.~through a callback to Rust); less common uses include
+pointer tagging. We believe that a viable GC for Rust must include this same
+ability, but it has a profound impact on \ourgc
+because Rust allows raw pointers to be converted to
+the integer type \lstinline{usize} and back\footnote{Although it is outside the
+scope of this paper, it would arguably
 be preferable for Rust to have different integer types for `data width' and
 `address'. Modern C, for example, does this with the \lstinline{size_t} and
-\lstinline{uintptr_t} types respectively.} In other words, if \ourgc wants to
-allow GCed values to be converted
-into pointers and back again, it must be able to track
-pointers to GC values that are stored in Rust \lstinline{usize} values.
-
-\jake{I'm not sure we give enough of a convincing motivation as to why these conversion
-to raw pointer APIs are needed. Is it for symmetry with Rc? Is it to enable GC to be used for
-pointer tagging in VMs etc. These are valid reasons, but we could equally say we won't support
-them and then is it still true that conservative GC is required.}
-\laurie{good question. we do say ``These functions have a number of uses, ranging
-from pointer tagging to passing values to foreign code.`` but perhaps (a)
-that's not verbose enough (b) there are other reasons too. fwiw, those two
-reasons are the major ones I can think of. i wonder if we can find a reference
-to a conservative GC paper that explains why conservative GC is necessary?}
+\lstinline{uintptr_t} types respectively.}. This means that \ourgc must be
+able to track pointers to GC values that are stored in Rust \lstinline{usize} values.
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
