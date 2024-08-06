@@ -421,11 +421,6 @@ challenges.
 
 \subsection{Challenges}
 
-\laurie{(1) some safe destructors are not safe finalisers;
-(2) finalisers can be run too early;
-and (3) finalisers are prohibitively slower than destructors. These are
-classical GC problems, but all are exacerbated in some way by Rust.}
-
 At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
 being run just before a value's backing memory is freed.
 However, there is an important difference between the two: while Rust defines precisely
@@ -433,20 +428,14 @@ when a destructor will be run, GC finalisers are
 only run at some unspecified point in time after the last
 reference to a GCed value is dropped.
 
-If we assume the existence in Rust of a `fully' GCed type \lstinline{Gc<T>}
-this immediately raises an important question: when are \lstinline{Gc<T>}
-finalisers run? When the reference count in an \lstinline{Rc<T>} goes to 0, \lstinline{T}'s
-drop method is called immediately. But when the last reference to an \lstinline{Gc<T>}
-is lost, \lstinline{T}'s drop method may not be called for some time.
-
-A more subtle issue is: where are finalisers run? Running
+A more subtle difference is: where are finalisers run? Running
 finalisers on the same thread as mutator code can cause deadlocks if a finaliser
 tries to access a resource that the mutator has locked
 (see~\cref{finaliser_thread} for more details). However, not all Rust destructors
 are safe to run on another thread.
 
-None of these issues are unique to GC in Rust: indeed, the wider challenges that
-finalisers cause are now well known (see~\cite{boehm03destructors} for an
+Indeed, the more that one looks into GC finalisation, the more challenges
+one finds (see~\cite{boehm03destructors} for an
 overview of these issues). For example, what should we do with finalisers
 in values that form a cycle? In such a situation, a finaliser can reference
 values that are partly, or wholly, `finalised'. Other issues include the
