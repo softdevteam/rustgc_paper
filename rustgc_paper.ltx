@@ -58,7 +58,7 @@ external libraries from being used with \lstinline{Gc<T>} entirely (see
 of poor ergonomics in those GCs for Rust which take this approach.
 
 In this paper we solve this ergonomic problem by allowing Rust's standard
-destructors to be automatically used as finalisers automatically. However,
+destructors to be used as finalisers. However,
 naively mapping destructors to finalisers introduces three fundamental
 problems:
 (1) some safe destructors are not safe finalisers;
