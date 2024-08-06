@@ -44,7 +44,7 @@ which provides solutions for each of these issues.
   scheduled to be run (line 12). The print statement will print \lstinline{2
   2} line 13). Note that, unlike normal destructors, finalisers are run at a
   non-deterministic point: \lstinline{drop 1} might be printed before or after
-  the values in line 12.}, label={fig:first_example}]
+  the values in line 12. \jake{This is true because of early finalisation, but I imagine saying it could be dropped before line 12 will be initially confusing for most readers and they'll assume it's a mistake}}, label={fig:first_example}]
 struct Node {value: u8, next: Option<Gc<Node<T>>>}
 
 impl<T> Drop for Node {
@@ -329,40 +329,20 @@ than duplicating an \lstinline{Rc<T>}.
 
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, the value's drop
-method is called. For example, eliding details such as weak counts,
-\lstinline{Rc<T>} has the following drop method:
-
-\laurie{in retrospect, using Rc is going to confuse readers here. can we find
-another type which has a useful, understandable drop method? preferably one
-that doesn't called `free'} \jake{The only good non-freeing example I can think of in the standard library is Mutex/MutexGuard. Perhaps even Box would be an appropriate starting point. Why do you want one that doesn't call `free'?}\laurie{i more meant ``preferably an example that isn't a one-liner `free'''}
-
-\jake{Thinking about this, I don't think it's a good idea to use MutexGuard instead of Rc.
-We would never want that to be used as a finaliser because it would never be guaranteed to
-be unlocked. There are no other standard library types that I'm aware of which would better
-illustrate the issue than Rc IMO.}
-\laurie{good point. it might be that we should define a custom destructor/finaliser in our running example and use that.}
+method is called. For example,
+\lstinline{Node}, from our previous example, has the following drop method:
 
 \begin{lstlisting}[language=Rust,numbers=left]
-impl<T> Drop for Rc<T> {
-  fn drop(&must self) {
-    self.inner.count -= 1;
-    if self.inner.count == 0 {
-      unsafe { Box::from_raw(self.inner.block);
-    }
-  }
+impl<T> Drop for Node {
+  fn drop(&mut self) { println!("drop {}", self.value); }
 }
+
 \end{lstlisting}
 
-\noindent \lstinline{Rc<T>} implements Rust's standard \lstinline{Drop} trait
-which then requires implementing a \lstinline{drop} method. \lstinline{Rc<T>}
-contains a (nested) reference count and a pointer to
-a block of memory on the heap allocated with Rust's standard \lstinline{Box<T>}
-type (which allocates heap memory). \lstinline{Rc<T>}'s drop method
-first decrements the reference count. If that count
-goes to zero then the underlying \lstinline{Box<T>} is reconstituted from its raw pointer
-(with \lstinline{from_raw}), and immediately goes out of scope, implicitly
-calling \lstinline{Box<T>}'s drop method. This then recursively calls \lstinline{T}'s
-drop method and frees its backing memory.
+\noindent \lstinline{Node} implements Rust's standard \lstinline{Drop} trait
+which then requires implementing a \lstinline{drop} method.
+
+\jake{Todo: Should we extend this to Node<T> to show that Drop works recursively?}
 
 Rust defines when destructors are called so that programmers can statically
 reason about when a value's destructor will be called\footnote{There are some exceptions: for
