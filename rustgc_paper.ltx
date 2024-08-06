@@ -144,44 +144,6 @@ meagre grasp: we encourage readers to skip ahead if they reach points that seem
 obvious to them.
 
 
-\section{Running example}
-
-\jake{This section will probably want deleting, but it serves as a place for me to build up a running example and show the various extensions of it for later on in the paper.}
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example of finalisation in Rust.},
-  label={fig:second_example}]
-impl<T> Drop for Node<T> {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.data);
-    }
-}
-
-fn main() {
-    ...
-    {
-        let gc3 = Gc::new(Node { data: 2 });
-    }
-
-    force_gc();   // `gc3` collected!
-                  // finaliser runs
-
-}
-\end{lstlisting}
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={Interior mutability example \laurie{is this showing a problem? i think it's showing `something that words as expected'?}},
-  label={fig:fifth_example}]
-struct Node<T> {
-    data: Mutex<T>,
-}
-
-let gc1 = Gc::new(Node { data: Mutex::new(1) });
-*gc1.lock().unwrap() = 2;
-\end{lstlisting}
-
 \section{Background}
 \label{sec:background}
 
