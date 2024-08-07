@@ -18,43 +18,28 @@ performance, and ergonomic issues. \ourgc provides solutions for each of these i
 \section{Introduction}
 
 \begin{figure}[t]
-\begin{lstlisting}[
-  language=Rust,
-  caption={An \ourgc example, showing use of the \lstinline{Gc<T>}
-  type and destructors as finalisers. We create a type
-  \lstinline{Node} which models a graph: it stores an 8 bit integer
-  value and a reference (possibly null, via Rust's standard \lstinline{Option}
-  type) to a neighbouring node (line 1). We add a normal Rust destructor
-  which \ourgc is able to use as a finaliser when \lstinline{Node} is used inside
-  \lstinline{Gc<T>} (line 2). Inside \lstinline{main} we create the first
-  GCed node in the graph (line 6). We use Rust's normal \lstinline{RefCell} type to allow
-  the node to be mutated (using
-  the \lstinline{RefCell::borrow\_mut} method to detect unsafe
-  mutation at runtime) and pointed to itself (line 7): i.e.~we create
-  a cycle using \lstinline{Gc<T>}. Cycles such as this cannot be created in the base
-  Rust language without \lstinline{unsafe} code. One can create cycles with
-  standard library types such as the reference counting
-  \lstinline{Rc<T>}, though these require careful, laborious programming
-  to avoid memory leaks (see~\cref{fig:rc_example}). We
-  then create a second cyclic graph (lines 8 and 9), immediately assigning it to the
-  \lstinline{gc1} variable (line 9). Doing so means that the first cyclic graph
-  \lstinline{Node\{value: 1, ..\}} is no longer reachable, so when we
-  force a collection (line 10) that node will be recognised as collectable and its finaliser
-  scheduled to be run. The print statement outputs \lstinline{2
-  2} (line 11).}, label={fig:first_example}]
-struct Node { value: u8, nbr: Option<Gc<RefCell<Node>>> }
-impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
-
-fn main() {
-  let mut gc1 = Gc::new(RefCell::new(Node{value: 1, None}));
-  gc1.borrow_mut().nbr = Some(gc1);
-  let gc2 = Gc::new(RefCell::new(Node{value: 2, None}));
-  gc2.borrow_mut().nbr = Some(gc2);
-  gc1 = gc2;
-  force_gc();
-  println!("{} {}", gc1.borrow().value, gc1.borrow().nbr.unwrap().borrow().value);
-}
-\end{lstlisting}
+\lstinputlisting[language=Rust, firstline=6]{listings/first_example.rs}
+\captionof{lstlisting}{An \ourgc example, showing use of the \lstinline{Gc<T>}
+  type and destructors as finalisers. We create a type \lstinline{Node} which
+  models a graph: it stores an 8 bit integer value and a reference (possibly
+  null, via Rust's standard \lstinline{Option} type) to a neighbouring node
+  (line 1). We add a normal Rust destructor which \ourgc is able to use as a
+  finaliser when \lstinline{Node} is used inside \lstinline{Gc<T>} (line 2).
+  Inside \lstinline{main} we create the first GCed node in the graph (line 6).
+  We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
+  (using the \lstinline{RefCell::borrow\_mut} method to detect unsafe mutation
+  at runtime) and pointed to itself (line 7): i.e.~we create a cycle using
+  \lstinline{Gc<T>}. Cycles such as this cannot be created in the base Rust
+  language without \lstinline{unsafe} code. One can create cycles with standard
+  library types such as the reference counting \lstinline{Rc<T>}, though these
+  require careful, laborious programming to avoid memory leaks
+  (see~\cref{fig:rc_example}). We then create a second cyclic graph (lines 8
+  and 9), immediately assigning it to the \lstinline{gc1} variable (line 9).
+  Doing so means that the first cyclic graph \lstinline{Node\{value: 1, ..\}}
+  is no longer reachable, so when we force a collection (line 10) that node
+  will be recognised as collectable and its finaliser scheduled to be run. The
+  print statement outputs \lstinline{2 2} (line 11).}
+\label{fig:first_example}
 \end{figure}
 
 Amongst the ways one can classify programming languages are whether they
@@ -151,19 +136,7 @@ comfortable with.
 \subsection{Does Rust need a GC?}
 
 \begin{figure}[t]
-\begin{lstlisting}[language=Rust]
-struct Node { value: u8, nbr: Option<Weak<RefCell<Node>>> }
-impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
-
-fn main() {
-  let mut rc1 = Rc::new(RefCell::new(Node{value: 1, nbr: None}));
-  rc1.borrow_mut().nbr = Some(Rc::downgrade(&rc1));
-  let rc2 = Rc::new(RefCell::new(Node{value: 2, nbr: None}));
-  rc2.borrow_mut().nbr = Some(Rc::downgrade(&rc2));
-  rc1 = Rc::clone(&rc2);
-  println!("{} {}", rc1.borrow().value, rc1.borrow().nbr.as_ref().unwrap().upgrade().unwrap().borrow().value);
-}
-\end{lstlisting}
+\lstinputlisting[language=Rust, firstline=5]{listings/rc_example.rs}
 \captionof{lstlisting}{
   A version of~\cref{fig:first_example} using Rust's standard reference
   counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
