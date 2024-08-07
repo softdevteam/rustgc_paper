@@ -21,12 +21,12 @@ which provides solutions for each of these issues.
 \begin{figure}[t]
 \begin{lstlisting}[
   language=Rust,
-  caption={An Alloy example, showing use of the \lstinline{Gc<T>}
+  caption={An \ourgc example, showing use of the \lstinline{Gc<T>}
   type and destructors as finalisers. We create a type
   \lstinline{Node<T>} which models a simple graph: it stores an 8 bit integer
   value and a reference (possibly null, via Rust's standard \lstinline{Option}
   type) to the next node in the graph (line 1). We add a normal Rust destructor
-  which Alloy is able to use as a finaliser when \lstinline{Node} is used inside
+  which \ourgc is able to use as a finaliser when \lstinline{Node} is used inside
   a \lstinline{Gc<T>} (lines 3--5). Inside \lstinline{main} we create the first
   GCed node in the graph, using Rust's normal \lstinline{RefCell} type to allow
   the node to be mutated later (line 8). We then mutate (using
@@ -134,7 +134,7 @@ techniques in this paper, particularly those related to finalisation, will gener
 ownership-based languages.
 
 This paper's high-level structure is: background (\cref{sec:background});
-Alloy's design (\cref{sec:alloy_design}); destructor and finaliser challenges
+\ourgc's design (\cref{sec:alloy_design}); destructor and finaliser challenges
 and solutions (\cref{sec:destructor challenges}); and evaluation
 (\laurie{XYZ}). The first three of these parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
