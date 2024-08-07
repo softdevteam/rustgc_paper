@@ -71,7 +71,7 @@ make mistakes more likely, and often come with a performance penalty.
 To solve this, there are now a number of GCs for Rust~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which: takes a value
 of type \lstinline{T} and moves it to the GC heap; and returns a wrapper around
-a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
+a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated)\jake{are we deliberately avoiding saying copied here?} and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack, etc.),
@@ -79,19 +79,25 @@ then the value on the GC heap can be reclaimed.
 
 It has proven hard to find a satisfying design and implementation for a GC for
 Rust, as perhaps suggested by the number of different attempts to do so.
-Although there are many minor issues, we identify two fundamental
-challenges for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
+Although there are many minor issues, we identify two fundamental challenges
+for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
 API; and how to make finalisation (i.e.~the code that is run just before a
 value is collected by the GC) safe, performant, and ergonomic. As we shall see,
-the API challenge is relatively easily addressed, but the finalisation
-challenge is more difficult.
+the API challenge is relatively easily addressed,\jake{something about this
+sentence makes me feel uneasy. There is lots of literature and work out there
+about how difficult it is to do GC API design, but they are always working with
+the implicit constraint that it needs to be done precisely. While I agree that
+conservative GC makes this task a lot easier, I feel like this sentence makes
+us seem enlightened in a way that no other person touching Rust GC is, whereas actually, it's
+just that our constraints are different.} but the finalisation challenge is more
+difficult.
 
 The most common solution to finalisation in GCs for Rust is to introduce a
 \lstinline{Finalize} \emph{trait} (roughly equivalent to a Java interface)
 that can be manually implemented for a type \lstinline{T} used in
 in \lstinline{Gc<T>}~\cite{manish15rustgc}. This not only forces the programmer to duplicate
 existing \emph{destructors} (i.e.~code which is run just before a value is
-freed by Rust's implicit memory management) but prevents prevents types in
+freed by Rust's implicit memory management) but prevents types in
 external libraries from being used with \lstinline{Gc<T>} entirely (see
 \cref{sec:why we use destructors as finalisers}). These are a cause
 of poor ergonomics in those GCs for Rust which take this approach.
@@ -187,7 +193,7 @@ read-write reference (`\lstinline{&mut}'); and references cannot outlast the own
 
 These basic rules mean that many Rust programs are as succinct as their equivalents
 in GCed languages. However, data structures that require values to have more
-than one owner -- or have otherwise `unusual' ownership requirements -- cannot
+than one owner -- or have otherwise `unusual' ownership requirements \jake{I can't think of any beside multiple owners?} -- cannot
 be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
 statically checked by the compiler). Instead, one must resort to (possibly
 indirect) \emph{unsafe} (i.e.~not fully statically checked by the compiler)
@@ -240,6 +246,9 @@ name to refer to the GCed value when it is unambiguous to do so, even though
 that variable is only of potentially many pointers to where the \lstinline{T}
 value resides on the GC heap.
 
+\jake{Should we clarify what is \ourgc? i.e. is \ourgc the modified Rust lang +
+collector, is it just the collector? I consider it the former}
+
 
 \section{\ourgc: Design and Implementation}
 \label{sec:alloy_design}
@@ -274,19 +283,19 @@ as they are a crucial link between Rust's high and low-level features. A
 common use is to pass raw pointers to C functions and later reconstitute the
 \lstinline{Rc<T>} (e.g.~through a callback to Rust); less common uses include
 pointer tagging. We believe that a viable GC for Rust must include this same
-ability, but it has a profound impact because Rust allows raw pointers to be converted to
+ability, but it has a profound impact because \jake{Safe?} Rust allows raw pointers to be converted to
 the integer type \lstinline{usize} and back\footnote{Although it is outside the
 scope of this paper, it would arguably
 be preferable for Rust to have different integer types for `data width' and
 `address'. Modern C, for example, does this with the \lstinline{size_t} and
-\lstinline{uintptr_t} types respectively.}.
+\lstinline{uintptr_t} types respectively.}.\jake{There is a provenance lint now for this kind of conversion which may turn this into a hard error in the future. However, even if that wasn't allowed, pointers can still have their pointee type casted arbitrarily using \lstinline{as}, so you could still hide the fact it's a GC pointer in safe Rust.}
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a \emph{conservative} GC, which treats each
 reachable machine word as a possible pointer: if,
 when considered as a pointer, a word's address falls within a GCed block of memory,
-then that block itself is considered reachable. Since a conservative GC can't know if a word is a
+then that block itself is considered reachable. \jake{I think we need something about how this is transitive. i.e. we keep following chains of pointers until we see a GC block} Since a conservative GC can't know if a word is a
 pointer from the program's perspective, or just happens to be a sequence of
 bits that also happens to make it a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
