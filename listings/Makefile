@@ -15,6 +15,11 @@ clean:
 
 %.stderr: %.rs ${RUSTC} alloy
 	${RUSTC} $< 2> $@ || true
+	# This is a hack to ensure that any non FSA-related compiler error
+	# causes the build to fail. This works because rust errors are usually
+	# written in the form error[ERRNO] but FSA does not provide ERRNO
+	# values.
+	! grep -q -v 'error\[' $@
 	grep -q -i 'cannot be safely constructed\|finalized' $@
 
 ${RUSTC}: alloy
