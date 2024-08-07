@@ -95,12 +95,12 @@ in \lstinline{Gc<T>}~\cite{manish15rustgc}. This not only forces the programmer 
 existing \emph{destructors} (i.e.~code which is run just before a value is
 freed by Rust's implicit memory management) but prevents prevents types in
 external libraries from being used with \lstinline{Gc<T>} entirely (see
-\cref{sec:why we use destructors as finalisers}). Both problems are a cause
+\cref{sec:why we use destructors as finalisers}). These are a cause
 of poor ergonomics in those GCs for Rust which take this approach.
 
-We address this ergonomic problem by allowing most standard Rust
+We address this ergonomic issue by allowing most standard Rust
 destructors to be transparently used as finalisers. However,
-naively mapping destructors to finalisers introduces three fundamental
+naively mapping destructors to finalisers introduces three
 problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
