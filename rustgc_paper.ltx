@@ -26,27 +26,24 @@ performance, and ergonomic issues. \ourgc provides solutions for each of these i
   value and a reference (possibly null, via Rust's standard \lstinline{Option}
   type) to a neighbouring node (line 1). We add a normal Rust destructor
   which \ourgc is able to use as a finaliser when \lstinline{Node} is used inside
-  \lstinline{Gc<T>} (lines 3--5). Inside \lstinline{main} we create the first
-  GCed node in the graph (line 8). We use Rust's normal \lstinline{RefCell} type to allow
+  \lstinline{Gc<T>} (line 2). Inside \lstinline{main} we create the first
+  GCed node in the graph (line 6). We use Rust's normal \lstinline{RefCell} type to allow
   the node to be mutated (using
   the \lstinline{RefCell::borrow\_mut} method to detect unsafe
-  mutation at runtime) and pointed to itself (line 9): i.e.~we create
+  mutation at runtime) and pointed to itself (line 7): i.e.~we create
   a cycle using \lstinline{Gc<T>}. Cycles such as this cannot be created in the base
   Rust language without \lstinline{unsafe} code. One can create cycles with
   standard library types such as the reference counting
   \lstinline{Rc<T>}, though these require careful, laborious programming
   to avoid memory leaks (see~\cref{fig:rc_example}). We
-  then create a second cyclic graph (lines 10 and 11), immediately assigning it to the
-  \lstinline{gc1} variable (line 11). Doing so means that the first cyclic graph
+  then create a second cyclic graph (lines 8 and 9), immediately assigning it to the
+  \lstinline{gc1} variable (line 9). Doing so means that the first cyclic graph
   \lstinline{Node\{value: 1, ..\}} is no longer reachable, so when we
-  force a collection (line 12) that node will be recognised as collectable and its finaliser
+  force a collection (line 10) that node will be recognised as collectable and its finaliser
   scheduled to be run. The print statement outputs \lstinline{2
-  2} (line 13).}, label={fig:first_example}]
-struct Node {value: u8, nbr: Option<Gc<RefCell<Node>>>}
-
-impl Drop for Node {
-  fn drop(&mut self) { println!("drop {}", self.value); }
-}
+  2} (line 11).}, label={fig:first_example}]
+struct Node { value: u8, nbr: Option<Gc<RefCell<Node>>> }
+impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
 
 fn main() {
   let mut gc1 = Gc::new(RefCell::new(Node{value: 1, None}));
@@ -150,10 +147,7 @@ comfortable with.
 \begin{figure}[t]
 \begin{lstlisting}[language=Rust]
 struct Node { value: u8, nbr: Option<Weak<RefCell<Node>>> }
-
-impl Drop for Node {
-  fn drop(&mut self) { println!("drop {}", self.value); }
-}
+impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
 
 fn main() {
   let mut rc1 = Rc::new(RefCell::new(Node{value: 1, nbr: None}));
@@ -168,12 +162,12 @@ fn main() {
   A version of~\cref{fig:first_example} using Rust's standard reference
   counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
   references between nodes (line 1). We again create two cyclic graphs (lines
-  8--11) using \lstinline{Rc::downgrade} to create weak references (lines 9 and
-  11). Since \lstinline{Rc<T>} is not copyable, we must use a manual
+  6--9) using \lstinline{Rc::downgrade} to create weak references (lines 7 and
+  0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
   \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
-  variables point to the same cyclic graph (line 12). Accessing a neighbour
+  variables point to the same cyclic graph (line 10). Accessing a neighbour
   node becomes a delicate dance requiring upgrading the weak reference (line
-  13).
+  11).
 }
 \label{fig:rc_example}
 \end{figure}
