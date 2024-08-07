@@ -418,40 +418,17 @@ unreachable, when the reference would no longer be valid.
 a standard Rust reference inside a finaliser can cause a use-after-free.
 
 \begin{figure}[t]
-\centering
-\begin{minipage}{0.50\textwidth}
-\begin{lstlisting}[
-  language=Rust,
-  label={fig:dangling_reference}]
-impl<T> Drop for Node<T> {
-    fn drop(&mut self) {
-        println!("Dropping {}", self.data);
-    }
-}
-
-fn main() {
-    {
-        let b: Box<u64> = Box::new(123);
-        let gc1 = Gc::new(Node{data: &*b});
-    } // b is dropped and its memory deallocated
-
-    // causes `gc::drop` finaliser to run which
-    // holds a reference to `b`.
-    force_gc();
-}
-\end{lstlisting}
-\end{minipage}%
-\begin{minipage}{0.50\textwidth}
-\includegraphics[width=\textwidth]{images/invalid_reference_finaliser}
-\end{minipage}
+\lstinputlisting[language=Rust,firstline=9]{listings/dangling_reference.rs}
 \label{fig:dangling_reference}
-\caption{A \lstinline{u64} is placed on the heap using a \lstinline{Box}, and
-  an immutable reference to it is stored inside the \lstinline{Gc<Node>}.
-  Without finalisation, this is valid as long as \lstinline{gc1} does not
-  outlive \lstinline{b}. However, the use of the references from the
-  \lstinline{drop} method is unsound. This is because the collector is likely
-  to schedule the finaliser to run after the \lstinline{Box<u64>} is freed when
-  \lstinline{b} goes out of scope. The dereference on line 3 would thus access a dangling reference causing a use-after-free.}
+\captionof{lstlisting}{A \lstinline{u64} is
+  placed on the heap using a \lstinline{Box}, and an immutable reference to it
+  is stored inside the \lstinline{Gc<Node>}. Without finalisation, this is
+  valid as long as \lstinline{gc1} does not outlive \lstinline{b}. However, the
+  use of the references from the \lstinline{drop} method is unsound. This is
+  because the collector is likely to schedule the finaliser to run after the
+  \lstinline{Box<u64>} is freed when \lstinline{b} goes out of scope. The
+  dereference on line 3 would thus access a dangling reference causing a
+  use-after-free.}
 \end{figure}
 
 \subsubsection{Thread-safety}
@@ -472,46 +449,22 @@ users from writing code which deadlocks, but it does not make the situation
 worse. However, if \ourgc were to perform on-thread finalisation, it would open
 the possibility of previously non-deadlocking code deadlocking.
 
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example showing how a potential deadlock can be caused if
-  finalisers are run on the mutator thread. A shared counter is created using a
-  reference counted container, a reference to this is then placed
-  inside a garbage collected container. This is potentially
-  short-lived, as it is only reachable by the \lstinline{gc} variable until the
-  end of the inner scope. If \ourgc decides to schedule a collection
-  after this then the \lstinline{Rc} could be
-  considered garbage, where a finaliser would run its drop method (line 10). If
-  this happens while the main mutator thread already holds
-  \lstinline{counter.lock()} (line 32-36) then this program can deadlock. When
-  finalisers are run on the same thread, there is nothing the programmer can do
-  in this situation to guarantee that this kind of deadlock does not occur.},
-  label={fig:finaliser_deadlock}]
-impl<T> Drop for Node<T> {
-    fn drop(&mut self) {
-        let d = self.data.lock().unwrap();
-        println!("Dropping {}", self.d);
-    } // d is dropped
-}
-...
-fn main() {
-    // Create a reference counted counter object protected by a mutex.
-    let counter = Rc::new(Mutex::new(0));
-
-    {
-        let gc1 = Gc::new(Node { data: Rc::clone(&counter) });
-    }
-
-    force_gc();
-
-    // If the finalizer for the `Gc<Node>` is asynchronously called
-    // while `counter.lock()` below is already acquired, a deadlock will occur.
-    let r1 = counter.lock().unwrap();
-    ...
-
-    assert_eq!(*r1, 0);
-}
-\end{lstlisting}
+\begin{figure}[t]
+\lstinputlisting[language=Rust, firstline=10]{listings/finaliser_deadlock.rs}
+\captionof{lstlisting}{An example showing how a potential deadlock can be
+  caused if finalisers are run on the mutator thread. A shared counter is
+  created using a reference counted container, a reference to this is then
+  placed inside a garbage collected container. This is potentially short-lived,
+  as it is only reachable by the \lstinline{gc} variable until the end of the
+  inner scope. If \ourgc decides to schedule a collection after this then the
+  \lstinline{Rc} could be considered garbage, where a finaliser would run its
+  drop method (line 10). If this happens while the main mutator thread already
+  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
+  When finalisers are run on the same thread, there is nothing the programmer
+  can do in this situation to guarantee that this kind of deadlock does not
+  occur.}
+\label{fig:finaliser_deadlock}
+\end{figure}
 
 Unfortunately, finalising objects off-thread now means that shared data, or other
 objects accessed from a finaliser must be done in a thread-safe way. The problem
