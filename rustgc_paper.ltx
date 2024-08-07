@@ -56,7 +56,7 @@ make mistakes more likely, and often come with a performance penalty.
 To solve this, there are now a number of GCs for Rust~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}. Typically these
 introduce a user-visible type \lstinline{Gc<T>} which: takes a value
 of type \lstinline{T} and moves it to the GC heap; and returns a wrapper around
-a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated)\jake{are we deliberately avoiding saying copied here?}\laurie{yes: most GCs' Gc<T> type isn't copyable} and
+a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated)
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack, etc.),
