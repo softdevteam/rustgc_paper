@@ -241,7 +241,7 @@ that variable is only of potentially many pointers to where the \lstinline{T}
 value resides on the GC heap.
 
 
-\section{\ourgc: Design Choices}
+\section{\ourgc: Design and Implementation}
 \label{sec:alloy_design}
 
 In this section we outline \ourgc's basic design choices
@@ -249,7 +249,7 @@ and implementation approach -- the rest of the paper then goes into detail on th
 advanced aspects.
 
 
-\subsection{Basic Design and Implementation Choices}
+\subsection{Basic Design}
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
 reference counting type \lstinline{Rc<T>} from Rust's standard library, because
@@ -263,7 +263,8 @@ moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
 simple wrapper around a pointer to \lstinline{v}'s new address. Dereferencing
 a \lstinline{Gc<T>} produces an immutable Rust reference to the underlying
 value: there is no way to directly mutate GCed values and users must use other
-standard Rust types that enable \emph{interior mutability} (e.g.~\lstinline{Mutex<T>}).
+standard Rust types that enable \emph{interior mutability}
+(e.g.~\lstinline{RefCell<T>} or \lstinline{Mutex<T>}).
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
@@ -273,19 +274,17 @@ as they are a crucial link between Rust's high and low-level features. A
 common use is to pass raw pointers to C functions and later reconstitute the
 \lstinline{Rc<T>} (e.g.~through a callback to Rust); less common uses include
 pointer tagging. We believe that a viable GC for Rust must include this same
-ability, but it has a profound impact on \ourgc
-because Rust allows raw pointers to be converted to
+ability, but it has a profound impact because Rust allows raw pointers to be converted to
 the integer type \lstinline{usize} and back\footnote{Although it is outside the
 scope of this paper, it would arguably
 be preferable for Rust to have different integer types for `data width' and
 `address'. Modern C, for example, does this with the \lstinline{size_t} and
-\lstinline{uintptr_t} types respectively.}. This means that \ourgc must be
-able to track pointers to GC values that are stored in Rust \lstinline{usize} values.
+\lstinline{uintptr_t} types respectively.}.
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
-inevitable that \ourgc must be a \emph{conservative} GC. In essence, such GCs,
-starting from the roots, treat each reachable machine word as a possible pointer: if,
+inevitable that \ourgc must be a \emph{conservative} GC, which treats each
+reachable machine word as a possible pointer: if,
 when considered as a pointer, a word's address falls within a GCed block of memory,
 then that block itself is considered reachable. Since a conservative GC can't know if a word is a
 pointer from the program's perspective, or just happens to be a sequence of
@@ -296,8 +295,8 @@ programs is under 0.01\% of live objects~\cite{shahriyar14fast}.
 
 Conservative GC occupies a grey zone in programming language semantics. In
 most languages (including the semantics of most compiler IRs) conservative GC
-relies on undefined behaviour. \ourgc's use of conservative GC means \ourgc
-is thus, formally speaking, unsound. However, conservative GC is widely used,
+relies on undefined behaviour. \ourgc's use of conservative GC means that it
+is, formally speaking, unsound. However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink rendering
 engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM -- JavaScriptCore~\citep{pizlo17riptide}.
 Even in 2024, we lack good alternatives: there is no cross-platform API for precise GC; and while some
@@ -315,11 +314,30 @@ is not just cloneable but also \emph{copyable}: duplication only requires copyin
 bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
 reducing the need for a function call entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
-also cloneable.}. Across large code bases, this seemingly minor syntactic
-convenience can be a real boon because copying frees the programmer from Rust's normal
-restrictions on ownership and moving. It also reflects an underlying
+also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
 than duplicating an \lstinline{Rc<T>}.
+
+
+\subsection{Basic Implementation}
+
+\laurie{rustc fork, BDWGC, GcBox, etc.}
+
+Currently, \ourgc uses the well-known
+Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
+challenges we tackle in this paper will remain the same no matter what
+underlying conservative GC is used.
+
+
+\section{Destructors and Finalisers}
+\label{sec:destructor challenges}
+
+In this section, we first provide a more detailed motivation for why \ourgc
+needs to use destructors as finalisers when possible. We then outline the
+differences between destructors and finalisers, outlining the general
+challenges that finalisers introduce. In subsequent sections (\laurie{reference
+them}), we show the specific challenges that using destructors as finalisers
+raise in Rust, and \ourgc's solutions for those challenges.
 
 
 \subsection{Why \ourgc Allows Destructors to be Used as Finalisers}
@@ -327,23 +345,12 @@ than duplicating an \lstinline{Rc<T>}.
 
 Rust uses destructors pervasively in the form of \emph{drop methods}.
 When the owner of a value goes out of scope, the value's drop
-method is called. For example,
-\lstinline{Node}, from our previous example, has the following drop method:
+method is called. Simplifying a number of details irrelevant to this paper,
+many drop methods are created automatically by Rust, though users often need to
+manually override or augment these.
 
-\begin{lstlisting}[language=Rust,numbers=left]
-impl<T> Drop for Node {
-  fn drop(&mut self) { println!("drop {}", self.value); }
-}
-
-\end{lstlisting}
-
-\noindent \lstinline{Node} implements Rust's standard \lstinline{Drop} trait
-which then requires implementing a \lstinline{drop} method.
-
-\jake{Todo: Should we extend this to Node<T> to show that Drop works recursively?}
-
-Rust defines when destructors are called so that programmers can statically
-reason about when a value's destructor will be called\footnote{There are some exceptions: for
+Rust defines syntactically when destructors are called, allowing relatively
+simple reasoning about a program's behaviour\footnote{There are some exceptions: for
 example Rust's `temporary lifetime extension' can delay destruction, but how
 long temporary values are kept alive for is currently unspecified.}. This leads
 to a style of programming that originated in C++ called RAII (Resource
@@ -370,74 +377,50 @@ defined in external libraries. In other words, it is impossible to provide a
 finaliser for a type \lstinline{T} from a library unless that library has
 existing, specific, support for the particular Rust GC one is using.
 
-Because destructors are used pervasively in Rust, we believe that a viable GC
-for Rust has no choice but to make use of Rust's existing support for
-destructors. \ourgc thus allows most drop methods to be automatically used as
-finalisers. Doing so naively, however, introduces a number of challenges
-which we will go into in more detail in \cref{sec:destructor challenges}.
+We believe that being forced to manually implement finalisers and not being
+able to use library types in GC makes resulting GCs for Rust of very limited
+use. Instead, we believe that a widely usable GC for Rust must make use of Rust's existing support for
+destructors.
 
 
-\subsection{Implementation Approach}
-
-\laurie{rustc fork, BDWGC, GcBox, etc.}
-
-Currently, \ourgc uses the well-known
-Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
-challenges we tackle in this paper will remain the same no matter what
-underlying conservative GC is used.
-
-
-\section{Destructors as Finalisers: Challenges and Solutions}
-\label{sec:destructor challenges}
-
-In \cref{sec:why we use destructors as finalisers} we explained why \ourgc uses
-Rust's existing destructors as finalisers. As we briefly hinted there, though,
-this introduces a number of challenges. In this section we first give an
-overview of these challenges before explaining \ourgc's solutions to these
-challenges.
-
-
-\subsection{Challenges}
+\subsection{Differences Between Destructors and Finalisers}
 
 At first glance, destructors can appear identical to GC finalisers: both concepts lead to user code
-being run just before a value's backing memory is freed.
-However, there is an important difference between the two: while Rust defines precisely
-when a destructor will be run, GC finalisers are
-only run at some unspecified point in time after the last
-reference to a GCed value is dropped.
+being run just before a value's backing memory is reclaimed. However, there
+are a number of gradually less obvious differences between the two that raise
+challenges that affect GCs in all languages (see \cite{boehm03destructors} for an
+overview of these challenges). In this subsection we look at these differences
+and general challenges in the context of GC for Rust.
 
-A more subtle difference is: where are finalisers run? Running
+The most obvious difference from our perspective is that while Rust defines
+precisely when a destructor will be run, GC finalisers cannot be run at a
+predictable point. Instead, finalisers run at an unspecified point in time
+after the last reference to a GCed value is removed.
+
+A less obvious difference is: where are finalisers run? Running
 finalisers on the same thread as mutator code can cause deadlocks if a finaliser
 tries to access a resource that the mutator has locked
-(see~\cref{finaliser_thread} for more details). However, not all Rust destructors
+(see~\cref{finaliser_thread} for more details). Such problems can be
+avoided by running finalisers on a non-mutator thread: however, not all Rust destructors
 are safe to run on another thread.
 
-Indeed, the more that one looks into GC finalisation, the more challenges
-one finds (see~\cite{boehm03destructors} for an
-overview of these issues). For example, what should we do with finalisers
-in values that form a cycle? In such a situation, a finaliser can reference
-values that are partly, or wholly, `finalised'. Other issues include the
-ability of finalisers to `resurrect' values by
-copying the reference passed to the finaliser somewhere where the rest of
-the program can now see it.
+Perhaps surprisingly, given that one of GC's selling points is its ability to
+deal with cycles, is that finalisation and cycles are problematic. The fundamental
+challenge is that a finaliser can reference
+values that are partly, or wholly, `finalised', something that will
+almost certainly cause undefined behaviour in Rust. A related, but
+distinct, challenge is the ability of finalisers to `resurrect' values by
+copying the reference passed to the finaliser and storing it somewhere
 
 Over time finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers, in favour of mechanisms such as per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}.
+However, because of Rust's pervasive use of destructors, it seems unlikely
+that something similar would be considered viable in a GC for Rust.
 
-\laurie{jake: we need to quickly survey existing rust gcs. i think they either
-don't allow finalisers or require users to write their own i.e.~duplicating
-drop methods. but maybe there are exceptions!}
 
-One of the fundamental assumptions underlying our work is that a usable GC \jake{What we mean by usable here is that it can interact bidirectionally with non-GCd memory. If our goal was to create regions of GC'd memory that are untouchable from other parts of Rust then I think one could argue that finalisation is not as important.}\laurie{is that true? i don't think our ability to span the ``two heaps'' is very relevant here: even with a single heap we'd need to think about things like on- or off-thread AFAICS?} for
-Rust has no choice but to make use of finalisers and, in particular, to map
-Rust's destructors to finalisers whenever possible. Without doing so, users are either forced
-to write finalisers in addition to destructors for each type they place into a
-\lstinline{Gc<T>}.
-
-The rest of this section will look in more detail at how specific examples of
-these issues can be a challenge for a GC in Rust.
+\section{Something or other}
 
 \subsection{Challenge (1): Sound finalisation}
 
