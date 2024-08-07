@@ -36,15 +36,15 @@ performance, and ergonomic issues. \ourgc provides solutions for each of these i
   standard library types such as the reference counting
   \lstinline{Rc<T>}, though these require careful, laborious programming
   to avoid memory leaks (see~\cref{fig:rc_example}). We
-  then create a second GCed node (line 10), immediately assigning it to the
-  \lstinline{gc1} variable (line 11). Doing so means that
+  then create a second cyclic graph (lines 10 and 11), immediately assigning it to the
+  \lstinline{gc1} variable (line 11). Doing so means that the first cyclic graph
   \lstinline{Node\{value: 1, ..\}} is no longer reachable, so when we
   force a collection (line 12) that node will be recognised as collectable and its finaliser
   scheduled to be run. The print statement outputs \lstinline{2
   2} (line 13).}, label={fig:first_example}]
-struct Node {value: u8, nbr: Option<Gc<Node>>}
+struct Node {value: u8, nbr: Option<Gc<RefCell<Node>>>}
 
-impl<T> Drop for Node {
+impl Drop for Node {
   fn drop(&mut self) { println!("drop {}", self.value); }
 }
 
@@ -52,9 +52,10 @@ fn main() {
   let mut gc1 = Gc::new(RefCell::new(Node{value: 1, None}));
   gc1.borrow_mut().nbr = Some(gc1);
   let gc2 = Gc::new(RefCell::new(Node{value: 2, None}));
+  gc2.borrow_mut().nbr = Some(gc2);
   gc1 = gc2;
   force_gc();
-  println!("{} {}", gc1.borrow().value, gc2.borrow().value);
+  println!("{} {}", gc1.borrow().value, gc1.borrow().nbr.unwrap().borrow().value);
 }
 \end{lstlisting}
 \end{figure}
@@ -146,6 +147,37 @@ comfortable with.
 
 \subsection{Does Rust need a GC?}
 
+\begin{figure}[t]
+\begin{lstlisting}[language=Rust]
+struct Node { value: u8, nbr: Option<Weak<RefCell<Node>>> }
+
+impl Drop for Node {
+  fn drop(&mut self) { println!("drop {}", self.value); }
+}
+
+fn main() {
+  let mut rc1 = Rc::new(RefCell::new(Node{value: 1, nbr: None}));
+  rc1.borrow_mut().nbr = Some(Rc::downgrade(&rc1));
+  let rc2 = Rc::new(RefCell::new(Node{value: 2, nbr: None}));
+  rc2.borrow_mut().nbr = Some(Rc::downgrade(&rc2));
+  rc1 = Rc::clone(&rc2);
+  println!("{} {}", rc1.borrow().value, rc1.borrow().nbr.as_ref().unwrap().upgrade().unwrap().borrow().value);
+}
+\end{lstlisting}
+\captionof{lstlisting}{
+  A version of~\cref{fig:first_example} using Rust's standard reference
+  counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
+  references between nodes (line 1). We again create two cyclic graphs (lines
+  8--11) using \lstinline{Rc::downgrade} to create weak references (lines 9 and
+  11). Since \lstinline{Rc<T>} is not copyable, we must use a manual
+  \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
+  variables point to the same cyclic graph (line 12). Accessing a neighbour
+  node becomes a delicate dance requiring upgrading the weak reference (line
+  13).
+}
+\label{fig:rc_example}
+\end{figure}
+
 In this section we briefly show why some data structures that are easy to
 write in GCed languages are challenging in Rust. This provides the core
 motivation for GC in Rust.
@@ -163,8 +195,9 @@ These basic rules mean that many Rust programs are as succinct as their equivale
 in GCed languages. However, data structures that require values to have more
 than one owner -- or have otherwise `unusual' ownership requirements -- cannot
 be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
-statically checked by the compiler). Instead, one must resort to indirect
-and/or \emph{unsafe} (i.e.~not fully statically checked by the compiler) workarounds.
+statically checked by the compiler). Instead, one must resort to (possibly
+indirect) \emph{unsafe} (i.e.~not fully statically checked by the compiler)
+workarounds.
 
 Perhaps the most widely used workaround is the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
@@ -179,42 +212,6 @@ there is a single owner for the entire data-structure at any point in the
 program. However, this prevents use cases where multiple owners (possibly,
 though not necessarily, in different threads) need to read or mutate different
 parts of a data-structure.
-
-\laurie{jake: can we find a minimal example here? linked lists are an obvious
-one, but they're too complicated i think: we can at least reference
-\lstinline{https://rust-unofficial.github.io/too-many-lists/} as proof of that.
-maybe the bronze GC paper has some good examples. otherwise, maybe we just
-introduce a type `S' which can reference other `S`s and show the problems with
-rc and rc/refcell?}
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example of Rc. \jake{This is probably too complex, but it highlights the boilerplate needed to do the strong / weak count dance for cycles.}},
-  label={fig:rc_example}]
-struct Node {
-    name: String,
-    strong_next: Option<Rc<RefCell<Node>>>,
-    weak_next: Option<Weak<RefCell<Node>>>,
-}
-
-fn main() {
-    let a = Rc::new(RefCell::new(Node {
-        name: String::from("a"),
-        strong_next: None,
-        weak_next: None,
-    }));
-
-    let b = Rc::new(RefCell::new(Node {
-        name: String::from("b"),
-        strong_next: None,
-        weak_next: None,
-    }));
-
-    a.borrow_mut().strong_next.insert(Rc::clone(&b));
-    b.borrow_mut()
-        .weak_next
-        .insert(Rc::downgrade(&Rc::clone(&a)));
-}
-\end{lstlisting}
 
 
 \subsection{GC terminology}
