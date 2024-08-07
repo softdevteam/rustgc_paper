@@ -196,11 +196,16 @@ workarounds.
 Perhaps the most widely used workaround is the reference counting type
 \lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
 data-structures, reference counting is a reasonable solution, but using it for
-cyclic data-structures requires juggling strong and weak counts, which makes
-it easy for values to live for shorter or longer than intended. Another solution are
-arenas which can gradually accumulate multiple values but free all of them in one go: values
-can no longer be reclaimed too early, but nor can they be freed early if they are
-no longer needed. A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+cyclic data-structures requires juggling strong and weak counts. This complicates
+the program (see~\cref{fig:rc_example}) and makes
+it easy for values to live for shorter or longer than intended.
+
+A similar solution are
+arenas which gradually accumulate multiple values but free all of them in one go: values
+can no longer be reclaimed too early, but equally individual values can not be
+reclaimed until all values are determined to be unneeded.
+
+A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
 which allow cyclic data-structures to be built by statically guaranteeing that
 there is a single owner for the entire data-structure at any point in the
 program. However, this prevents use cases where multiple owners (possibly,
@@ -214,8 +219,8 @@ GC is a venerable field and has accumulated terminology that can seem
 unfamiliar or unintuitive. We mostly use the same terminology
 as~\cite{jones16garbage}, the major parts of which we define here.
 
-A program which uses GC is split into \emph{mutator} (the user's program) and
-\emph{collector} (the GC itself) code. At any given point, a thread is either
+A program which uses GC is split between the \emph{mutator} (the user's program) and
+the \emph{collector} (the GC itself). At any given point, a thread is either
 running as a mutator or a collector, though some threads may be given over
 entirely to the collector. A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
@@ -229,6 +234,11 @@ this paper collections are \emph{stop-the-world}, where all mutator threads
 are paused while collection occurs. We refer to memory which is solely under
 the control of the GC as the \emph{GC heap}, though this may in practise be
 intermingled with non-GCed memory.
+
+When we assign a \lstinline{Gc<T>} value to a variable, we use that variable's
+name to refer to the GCed value when it is unambiguous to do so, even though
+that variable is only of potentially many pointers to where the \lstinline{T}
+value resides on the GC heap.
 
 
 \section{\ourgc: Design Choices}
