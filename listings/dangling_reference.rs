@@ -3,8 +3,8 @@ use std::gc::Gc;
 use std::cell::RefCell;
 fn force_gc() { std::gc::GcAllocator::force_gc() }
 
-struct Node { value: &u8, nbr: Option<Gc<RefCell<Node>>> }
-impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
+struct Node<'a> { value: &'a u8, nbr: Option<Gc<RefCell<Node<'a>>>> }
+impl<'a> Drop for Node<'a> { fn drop(&mut self) { println!("drop {}", self.value); } }
 
 fn main() {
     {
