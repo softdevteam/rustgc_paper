@@ -25,20 +25,22 @@ performance, and ergonomic issues. \ourgc provides solutions for each of these i
   null, via Rust's standard \lstinline{Option} type) to a neighbouring node
   (line 1). We add a normal Rust destructor which \ourgc is able to use as a
   finaliser when \lstinline{Node} is used inside \lstinline{Gc<T>} (line 2).
-  Inside \lstinline{main} we create the first GCed node in the graph (line 6).
+  Inside \lstinline{main} we create the first GCed node in the graph (line 5).
   We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
-  (using the \lstinline{RefCell::borrow\_mut} method to detect unsafe mutation
-  at runtime) and pointed to itself (line 7): i.e.~we create a cycle using
+  (using the \lstinline{RefCell::borrow\_mut} method to dynamically detect mutation that
+  would undermine Rust's static borrow checker rules)
+  and pointed to itself (line 6): i.e.~we create a cycle using
   \lstinline{Gc<T>}. Cycles such as this cannot be created in the base Rust
   language without \lstinline{unsafe} code. One can create cycles with standard
   library types such as the reference counting \lstinline{Rc<T>}, though these
   require careful, laborious programming to avoid memory leaks
-  (see~\cref{fig:rc_example}). We then create a second cyclic graph (lines 8
-  and 9), immediately assigning it to the \lstinline{gc1} variable (line 9).
+  (see~\cref{fig:rc_example}). We then create a second cyclic graph (lines 7
+  and 8), immediately assigning it to the \lstinline{gc1} variable (line 9).
   Doing so means that the first cyclic graph \lstinline{Node\{value: 1, ..\}}
   is no longer reachable, so when we force a collection (line 10) that node
-  will be recognised as collectable and its finaliser scheduled to be run. The
-  print statement outputs \lstinline{2 2} (line 11).}
+  will be recognised as collectable; its finaliser is scheduled to be run (causing
+  \lstinline{drop 1} to be printed out at a later point), and when done so the backing
+  memory can be reclaimed. The print statement outputs \lstinline{2 2} (line 11).}
 \label{fig:first_example}
 \end{figure}
 
@@ -139,8 +141,11 @@ comfortable with.
   0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
   \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
   variables point to the same cyclic graph (line 10). Accessing a neighbour
-  node becomes a delicate dance requiring upgrading the weak reference (line
-  11).
+  node becomes a delicate dance requiring upgrading the weak reference (line 11).
+  The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
+  (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
+  creates significant extra complexity relative to~\cref{fig:first_example}: compare
+  line 11 in both Listings.
 }
 \label{fig:rc_example}
 \end{figure}
