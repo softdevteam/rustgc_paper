@@ -479,7 +479,26 @@ unreachable, when the reference would no longer be valid.
 a standard Rust reference inside a finaliser can cause a use-after-free.
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust,firstline=9]{listings/dangling_reference.rs}
+\centering
+\begin{minipage}{0.50\textwidth}
+\lstinputlisting[language=Rust,firstline=9,lastline=18]{listings/dangling_reference.rs}
+\subcaption{}
+\end{minipage}%
+\begin{minipage}{0.50\textwidth}
+\begin{lstlisting}[language=Rust, numbers=none]
+error: `Node{value: &*b, nbr: None}` cannot be safely
+       constructed.
+ |  let gc1 = Gc::new(Node{value: &*b, nbr: None});
+ |            --------^^^^^^^^^^^^^^^^^^^^^^^^^^^-
+ |            |       |
+ |            |       contains a reference (&) which
+ |            |       may no longer be valid when it
+ |            |       is finalized.
+ |            `Gc::new` requires that a type is
+ |            reference free.
+\end{lstlisting}
+\subcaption{}
+\end{minipage}
 \label{fig:dangling_reference}
 \captionof{lstlisting}{A \lstinline{u64} is
   placed on the heap using a \lstinline{Box}, and an immutable reference to it
@@ -550,34 +569,38 @@ structures will be finalised `outside-in'.
 \begin{figure}[t]
 \centering
 \begin{minipage}{0.50\textwidth}
-\begin{lstlisting}[language=Rust]
-struct Node<T> {
-    ...
-    next: Option<Gc<Mutex<Node>>>,
-}
-
-fn main() {
-    let n1 = Gc::new(Mutex::new(Node {
-        data: 1,
-        next: None,
-    }));
-
-    let n2 = Gc::new(Mutex::new(Node {
-        data: 2,
-        next: None,
-    }));
-
-    n1.lock().unwrap().next.insert(b);
-}
-\end{lstlisting}
+\lstinputlisting[language=Rust,firstline=5]{listings/finalisation_cycle.rs}
+\subcaption{}
 \end{minipage}%
 \begin{minipage}{0.50\textwidth}
-\includegraphics[width=\textwidth]{images/finaliser_cycle_unsound}
+\begin{lstlisting}[language=Rust, numbers=none]
+error: `n1` cannot be safely finalized.
+   |
+4  | let nbr = self.nbr.unwrap();
+   |           --------
+   |           |
+   |           caused by the expression in `fn drop(&mut)`
+   |           here because it uses a type which is not
+   |           safe to use in a finalizer.
+...
+11 | let gc1 = Gc::new(n1);
+   |                   ^^ has a drop method which cannot
+   |                      be safely finalized.
+   |
+   = help: `Gc` runs finalizers on a separate thread,
+           so drop methods must only use values whose
+           types implement `Send + Sync + FinalizerSafe`.
+\end{lstlisting}
+\subcaption{}
 \end{minipage}
-\caption{An example of unsoundness with cyclic finalisation.}
-\label{fig:dangling_reference}
+\label{fig:finalisation_cycle}
+\captionof{lstlisting}{An example of finaliser safety analysis preventing an
+  unsound Rust program. \textbf{(b)} showing the compile-time error message
+  shown when attempting to compile the example in \textbf{(a)}. FSA identifies
+  that another \lstinline{Gc} is being dereferenced inside a finaliser. This is
+  unsound when \ourgc does not use ordered finalisation as it may have already
+  been collected.}
 \end{figure}
-
 
 \subsection{Design Context}
 
@@ -746,95 +769,50 @@ error for those programs which violate it.
 \subsubsection{Ensuring thread-safety}
 
 The basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
-drop method needs to be checked to ensure it only accesses fields which are safe to be used inside a finaliser. Performing this check only when such types are
-used in \lstinline{Gc} is important as it prevents FSA from breaking existing
-Rust programs: drop methods with unsound finalisation behaviour are not a
-problem if they are never used in a \lstinline{Gc}.
+drop method needs to be checked to ensure it only accesses fields which are
+safe to be used inside a finaliser. Performing this check only when such types
+are used in \lstinline{Gc} is important as it prevents FSA from breaking
+existing Rust programs: drop methods with unsound finalisation behaviour are
+not a problem if they are never used in a \lstinline{Gc}.
 
 \begin{figure}[t]
-% Hack to get the listing in the figure
-\newsavebox{\fsaalisting}
-\begin{lrbox}{\fsaalisting}
-\begin{lstrustsmall}
-use std::rc::Rc;
-use std::gc::Gc;
-
-fn main() {
-    let rc1 = Rc::new(123);
-    let rc2 = Rc::clone(&rc1);
-    let gc1 = Gc::new(rc2);
-}
-\end{lstrustsmall}
-\end{lrbox}
-
-\newsavebox{\fsablisting}
-\begin{lrbox}{\fsablisting}
-\begin{lstrustsmallnonums}
-error: `rc2` cannot be safely finalized.
-    --> src/main.rs:9:22
-     |
-9    |     let gc = Gc::new(rc2);
-     |                      ^^^ has a drop method
-     |                          which cannot be
-     |                          safely finalized.
-     |
-    ::: /rust/library/alloc/src/rc.rs:1559:13
-     |
-1559 |             self.inner().dec_strong();
-     |             ------------
-     |             |
-     |             caused by the expression in
-     |             `fn drop(&mut)` here because
-     |             it uses a type which is not
-     |             safe to use in a finalizer.
-     |
-     = help: `Gc` runs finalizers on a separate
-     | thread, so drop methods must only use values
-     | whose types implement `FinalizerSafe`.
-
-\end{lstrustsmallnonums}
-\end{lrbox}
-    \centering
-    \subfloat{\usebox{\fsaalisting}}
-    % \hfill
-    \subfloat{\usebox{\fsablisting}}
-    \caption{A \lstinline{Gc} object stores a reference counted integer
-(\lstinline{Rc<u64>}). The drop method of an \lstinline{Rc} decrements the
-underlying object's reference count, which is called as a finaliser before
-collecting the \lstinline{Gc<Rc<u64>>} object. This is not thread-safe because
-decrementing a reference count in \lstinline{Rc} is non-atomic, and the
-finaliser will be run on a separate thread, which would race if the finaliser
-ran while the mutator also updated the count. FSA detects this, and prevent the program from compiling, with the error message
-in \textbf{(b)} displaying the exact line of code that FSA rejected. In this
-example, as is often the case in practise, the offending line is not \emph{in}
-the finaliser but is \emph{called} by the finaliser.
-}
-\label{fig:fsa_example}
+\centering
+\begin{minipage}{0.50\textwidth}
+\lstinputlisting[language=Rust,firstline=9,lastline=18]{listings/thread_unsafety.rs}
+\subcaption{}
+\end{minipage}%
+\begin{minipage}{0.50\textwidth}
+\begin{lstlisting}[language=Rust, numbers=none]
+error: `n1` cannot be safely finalized.
+    |
+11  | let gc1 = Gc::new(n1);
+    |                   ^^ has a drop method which cannot
+    |                      be safely finalized.
+    |
+   ::: ../rc.rs:368:18
+    |
+368 |         unsafe { self.ptr.as_ref() }
+    |                  --------
+    |                  |
+    |                  caused by the expression in `fn drop(&mut)` here because
+    |                  it uses a type which is not safe to use in a finalizer.
+    |
+    = help: `Gc` runs finalizers on a separate thread, so drop methods
+            must only use values whose types implement `Send + Sync + FinalizerSafe`.
+\end{lstlisting}
+\subcaption{}
+\end{minipage}
+\label{fig:dangling_reference}
+\captionof{lstlisting}{A \lstinline{u64} is
+  placed on the heap using a \lstinline{Box}, and an immutable reference to it
+  is stored inside the \lstinline{Gc<Node>}. Without finalisation, this is
+  valid as long as \lstinline{gc1} does not outlive \lstinline{b}. However, the
+  use of the references from the \lstinline{drop} method is unsound. This is
+  because the collector is likely to schedule the finaliser to run after the
+  \lstinline{Box<u64>} is freed when \lstinline{b} goes out of scope. The
+  dereference on line 3 would thus access a dangling reference causing a
+  use-after-free.}
 \end{figure}
-
-FSA permits a \lstinline{Gc} to contain values with non-thread-safe fields
-provided they are not used in the drop method. Consider the following example:
-
-\begin{lstrustsmall}
-struct Wrapper(RefCell<String>);
-
-impl Drop for Wrapper {
-    fn drop(&mut self) {
-        println!("Dropping Wrapper");
-    }
-}
-
-impl Wrapper {
-    fn swap_string(&self) {
-        *self.0.borrow_mut() = String::from("b");
-    }
-}
-
-fn main() {
-    let gc = Gc::new(Wrapper(RefCell::new(String::from("a"))));
-    gc.swap_string();
-}
-\end{lstrustsmall}
 
 The \lstinline{Wrapper} uses a \lstinline{RefCell} to swap the value of
 underlying string (line 11). A \lstinline{RefCell} provides a form of interior
