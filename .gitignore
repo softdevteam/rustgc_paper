@@ -9,5 +9,5 @@ rustgc_paper_preamble.fmt
 rustgc_paper_preamble.log
 images/*.pdf
 listings/*.out
-listings/*.sterr
+listings/*.stderr
 listings/alloy
