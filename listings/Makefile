@@ -19,7 +19,7 @@ clean:
 	# causes the build to fail. This works because rust errors are usually
 	# written in the form error[ERRNO] but FSA does not provide ERRNO
 	# values.
-	! grep -q -v 'error\[' $@
+	! grep -q 'error\[' $@
 	grep -q -i 'cannot be safely constructed\|finalized' $@
 
 ${RUSTC}: alloy
