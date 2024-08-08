@@ -444,7 +444,25 @@ Fortunately for us, Rust's unusual static guarantees, suitably expanded by
 following sections, we tackle each of these challenges in detail.
 
 
-\section{Challenge (1): Sound finalisation}
+\section{Finaliser Safety Analysis}
+
+In this section we address the challenge that some safe destructors are not
+safe finalisers through the novel technique of \emph{finaliser safety
+analysis}. We extend Rust's static analyses -- including altering
+the relevant parts \rustc -- to reject a type \lstinline{T}'s destructor if it
+is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}. In
+essence, we identify the various causes of finaliser misbehaviour -- some of
+which are problems faced by any GC, some of which are more specific to \ourgc's
+design choices -- and show how Rust can be extended to identify and reject
+each.
+
+To the best of our knowledge, no other language has an
+equivalent of finaliser safety analysis: indeed, it relies on some of Rust's
+less common static guarantees. In this section we outline the basic problem,
+the solution, and the implementation in \ourgc.
+
+
+\subsection{General Problems}
 
 \subsubsection{Rust references}
 
@@ -474,46 +492,6 @@ a standard Rust reference inside a finaliser can cause a use-after-free.
   use-after-free.}
 \end{figure}
 
-\subsubsection{Thread-safety}
-
-It is common in many languages for finalisers to access fields from other
-objects or even global state. Since an object's finaliser is run at some unknown
-point in time once it is considered unreachable by the collector, it must be
-able to safely access such state without racing with the mutator.
-
-One possible solution might seem to be to prohibit finalisers from acquiring
-locks, however this can still cause race-like bugs because of how finalisers can
-interleave asynchronously with the mutator~\citep{niko13destructors}.
-
-In addition, \ourgc schedules all finalisers to run on a separate thread to the
-mutator. As with any GC, \ourgc can finalise objects at its leisure, with no
-way for the programmer to know when this will happen. Rust does not prevent
-users from writing code which deadlocks, but it does not make the situation
-worse. However, if \ourgc were to perform on-thread finalisation, it would open
-the possibility of previously non-deadlocking code deadlocking.
-
-\begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=10]{listings/finaliser_deadlock.rs}
-\captionof{lstlisting}{An example showing how a potential deadlock can be
-  caused if finalisers are run on the mutator thread. A shared counter is
-  created using a reference counted container, a reference to this is then
-  placed inside a garbage collected container. This is potentially short-lived,
-  as it is only reachable by the \lstinline{gc} variable until the end of the
-  inner scope. If \ourgc decides to schedule a collection after this then the
-  \lstinline{Rc} could be considered garbage, where a finaliser would run its
-  drop method (line 10). If this happens while the main mutator thread already
-  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
-  When finalisers are run on the same thread, there is nothing the programmer
-  can do in this situation to guarantee that this kind of deadlock does not
-  occur.}
-\label{fig:finaliser_deadlock}
-\end{figure}
-
-Unfortunately, finalising objects off-thread now means that shared data, or other
-objects accessed from a finaliser must be done in a thread-safe way. The problem
-with this is that in \ourgc, a finaliser calls a type's existing drop methods.
-Since \lstinline{Drop} was not originally defined in expectation of being
-called on a separate thread, it does not guarantee thread safety.
 
 \subsubsection{Finalisation order}
 
@@ -600,7 +578,52 @@ fn main() {
 \label{fig:dangling_reference}
 \end{figure}
 
-\subsection{Solution (1): Finaliser Safety Analysis}
+
+\subsection{Design Context}
+
+\subsubsection{Thread-safety}
+
+It is common in many languages for finalisers to access fields from other
+objects or even global state. Since an object's finaliser is run at some unknown
+point in time once it is considered unreachable by the collector, it must be
+able to safely access such state without racing with the mutator.
+
+One possible solution might seem to be to prohibit finalisers from acquiring
+locks, however this can still cause race-like bugs because of how finalisers can
+interleave asynchronously with the mutator~\citep{niko13destructors}.
+
+In addition, \ourgc schedules all finalisers to run on a separate thread to the
+mutator. As with any GC, \ourgc can finalise objects at its leisure, with no
+way for the programmer to know when this will happen. Rust does not prevent
+users from writing code which deadlocks, but it does not make the situation
+worse. However, if \ourgc were to perform on-thread finalisation, it would open
+the possibility of previously non-deadlocking code deadlocking.
+
+\begin{figure}[t]
+\lstinputlisting[language=Rust, firstline=10]{listings/finaliser_deadlock.rs}
+\captionof{lstlisting}{An example showing how a potential deadlock can be
+  caused if finalisers are run on the mutator thread. A shared counter is
+  created using a reference counted container, a reference to this is then
+  placed inside a garbage collected container. This is potentially short-lived,
+  as it is only reachable by the \lstinline{gc} variable until the end of the
+  inner scope. If \ourgc decides to schedule a collection after this then the
+  \lstinline{Rc} could be considered garbage, where a finaliser would run its
+  drop method (line 10). If this happens while the main mutator thread already
+  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
+  When finalisers are run on the same thread, there is nothing the programmer
+  can do in this situation to guarantee that this kind of deadlock does not
+  occur.}
+\label{fig:finaliser_deadlock}
+\end{figure}
+
+Unfortunately, finalising objects off-thread now means that shared data, or other
+objects accessed from a finaliser must be done in a thread-safe way. The problem
+with this is that in \ourgc, a finaliser calls a type's existing drop methods.
+Since \lstinline{Drop} was not originally defined in expectation of being
+called on a separate thread, it does not guarantee thread safety.
+
+
+\subsection{The Analysis}
 \label{sec:fsa}
 
 Extends Rust's type system to reject programs whose destructors are not
@@ -983,7 +1006,7 @@ unsound field accesses will be caught in a single FSA pass.
 
 
 
-\subsection{Challenge (2): Finalisers may run earlier than expected}
+\section{Early Finaliszer Prevention}
 
 Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
 are called by a garbage collector non-deterministically. They can run at the
@@ -1182,7 +1205,8 @@ After this pass, we call the Rust compiler's existing \emph{simplify mir} pass,
 which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
 
-\subsection{Challenge (3): Too many finalisers}
+
+\section{Finaliser Elision}
 
 For performance reasons, many GC'd languages discourage programmers from using finalisers.
 In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
