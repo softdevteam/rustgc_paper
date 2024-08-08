@@ -89,9 +89,9 @@ naively mapping destructors to finalisers introduces three
 problems:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
-and (3) finalisers are prohibitively slower than destructors. Problem (1) is
-unique to our situation; (2) and (3) are classical GC problems though
-exacerbated in some way by Rust (and shared by many other GCs for Rust).
+and (3) finalisers are prohibitively slower than destructors. All are,
+at least to some degree, classical GC problems; all are exacerbated
+in some way by Rust.
 
 We introduce novel solutions for each problem:
 (1) \emph{finaliser safety analysis}
@@ -379,12 +379,15 @@ being run just before a value's backing memory is reclaimed. However, there
 are a number of gradually less obvious differences between the two that raise
 challenges that affect GCs in all languages (see \cite{boehm03destructors} for an
 overview of these challenges). In this subsection we look at these differences
-and general challenges in the context of GC for Rust.
+in the context of GCs in general (i.e.~not just for Rust).
 
 The most obvious difference from our perspective is that while Rust defines
 precisely when a destructor will be run, GC finalisers cannot be run at a
 predictable point. Instead, finalisers run at an unspecified point in time
-after the last reference to a GCed value is removed.
+after the last reference to a GCed value is removed. However, in some situations
+finalisers can be run too early: valid optimisations (e.g~scalar replacement)
+can cause a value to appear to be unused, and thus ready for finalisation,
+even though some of its constituent parts are still being used.
 
 A less obvious difference is: where are finalisers run? Running
 finalisers on the same thread as mutator code can cause deadlocks if a finaliser
@@ -401,19 +404,41 @@ challenge is that a finaliser can reference
 values that are partly, or wholly, `finalised', something that will
 almost certainly cause undefined behaviour in Rust. A related, but
 distinct, challenge is the ability of finalisers to `resurrect' values by
-copying the reference passed to the finaliser and storing it somewhere
+copying the reference passed to the finaliser and storing it somewhere.
+
+\laurie{do we have a reference of the performance costs of finalisers?}
+
+
+\subsection{The Challenge of Finalisers for \ourgc}
+
+At this point we hope to have convinced the reader of two general points: a
+viable GC for Rust needs to be able to use existing destructors as finalisers
+whenever possible; and that finalisers, even in existing GCs, impose
+various difficulties.
 
 Over time finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
-finalisers, in favour of mechanisms such as per-object `cleaners', whose API
-prevents problems such as object resurrection~\cite{goetz21deprecated}.
-However, because of Rust's pervasive use of destructors, it seems unlikely
-that something similar would be considered viable in a GC for Rust.
+finalisers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
+prevents problems such as object resurrection~\cite{goetz21deprecated}. It
+is important to differentiate such mechanisms from the \lstinline{Finalize} trait that many existing GCs for
+Rust force users to manually implement: cleaners impose restrictions
+to make finalisers less problematic; existing \lstinline{Finalize} traits
+do not impose any such restrictions.
+
+Our aim for \ourgc may thus seem out of reach: \ourgc must be able to use
+existing Rust destructors as finalisers whenever possible but do so in a way
+that minimises the problems that finalisers introduce. We break the challenges
+\ourgc faces into three categories:
+(1) some safe destructors are not safe finalisers;
+(2) finalisers can be run too early;
+and (3) finalisers are prohibitively slower than destructors.
+
+Fortunately for us, Rust's unusual static guarantees, suitably expanded by
+\rustgc, allow us to address each challenge in a satisfying way. In the
+following sections, we tackle each of these challenges in detail.
 
 
-\section{Something or other}
-
-\subsection{Challenge (1): Sound finalisation}
+\section{Challenge (1): Sound finalisation}
 
 \subsubsection{Rust references}
 
