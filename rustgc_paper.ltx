@@ -218,7 +218,7 @@ name to refer to the GCed value when it is unambiguous to do so, even though
 that variable contains only one of potentially many pointers to where the \lstinline{T}
 value resides on the GC heap.
 
-We use \ourgc to refer to the combination of: our extension to the Rust
+We use ``\ourgc'' to refer to the combination of: our extension to the Rust
 language; our modifications to the \lstinline{rustc} compiler; and our
 integration of the Boehm-Demers-Weiser GC into the runtime of programs
 compiled with our modified \lstinline{rustc}.
@@ -278,7 +278,7 @@ most extensive study we know of suggests the false detection rate in Java
 programs is under 0.01\% of live objects~\cite{shahriyar14fast}.
 
 Conservative GC occupies a grey zone in programming language semantics. In
-most languages (including the semantics of most compiler IRs) conservative GC
+most languages -- including the semantics of most compiler Intermediate Representations (IRs) -- conservative GC
 relies on undefined behaviour. \ourgc's use of conservative GC means that it
 is, formally speaking, unsound. However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink rendering
@@ -289,23 +289,28 @@ incomplete and buggy. Practically speaking, despite the potential soundness
 worries, conservative GC remains a widely used technique.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
-most other GCs for Rust. \lstinline{Rc<T>} is a \emph{cloneable} type: it can be duplicated, but doing
-so requires executing arbitrary user code (in this case to increment / decrement
-reference counts). To make the possible run-time cost of this clear, Rust has
+most other GCs for Rust whose \lstinline{Gc<T>} is only \emph{cloneable}. Such types can be duplicated, but doing
+so requires executing arbitrary user code. To make the possible run-time cost of this clear, Rust has
 no direct syntax for cloning: users must explicitly call \lstinline{Rc::clone(&x)}
-to duplicate a value \lstinline{x}. In contrast, since \lstinline{Gc<T>} is just a wrapper around a pointer it
+to duplicate a value \lstinline{x}. In contrast, since \ourgc's \lstinline{Gc<T>} is just a wrapper around a pointer it
 is not just cloneable but also \emph{copyable}: duplication only requires copying
 bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
 reducing the need for a function call entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
 also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
-semantic difference: duplicating a \lstinline{Gc<T>} is a cheaper and simpler operation
-than duplicating an \lstinline{Rc<T>}.
+semantic difference: duplicating a \lstinline{Gc<T>} in \ourgc is is a cheaper and simpler operation
+than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 
 
 \subsection{Basic Implementation}
 
 \laurie{rustc fork, BDWGC, GcBox, etc.}
+
+The most visible aspect of \ourgc is its fork, and extension of, the standard
+Rust compiler \rustc. The current version of Alloy forks \rustc~\rustcversion,
+adding or changing approximately \laurie{how many?} Lines Of Code (LOC).
+
+\laurie{jake: please add some basic details about alloy's fork in here}
 
 Currently, \ourgc uses the well-known
 Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage}, although the major
@@ -384,7 +389,9 @@ after the last reference to a GCed value is removed.
 A less obvious difference is: where are finalisers run? Running
 finalisers on the same thread as mutator code can cause deadlocks if a finaliser
 tries to access a resource that the mutator has locked
-(see~\cref{finaliser_thread} for more details). Such problems can be
+(see~\cref{finaliser_thread} for more details): although such problems can
+affect destructors, they are more likely to affect finalisers since one cannot
+predict when a finaliser runs. Such problems can be
 avoided by running finalisers on a non-mutator thread: however, not all Rust destructors
 are safe to run on another thread.
 
