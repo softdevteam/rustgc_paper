@@ -55,45 +55,48 @@ data-structures that require multiple owners (e.g.~doubly linked lists).
 Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty.
 
-To solve this, there are now a number of GCs for Rust~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}. Typically these
+To solve this, there are now a number of GCs for Rust
+(e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
 introduce a user-visible type \lstinline{Gc<T>} which: takes a value
 of type \lstinline{T} and moves it to the GC heap; and returns a wrapper around
-a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated)
+a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} values can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack, etc.),
-then the value on the GC heap can be reclaimed.
+then the underlying memory can be reclaimed.
 
 It has proven hard to find a satisfying design and implementation for a GC for
 Rust, as perhaps suggested by the number of different attempts to do so.
-Although there are many minor issues, we identify two fundamental challenges
+We identify two major challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
-API; and how to make finalisation (i.e.~the code that is run just before a
-value is collected by the GC) safe, performant, and ergonomic. We show that
+API; and how to make \emph{finalisation} (i.e.~the code that is run just before a
+values collected by the GC) safe, performant, and ergonomic. We show that
 using conservative GC is necessary and sufficient to solve the API challenge,
 but the finalisation challenge is more difficult.
 
-The most common solution to finalisation in GCs for Rust is to introduce a
-\lstinline{Finalize} \emph{trait} (roughly equivalent to a Java interface)
-that can be manually implemented for a type \lstinline{T} used in
-in \lstinline{Gc<T>}~\cite{manish15rustgc}. This not only forces the programmer to duplicate
+If a type requires finalisation, existing GCs for Rust require programmers to
+provide a new method which does so. Not only do most finalisers end up duplicating
 existing \emph{destructors} (i.e.~code which is run just before a value is
-freed by Rust's implicit memory management) but prevents types in
-external libraries from being used with \lstinline{Gc<T>} entirely (see
-\cref{sec:why we use destructors as finalisers}). These are a cause
-of poor ergonomics in those GCs for Rust which take this approach.
+freed by Rust's implicit memory management) but this prevents programmers from
+providing finalisers for types in external libraries.
 
-We address this ergonomic issue by allowing most standard Rust
-destructors to be transparently used as finalisers. However,
-naively mapping destructors to finalisers introduces three
-problems:
+The `obvious' solution to this problem is to allow existing Rust destructors to
+be automatically used as finalisers. However, this introduces a number of
+problems. In the nearest context to our work, GC for C++, this solution was
+explicitly ruled out as the problems were thought
+insoluble~\cite[p.~32]{boehm09garbage}. We break these problems down into three
+categories:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run too early;
 and (3) finalisers are prohibitively slower than destructors. All are,
 at least to some degree, classical GC problems; all are exacerbated
-in some way by Rust.
+in some way by Rust; and none, with the partial exception of (2), has
+existing solutions.
 
-We introduce novel solutions for each problem:
+We introduce novel solutions, relying at least in part on Rust's unusual static
+guarantees, to each of these problems. We thus gain not just a better GC for
+Rust, but also solutions for open GC problems. In order, our solutions to each
+problem are:
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers;
@@ -101,10 +104,7 @@ provably safe to be used as finalisers;
 optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead;
 and (3) \emph{finaliser elision} statically optimises away finalisers if
-the destructor that is their basis simply frees heap memory. We are able to
-provide these solutions, at least in part, because of Rust's unusual static
-guarantees: in other words, we implicitly show that GC for Rust can solve
-open GC problems.
+the destructor that is their basis simply frees heap memory.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust.
 Although \ourgc is not production ready, it has good enough performance
