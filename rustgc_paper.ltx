@@ -309,9 +309,9 @@ than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. The current version of Alloy forks \rustc~\rustcversion,
-adding or changing approximately \laurie{how many?} Lines Of Code (LOC).
+adding or changing approximately 3150 Lines Of Code (LOC).
 
-\ourgc uses the conservative \boehm GC \citep{boehm88garbage} as its collector.
+\ourgc uses the conservative Boehm-Demers-Weiser GC (\boehm) \citep{boehm88garbage} as its collector.
 Although we use some uncommon parts of \boehm -- and, as we shall see, add some
 extensions of our own -- there is nothing conceptually unique about \boehm from
 \ourgc's perspective. We made some minor changes to \boehm and also the code
@@ -324,7 +324,9 @@ thread local storage implementation, which stores such pointers in the
 during each collection, this ELF segment is scanned for roots. Third, \ourgc is
 altered to explicitly register new threads with \boehm such that their call
 stacks are reliably scanned \laurie{is this because boehm's approach is to
-override C thread creation via macros?}.
+override C thread creation via macros?} \jake{It's because boehm is statically
+linked (because of non-interesting prohibitive bootstrapping / dynamic linkage
+reasons in rustc) and thus we can't use it to dynamically intercept pthread calls}.
 
 
 \section{Destructors and Finalisers}
