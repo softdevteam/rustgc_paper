@@ -350,32 +350,50 @@ analogous to Rust's standard \lstinline{Drop} trait. Users who want finalisation
 must manually implement the \lstinline{Finalise} trait for each type of interest.
 
 This approach has four problems: (1) most such finalisers largely or wholly
-duplicate the type's existing drop method; \laurie{jake: i'm not sure i've got
-this quite right. maybe this isn't even an issue for existing GCs; maybe Alloy
-doesn't generate the relevant drop code for finalisation; or ...?} \jake{(1)
-seems correct, but it's the accompanying comment that confuses me. could you
-rephrase it?} (2) Rust auto-generates some parts of a drop method, which may
-not be present in a manually written finaliser; \jake{it's more that the
-recursive calls to the drop methods of component types are automatically
-inserted by the compiler} (3) external libraries are unlikely to provide such
-finalisers; (3) Rust's \emph{orphan rule} \laurie{jake: is
+duplicate the type's existing drop method; (2) Rust auto-generates some parts
+of a drop method, and enforces other constraints, which may not be present or
+enforceable with manually written finalisers; (3) external libraries are
+unlikely to provide such
+finalisers; (4) Rust's \emph{orphan rule} \laurie{jake: is
 https://rust-lang.github.io/chalk/book/clauses/coherence.html the best
 reference for this?} prevents one implementing traits for types defined in
 external libraries (i.e.~unless a library's types were designed to support
-\lstinline{Gc<T>}, those types cannot be directly GCed). Our belief is that
-these problems are, collectively, a significant barrier to practical use of GC
-for Rust.
+\lstinline{Gc<T>}, those types cannot be directly GCed).
 
-\jake{These are all significant barriers to a practical use of a separate
-Finalise trait. However, there are counter arguments to each, and also there
-are workarounds to things like the orphan rule (e.g. newtype idiom) where I
-feel that a case could still be made for a separate trait. On balance, I feel
-like overloading the drop method is probably the best of a bad situation if
-retro-fitting GC to Rust is the desired approach. A new Rust+GC language would
-definitely be wise to separate these traits. However, I think it's worth
-mentioning that in spite of all this, the techniques such as FSA are
-orthogonal, and whichever decision we make we would still need things like FSA
-for soundness.}
+Programmers can work around each of these problems but with varying degrees of
+drudgery or fragility. For example, \emph{new types} (zero-cost wrappers
+around existing types that allow new behaviour to be added without adding
+run-time memory costs) can be manually implemented to work around problems (3)
+and (4). Doing so involves drudgery, but little conceptually
+difficulty.
+
+However, problem (2) cannot be fixed by drudgery or ingenuity, as it relies on
+parts of Rust and \rustc that users cannot replicate. The reasons for this are due to
+automated parts of destruction in Rust that programmers rarely need to think
+about.
+
+First, \rustc automatically adds \emph{drop glue} to \lstinline{struct}s and
+\lstinline{enum}s, which recursively calls all of the necessary destructors
+(e.g.~a \lstinline{struct}'s fields). As we saw in~\cref{fig:first_example},
+drop methods take a parameter of type \lstinline{&mut self} (i.e.~a mutable
+reference to \lstinline{self}), but dropping part of self would require a parameter
+of type \lstinline{self} (i.e.~a move of \lstinline{self}). It might seem
+surprising that a \lstinline{drop} method cannot actually drop any part of its
+\lstinline{self} value, until one realises that this simplifies drop glue,
+which can be added without any analysis of a type's \lstinline{drop} method:
+it is always safe for drop glue to drop every part of a value after a user's
+\lstinline{drop} method has been called.
+
+Second, although trait methods can normally be called directly by the
+programmer, \rustc explicitly raises an error if a programmer attempts to
+explicitly call \lstinline{Drop::drop}, in order to prevent values being
+dropped more than once. There is no user-level means of automatically
+replicating drop glue and its associated safety warning.
+
+In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
+maintain most if not all of those properties for finalisation; but some parts
+cannot be replicated in normal user code.
+
 
 \subsection{General Challenges When Using Destructors as Finalisers}
 
@@ -391,8 +409,8 @@ compilers. C++23 removed these features.}.
 The most obvious difference from our perspective is that while Rust defines
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
-unspecified.}\jake{If I'm being pedantic, even without Temp. lifetime ext I don't think this can be strictly true all of the time. In some cases it can only be determined at runtime when a value might be dropped: https://doc.rust-lang.org/stable/nomicon/drop-flags.html }, finalisers are not run at a
-predictable point. Instead, finalisers run at an unspecified point in time
+unspecified.}, finalisers are not run at an unspecified point.
+Instead, finalisers run at an unspecified point in time
 after the last reference to a GCed value is removed. However, in some situations
 finalisers can be run too early: valid optimisations (e.g~scalar replacement)
 can cause a value to appear to be unused, and thus ready for finalisation,
@@ -416,7 +434,8 @@ copying the reference passed to the finaliser and storing it somewhere.
 
 \laurie{do we have a reference of the performance costs of finalisers?}
 \jake{Nothing concrete. Most blogs / papers I've come across treat the
-performance costs of finalisation as conventional wisdom}
+performance costs of finalisation as conventional wisdom}\laurie{not even
+steve's papers? there is a vague hint in boehm09, but nothing very concrete}
 
 
 \subsection{The Challenge of Finalisers for \ourgc}
