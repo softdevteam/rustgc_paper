@@ -308,10 +308,10 @@ than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 \subsection{Basic Implementation}
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
-Rust compiler \rustc. The current version of Alloy forks \rustc~\rustcversion,
-adding or changing approximately 3150 Lines Of Code (LOC).
+Rust compiler \rustc. We forked \rustc~\rustcversion and have
+added or changed approximately 3,150 Lines Of Code (LOC).
 
-\ourgc uses the conservative Boehm-Demers-Weiser GC (\boehm) \citep{boehm88garbage} as its collector.
+\ourgc uses the conservative Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage} as its collector.
 Although we use some uncommon parts of \boehm -- and, as we shall see, add some
 extensions of our own -- there is nothing conceptually unique about \boehm from
 \ourgc's perspective. We made some minor changes to \boehm and also the code
@@ -320,13 +320,12 @@ because, for reasons we don't fully understand, it worsens \ourgc's
 performance. Second, \boehm cannot scan pointers stored in thread locals
 because these are highly platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
-\lstinline{PT_TLS} segment of the ELF binary. We thus modified \boehm so that,
-during each collection, this ELF segment is scanned for roots. Third, \ourgc is
-altered to explicitly register new threads with \boehm such that their call
-stacks are reliably scanned \laurie{is this because boehm's approach is to
-override C thread creation via macros?} \jake{It's because boehm is statically
-linked (because of non-interesting prohibitive bootstrapping / dynamic linkage
-reasons in rustc) and thus we can't use it to dynamically intercept pthread calls}.
+\lstinline{PT_TLS} segment of the ELF binary. We modified \boehm to scan
+this ELF segment during each collection. Third,
+\boehm normally statically intercepts thread creation calls so that it can
+then can scan their stacks, but (for bootstrapping
+reasons) it is unable to do so in our context: we explicitly changed \ourgc
+to register new threads with \boehm.
 
 
 \section{Destructors and Finalisers}
