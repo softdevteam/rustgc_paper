@@ -331,30 +331,31 @@ to register new threads with \boehm.
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
-Rust uses destructors pervasively in the form of \emph{drop methods}. When the
-owner of a value goes out of scope, the value's drop method is called.
+Rust uses destructors pervasively in the form of \emph{drop methods}.
 Simplifying somewhat, drop methods are mostly created automatically by Rust,
-though users often need to manually override or augment those. Drop methods
+though users often need to manually augment those using the
+\lstinline{Drop} trait. Drop methods
 enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}. When a
 value is dropped, the underlying resources (e.g.~file handles or mutexes) it
 acquired when created are released. Whether one considers all uses of drop
 methods to be RAII or not, even a brief perusal of Rust code will show that
-drop methods are used extensively.
+they are used extensively.
 
-A fundamental question in the context of GC for Rust is: should destructors be
-used as finalisers? No existing GC for Rust we are aware
-of allows destructors to be used as finalisers. Instead the most common solution
-is a new trait, typically called \lstinline{Finalise}, and intended to be roughly
-analogous to Rust's standard \lstinline{Drop} trait. Users who want finalisation
+Existing GCs for Rust have very separate notions of destructors and finaliser.
+Where the former have the \lstinline{Drop} trait, the later typically have
+a \lstinline{Finalise} trait. Users who want finalisation
 must manually implement the \lstinline{Finalise} trait for each type of interest.
+This quickly becomes tiresome, in part because Rust auto-generates most parts
+of most destructors in a way that users cannot override, and often are not
+really unaware of.
 
-This approach has four problems: (1) most such finalisers largely or wholly
-duplicate the type's existing drop method; (2) Rust auto-generates some parts
-of a drop method, and enforces other constraints, which may not be present or
-enforceable with manually written finalisers; (3) external libraries are
-unlikely to provide such
-finalisers; (4) Rust's \emph{orphan rule} \laurie{jake: is
+There are many conceivable designs for finalisation for \ourgc, but our belief
+is that the most acceptable is likely to be using existing destructors as
+finalisers whenever possible. However, doing so introduces a number of problems:
+(1) one cannot automatically replicate the auto-generated aspects
+of destructors; (2) external libraries are
+unlikely to provide finalisers; (3) and Rust's \emph{orphan rule} \laurie{jake: is
 https://rust-lang.github.io/chalk/book/clauses/coherence.html the best
 reference for this?} prevents one implementing traits for types defined in
 external libraries (i.e.~unless a library's types were designed to support
@@ -363,14 +364,14 @@ external libraries (i.e.~unless a library's types were designed to support
 Programmers can work around each of these problems but with varying degrees of
 drudgery or fragility. For example, \emph{new types} (zero-cost wrappers
 around existing types that allow new behaviour to be added without adding
-run-time memory costs) can be manually implemented to work around problems (3)
-and (4). Doing so involves drudgery, but little conceptually
+run-time memory costs) can be manually implemented to work around problems (2)
+and (3). Doing so involves drudgery, but little conceptually
 difficulty.
 
-However, problem (2) cannot be fixed by drudgery or ingenuity, as it relies on
-parts of Rust and \rustc that users cannot replicate. The reasons for this are due to
-automated parts of destruction in Rust that programmers rarely need to think
-about.
+However, problem (1) cannot be fixed by drudgery or ingenuity, as it relies on
+parts of Rust and \rustc that users cannot replicate. In order to explain this,
+we need to delve into two aspects of destruction in Rust which most users can
+ignore.
 
 First, \rustc automatically adds \emph{drop glue} to \lstinline{struct}s and
 \lstinline{enum}s, which recursively calls all of the necessary destructors
@@ -380,15 +381,14 @@ reference to \lstinline{self}), but dropping part of self would require a parame
 of type \lstinline{self} (i.e.~a move of \lstinline{self}). It might seem
 surprising that a \lstinline{drop} method cannot actually drop any part of its
 \lstinline{self} value, until one realises that this simplifies drop glue,
-which can be added without any analysis of a type's \lstinline{drop} method:
-it is always safe for drop glue to drop every part of a value after a user's
+which can be added without any analysis of a type's \lstinline{drop} method.
+In othher words, it is always safe for drop glue to drop every part of a value after a user's
 \lstinline{drop} method has been called.
 
 Second, although trait methods can normally be called directly by the
 programmer, \rustc explicitly raises an error if a programmer attempts to
 explicitly call \lstinline{Drop::drop}, in order to prevent values being
-dropped more than once. There is no user-level means of automatically
-replicating drop glue and its associated safety warning.
+dropped more than once.
 
 In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
 maintain most if not all of those properties for finalisation; but some parts
@@ -397,16 +397,17 @@ cannot be replicated in normal user code.
 
 \subsection{General Challenges When Using Destructors as Finalisers}
 
-The `obvious' solution to the problems of manual finalisers is to allow existing Rust destructors to
-be automatically used as finalisers. However, there are a number of differences
-between destructors and finalisers that make doing so difficult or dangerous. The
-best overall guide to these problems is \cite{boehm03destructors}; it is also
+Even if there were no Rust-specific challenges to using destructors as
+finalisers, we would still face the problem that finalisers have a number of
+fundamental properties that stand at odds with destructors. The best overall
+guide to these properties and problems is \cite{boehm03destructors}; it is also
 worth supplementing this with later work by some of the same authors on support
 for GC in the C++ specification~\cite{boehm09garbage}\footnote{These features
 were added to the C+11 specification, but do not seem to have been implemented by
 compilers. C++23 removed these features.}.
 
-The most obvious difference from our perspective is that while Rust defines
+A fundamental difference between destructors and finalisers is when both
+are run. Where Rust defines
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalisers are not run at an unspecified point.
@@ -429,13 +430,8 @@ Perhaps surprisingly, given that one of GC's selling points is its ability to
 deal with cycles, is that finalisation and cycles are problematic. Finalisers
 can reference values that are partly, or wholly, `finalised', which is rarely
 safe or defined behaviour. A related, but
-distinct, challenge is the ability of finalisers to `resurrect' values by
+distinct, problem is the ability of finalisers to `resurrect' values by
 copying the reference passed to the finaliser and storing it somewhere.
-
-\laurie{do we have a reference of the performance costs of finalisers?}
-\jake{Nothing concrete. Most blogs / papers I've come across treat the
-performance costs of finalisation as conventional wisdom}\laurie{not even
-steve's papers? there is a vague hint in boehm09, but nothing very concrete}
 
 
 \subsection{The Challenge of Finalisers for \ourgc}
@@ -454,9 +450,9 @@ Rust force users to manually implement: cleaners impose restrictions
 to make finalisers less problematic; existing \lstinline{Finalize} traits
 do not impose any such restrictions.
 
-Our aim for \ourgc may thus seem out of reach: to use
-existing Rust destructors as finalisers whenever possible. In the nearest
-context to our work, GC for C++, this solution was explicitly ruled out as the
+Our aim for \ourgc to use existing Rust destructors as finalisers whenever
+possible may thus seem out of reach. Indeed, in the nearest
+context to our work GC for C++ this solution was explicitly ruled out for GC for C++ as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into three categories:
 (1) some safe destructors are not safe finalisers;
