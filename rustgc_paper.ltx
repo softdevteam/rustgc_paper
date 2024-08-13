@@ -468,29 +468,38 @@ following sections, we tackle each of these challenges in detail.
 
 In this section we address the challenge that some safe destructors are not
 safe finalisers by introducing the novel technique of \emph{finaliser safety
-analysis}. We extend Rust's static analyses -- including altering
-the relevant parts \rustc -- to reject a type \lstinline{T}'s destructor if it
-is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}. In
-essence, we identify the various causes of finaliser misbehaviour -- some of
-which are problems faced by any GC, some of which are more specific to \ourgc's
-design choices -- and show how Rust can be extended to identify and reject
-each.
-
+analysis}. We extend Rust's static analyses, and alter the relevant parts
+of \rustc, to reject a type \lstinline{T}'s destructor if it
+is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 To the best of our knowledge, no other GCed language has an
 equivalent of finaliser safety analysis: indeed, we rely on some of Rust's less
-common static guarantees. In this section we first define the ways that reusing
-destructors as finalisers would cause unsafety, and the rules for ruling out
-each such case. We then explain how we changed \rustc to implement these rules
-in \ourgc.
+common static guarantees.
 
-\subsection{\lstinline{Gc<T>} Breaks Ownership Rules for References}
+In this section we first define the ways that reusing destructors as finalisers
+would undermine safety, and the general rules for identifying the troublesome
+cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 
-Like other smart pointers in Rust, a \lstinline{Gc} can store ordinary Rust
-references (both directly, and indirectly, via fields). Without finalisers,
-this is perfectly safe, because Rust's borrow rules would prevent the
-\lstinline{Gc} from being used in places where the stored Rust reference would
-outlive its referent.
 
+\subsection{The Troublesome Cases}
+
+\subsubsection{Normal Rust References and Finalisers}
+
+As with other `smart pointers' such as \lstinline{Rc<T>}, a \lstinline{Gc} can store
+(indirectly or indirectly) ordinary Rust references (i.e.~\lstinline{&} and
+\lstinline{&mut}), subjecting the smart pointer to Rust's normal borrow
+checker rules: the smart pointer cannot outlive the value whose reference it
+now contains.
+
+Doing so is safe for \lstinline{Gc<T>} except when a finaliser accesses a
+stored reference, since the finaliser may (indeed, is likely to) be run after
+the reference is no longer valid.
+
+\laurie{we have a small but important discrepancy between text and figure: the
+text says ``you can't use references in a finaliser'' but the listing shows
+``you can't create a Gc with a reference in it''. the latter is clearly a (i
+believe strict) superset of the former. could we / should we only bork if the
+finaliser uses the reference? or is our argument ``it's simpler to just reject
+all references because doing so isn't useful anyway?''}
 However, using such references from a finaliser is unsound. This is because the
 collector may schedule the finaliser to run after the \lstinline{Gc}'d object is
 unreachable, when the reference would no longer be valid.
@@ -531,7 +540,7 @@ error: `Node{value: &*b, nbr: None}` cannot be safely
 \end{figure}
 
 
-\subsection{Destructors Must Be \lstinline{Send}able To Another Thread}
+\subsubsection{Destructors Must Be \lstinline{Send}able To Another Thread}
 
 It is common in many languages for finalisers to access fields from other
 objects or even global state. Since an object's finaliser is run at some unknown
@@ -662,9 +671,6 @@ error: `n1` cannot be safely finalized.
   unsound when \ourgc does not use ordered finalisation as it may have already
   been collected.}
 \end{figure}
-
-\subsection{Design Context}
-
 
 
 \subsection{The Analysis}
