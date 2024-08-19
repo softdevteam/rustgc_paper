@@ -498,7 +498,7 @@ text says ``you can't use references in a finaliser'' but the listing shows
 ``you can't create a Gc with a reference in it''. the latter is clearly a (i
 believe strict) superset of the former. could we / should we only bork if the
 finaliser uses the reference? or is our argument ``it's simpler to just reject
-all references because doing so isn't useful anyway?''}
+all references because doing so isn't useful anyway?''} \jake{Yes, this is unfortunate. We have to treat Rust references differently to other things in FSA because it's much harder to do a drop body per-line analysis on them. The rule for Rust references is essentially: Type containing ref. XOR drop method. In other words, if your type has a ref, you can't have a drop method, even if it doesn't use it. This is clearly not ideal, but the lack of def-use support in MIR meant that it's really hard to know whether a deref inside a drop was safe (e.g. \lstinline{&mut self.x.y.z}) or unsafe.}
 However, using such references from a finaliser is unsound. This is because the
 collector may schedule the finaliser to run after the \lstinline{Gc}'d object is
 unreachable, when the reference would no longer be valid.
