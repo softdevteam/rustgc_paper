@@ -155,7 +155,7 @@ write in GCed languages are challenging in Rust. This provides the core
 motivation for GC in Rust.
 
 Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
-to statically guarantee that: a \emph{value} has a
+to statically guarantee that: a \emph{value} (i.e.~an instance of a type) has a
 single owner (e.g.~a variable); an owner can \emph{move} a value to another owner
 when a value's owner goes out of scope, the value's \lstinline{drop} method (its destructor)
 is run and its backing memory freed. An owner can pass \emph{references} to a value
@@ -198,23 +198,24 @@ unfamiliar or unintuitive. We mostly use the same terminology
 as~\cite{jones16garbage}, the major parts of which we define here.
 
 A program which uses GC is split between the \emph{mutator} (the user's program) and
-the \emph{collector} (the GC itself). At any given point, a thread is either
-running as a mutator or a collector, though some threads may be given over
-entirely to the collector. A \emph{tracing} GC is one that scans memory looking
+the \emph{collector} (the GC itself). At any given point in time, a particular thread is either
+running as a mutator or a collector. In our context, all threads
+run as a collector at least sometimes, with some threads always running as a collector.
+Tracing and reclamation is performed during a \emph{collection} phase. In the context of
+this paper, collections are \emph{stop-the-world}, where all mutator threads
+are paused while collection occurs.
+
+A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
 from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
 in most GC literature, henceforth we use `GC' to mean `tracing GC' unless
 explicitly stated otherwise.
 
-Tracing and reclamation is performed during a \emph{collection} phase. In the context of
-this paper, collections are \emph{stop-the-world}, where all mutator threads
-are paused while collection occurs. We refer to memory which is solely under
+We refer to memory which is solely under
 the control of the GC as the \emph{GC heap}, though this may in practise be
-intermingled with non-GCed memory.
-
-We use the term `GC value' to refer both to the pointer wrapped in a
-\lstinline{Gc<T>} and the underlying value on the heap, even though multiple
+intermingled with non-GCed memory. We use the term `GC value' to refer both to the pointer wrapped in a
+\lstinline{Gc<T>} and the underlying value on the GC heap, even though multiple
 pointers / wrappers can refer to a single value on the heap, unless doing so
 would lead to ambiguity.
 
@@ -276,7 +277,8 @@ pointer from the program's perspective, or just happens to be a sequence of
 bits that also happens to make it a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
 most extensive study we know of suggests the false detection rate in Java
-programs is under 0.01\% of live objects~\cite{shahriyar14fast}.
+programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
+rarely a problem in practise.
 
 Conservative GC occupies a grey zone in programming language semantics. In most
 languages -- including the semantics of most compiler Intermediate
@@ -285,8 +287,8 @@ some languages allow arbitrary `bit fiddling' on pointers that temporarily
 obscures the address they are referring to. \ourgc's use of conservative GC means that it
 is, formally speaking, unsound. However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink rendering
-engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM -- JavaScriptCore~\citep{pizlo17riptide}.
-Even in 2024, we lack good alternatives: there is no cross-platform API for precise GC; and while some
+engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM JavaScriptCore~\citep{pizlo17riptide}.
+Even in 2024, we lack good alternatives to conservative GC: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
 incomplete and buggy. Practically speaking, despite the potential soundness
 worries, conservative GC remains a widely used technique.
