@@ -158,7 +158,7 @@ Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} (i.e.~an instance of a type) has a
 single owner (e.g.~a variable); an owner can \emph{move} (i.e.~permanently
 transfer the ownership of) a value to another owner; and
-when a value's owner goes out of scope, the value's \lstinline{drop} method (its destructor)
+when a value's owner goes out of scope, the value's destructor
 is run and its backing memory reclaimed. An owner can pass \emph{references} to a value
 to other code, subject to these static restrictions: there can be
 multiple read-only references (`\lstinline{&}') to a value or a single
@@ -360,58 +360,53 @@ on a separate thread (see \laurie{Section XYZ}).
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
-Rust uses destructors pervasively in the form of \emph{drop methods}.
-Simplifying somewhat, drop methods are mostly created automatically by Rust \jake{I'm not sure what this means. Do you mean they're inserted automatically? The actual drop bodies are always hand-written.}\laurie{it depends if by ``drop method'' we mean `a method that a human wrote explicitly' or `some glue that rustc inserted on the user's behalf'. i'm neutral as to which we choose, so long as we're consistent},
-though users often need to manually augment those using the
-\lstinline{Drop} trait. Drop methods
-enable a style of programming that originated in C++ called RAII (Resource
-Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}. When a
-value is dropped, the underlying resources (e.g.~file handles or mutexes) it
-acquired when created are released. Whether one considers all uses of drop
-methods to be RAII or not, even a brief perusal of Rust code will show that
-they are used extensively.
+Rust uses destructors pervasively, in the form of \emph{drop methods} and
+\emph{drop glue}. Drop methods are hand-written methods that implement the
+\lstinline{Drop} trait that are called as the first stage of destruction. Drop
+glue recursively calls destructors of contained types (e.g.~fields in a
+\lstinline{struct}); it is automatically inserted by \rustc, and is run as the
+second, and final, stage of destruction. Although it is common usage to map
+`destructor' in Rust to just `drop methods', `drop glue' is a vital part of a
+destructor: when a value is \emph{dropped} (e.g.~the value's owner went out of
+scope), both drop method and glue are executed.
 
-Existing GCs for Rust have very separate notions of destructors and finaliser.
+Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
+Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
+value is dropped, the underlying resources (e.g.~file handles or mutexes) it
+acquired when created are released. Whether one considers all such uses
+to be RAII or not, a brief perusal of Rust code will show that both that
+types that have drop methods are used frequently, and that users fairly often
+implement new drop methods.
+
+Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalise} trait. If a user type needs to be finalised, then
 the user must provide an implementation of the \lstinline{Finalise} trait for that type.
 However, doing so introduces a number of problems:
-(1) one cannot automatically replicate the auto-generated aspects
-of destructors; (2) external libraries are
+(1) one cannot automatically replicate drop glue for finalisers; (2) external libraries are
 unlikely to provide finalisers; (3) and Rust's \emph{orphan rule} \laurie{jake: is
 https://rust-lang.github.io/chalk/book/clauses/coherence.html the best
 reference for this?} prevents one implementing traits for types defined in
 external libraries (i.e.~unless a library's types were designed to support
 \lstinline{Gc<T>}, those types cannot be directly GCed).
 
-Programmers can work around each of these problems but with varying degrees of
-drudgery or fragility. For example, \emph{newtypes} (zero-cost wrappers
-around existing types that allow new behaviour to be added without adding
-run-time memory costs) can be manually implemented to work around problems (2)
-and (3). Doing so involves drudgery, but little conceptually
-difficulty.
+Programmers can workaround problems (2) and (3) in various ways. For example,
+they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
+and implement finalisers on those instead. Doing so involves drudgery, but
+little conceptually difficulty.
 
-However, problem (1) cannot be fixed by drudgery or ingenuity, as it relies on
-parts of Rust and \rustc that users cannot replicate. In order to explain this,
-we need to delve into two aspects of destruction in Rust which most users can
-ignore.
-
-First, \rustc automatically adds \emph{drop glue} to \lstinline{struct}s and
-\lstinline{enum}s, which recursively calls all of the necessary destructors
-(e.g.~a \lstinline{struct}'s fields). As we saw in~\cref{fig:first_example},
-drop methods take a parameter of type \lstinline{&mut self} (i.e.~a mutable
-reference to \lstinline{self}), but dropping part of self would require a parameter
-of type \lstinline{self} (i.e.~a move of \lstinline{self}). It might seem
-surprising that a \lstinline{drop} method cannot actually drop any part of its
-\lstinline{self} value, until one realises that this simplifies drop glue,
-which can be added without any analysis of a type's \lstinline{drop} method. \jake{I don't really understand this sentence.} \laurie{my intuition is that a drop method doesn't drop a value, so you can put any old thing in a drop method, and drop glue doesn't need to know about it: the drop glues actually drops the value after the drop method is called. another way of thinking of this is that ``drop methods'' might better be called ``predrop''!}
-In other words, it is always safe for drop glue to drop every part of a value after a user's
-\lstinline{drop} method has been called.
-
-Second, although trait methods can normally be called directly by the
-programmer, \rustc explicitly raises an error if a programmer attempts to
-explicitly call \lstinline{Drop::drop}, in order to prevent values being
-dropped more than once.
+However, problem (1) cannot be fixed by drudgery or ingenuity, as the insertion
+of drop glue is outside of the user's control. There are additional subtleties.
+Because destruction is split into calling a drop method and then drop glue, a
+drop method does not actually drop a value (as can be seen from the fact
+\lstinline{drop} takes a value of \lstinline{&mut self}). Splitting destruction
+in this way means that drop glue can be added without regard to the contents of
+a drop method. However, because a drop method does not actually drop a value,
+calling it more than once would often lead to semantic errors. This is a
+problem, because \emph{Drop::drop} is a normal trait method, and trait methods
+can be called directly by the programmer as many times as they wish. To avoid
+this, \rustc special cases \lstinline{Drop::drop}, raising an error if it is
+called directly by the programmer.
 
 In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
 maintain most if not all of those properties for finalisation; but some parts
