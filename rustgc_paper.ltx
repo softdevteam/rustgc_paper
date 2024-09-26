@@ -268,21 +268,23 @@ need from such a type.
 
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to \lstinline{v}'s new address. Dereferencing
-a \lstinline{Gc<T>} produces an immutable Rust reference to the underlying
-value: there is no way to directly mutate GCed values and users must use other
-standard Rust types that enable \emph{interior mutability}
-(e.g.~\lstinline{RefCell<T>} or \lstinline{Mutex<T>}).
+simple wrapper around a pointer to \lstinline{v}'s new address. Since the
+purpose of a \lstinline{Gc<T>} is to allow a value to have multiple owners,
+it must not only be possible to dereference it arbitrarily many times, but
+the lifetimes of those references must be allowed to overlap. To avoid undermining
+Rust's ownership system, this means that dereferencing a \lstinline{Gc<T>} must
+produce an immutable (i.e.~`\lstinline{&}') reference to the underlying value.
+If the user wishes to mutate the underlying value, they must use other Rust
+types that enable \emph{interior mutability} (e.g.~\lstinline{RefCell<T>} or
+\lstinline{Mutex<T>}).
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
 back (\lstinline{from_raw}). Though many programmers do not directly
-encounter these functions, they are widely used in enabling code,
-as they are a crucial link between Rust's high and low-level features. A
-common use is to pass raw pointers to C functions and later reconstitute the
-\lstinline{Rc<T>} (e.g.~through a callback to Rust); less common uses include
-pointer tagging. We believe that a viable GC for Rust must include this same
-ability, but it has a profound impact because Rust allows raw pointers to be converted to
+encounter these functions, they are a crucial link between Rust's high and
+low-level features (e.g.~being used for the C Foreign Function Interface
+(FFI)). We believe that a viable GC for Rust must include this same
+ability, but doing so has a profound impact: Rust allows raw pointers to be converted to
 the integer type \lstinline{usize} and back\footnote{Although it is outside the
 scope of this paper, it would arguably
 be preferable for Rust to have different integer types for `data width' and
@@ -297,8 +299,7 @@ inevitable that \ourgc must be a \emph{conservative} GC, which treats each
 reachable machine word as a possible pointer: if,
 when considered as a pointer, a word's address falls within a GCed block of memory,
 then that block itself is considered reachable (and thus transitively scanned).
-Since a conservative GC cannot know if a word is a
-pointer from the program's perspective, or just happens to be a sequence of
+Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
 bits that also happens to make it a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
 most extensive study we know of suggests the false detection rate in Java
@@ -315,8 +316,8 @@ including in the two most widespread web browsers: Chrome uses it in its Blink r
 engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM JavaScriptCore~\citep{pizlo17riptide}.
 Even in 2024, we lack good alternatives to conservative GC: there is no cross-platform API for precise GC; and while some
 compilers such as LLVM provide some support for GC features, we have found them
-incomplete and buggy. Practically speaking, despite the potential soundness
-worries, conservative GC remains a widely used technique.
+incomplete and buggy. Despite the potential soundness
+worries, conservative GC thus remains a widely used technique.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust whose \lstinline{Gc<T>} is only \emph{cloneable}. Such types can be duplicated, but doing
@@ -345,7 +346,7 @@ nothing inherently unique about \boehm from \ourgc's perspective.
 We made the following changes to \boehm. First, we disabled \boehm's parallel collector threads
 because, for reasons we don't fully understand, it worsens \ourgc's
 performance. Second, \boehm cannot scan pointers stored in thread locals
-because these are highly platform dependent. Fortunately, \rustc uses LLVM's
+because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
 this ELF segment during each collection. Third,
@@ -353,7 +354,7 @@ this ELF segment during each collection. Third,
 then can scan their stacks, but (for bootstrapping
 reasons) it is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm. Fourth, we modified \boehm to run finalisers
-on a separate thread.
+on a separate thread (see \laurie{Section XYZ}).
 
 
 \section{Destructors and Finalisers}
