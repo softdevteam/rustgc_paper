@@ -194,7 +194,7 @@ arenas, which gradually accumulate multiple values but free all of them in one g
 can no longer be reclaimed too early, but, equally, individual values can not be
 reclaimed until all values are determined to be unneeded.
 
-An interesting type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
 which allow data-structures that have multiple owners to be built
 by statically guaranteeing that
 there is a single owner for the entire data-structure at any point in the
@@ -416,31 +416,34 @@ cannot be replicated in normal user code.
 \subsection{General Challenges When Using Destructors as Finalisers}
 
 Even if there were no Rust-specific challenges to using destructors as
-finalisers, we would still face the problem that finalisers have a number of
-fundamental properties that stand at odds with destructors. The best overall
-guide to these properties and problems is \cite{boehm03destructors}; it is also
-worth supplementing this with later work by some of the same authors on support
+finalisers, we would still face the problem that finalisers and destructors
+have different, and sometimes incompatible, properties. The best overall
+guide to these differences, and the resulting problems, is~\cite{boehm03destructors},
+supplemented by later work by some of the same authors on support
 for GC in the C++ specification~\cite{boehm09garbage}\footnote{These features
 were added to the C+11 specification, but do not seem to have been implemented by
 compilers. C++23 removed these features.}.
 
-A fundamental difference between destructors and finalisers is when both
-are run. Where Rust defines
+An obvious difference between destructors and finalisers is when both
+are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
-unspecified.}, finalisers are not run at an unspecified point.
-Instead, finalisers run at an unspecified point in time
+unspecified.}, finalisers run at an unspecified point in time
 after the last reference to a GCed value is removed. However, in some situations
 finalisers can be run too early: valid optimisations (e.g~scalar replacement)
 can cause a value to appear to be unused, and thus ready for finalisation,
 even though some of its constituent parts are still being used.
 
-A less obvious difference is: where are finalisers run? Running
-finalisers on the same thread as mutator code will cause deadlocks if a finaliser
-tries to access a resource that the mutator has locked
-(see~\cref{finaliser_thread} for more details): although such problems can
-affect destructors, they are more likely to affect finalisers since one cannot
-predict when a finaliser runs. Such problems can only be avoided by running
+A less obvious difference relates to where destructors and finalisers are run.
+Destructors are run in the thread that the last owner of the value ran in.
+However, running finalisers in the same thread as the last owner of the value
+ran in can cause deadlocks if a finaliser tries to access a resource that the mutator has locked
+(see~\cref{finaliser_thread} for more details). Although such problems can
+affect destructors, it is a clear case of programmer error, since they should
+have taken into account the predictable execution point of destructors. Since
+finalisers have no such predictable execution point, there is no way for finalisers
+to safely access shared resources if they are run on the same thread. Such
+problems can only be avoided by running
 finalisers on a non-mutator thread: however, not all Rust destructors
 are safe to run on another thread.
 
@@ -456,8 +459,8 @@ copying the reference passed to the finaliser and storing it somewhere.
 
 At this point we hope to have convinced the reader of two general points: a
 viable GC for Rust needs to be able to use existing destructors as finalisers
-whenever possible; and that finalisers, even in existing GCs, impose
-various difficulties.
+whenever possible; and that finalisers, even in existing GCs, cause
+various problems.
 
 Over time finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
@@ -468,7 +471,7 @@ Rust force users to manually implement: cleaners impose restrictions
 to make finalisers less problematic; existing \lstinline{Finalize} traits
 do not impose any such restrictions.
 
-Our aim for \ourgc to use existing Rust destructors as finalisers whenever
+Our desire that \ourgc should use existing Rust destructors as finalisers whenever
 possible may thus seem out of reach. Indeed, in the nearest
 context to our work GC for C++ this solution was explicitly ruled out for GC for C++ as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
