@@ -80,7 +80,7 @@ In existing GCs for Rust, if a user needs values of type \lstinline{T} to cause 
 finaliser to run, then the user must manually implement a finaliser.
 Not only do most finalisers end up duplicating
 existing \emph{destructors} (i.e.~code which is run just before a value is
-freed by Rust's implicit memory management) but this makes it impossible to
+reclaimed by Rust's implicit memory management) but this makes it impossible to
 provide finalisers for types in external libraries.
 
 The `obvious' solution to this problem is to allow existing Rust destructors to
@@ -154,45 +154,66 @@ comfortable with.
 \label{fig:rc_example}
 \end{figure}
 
-In this section we briefly show why some data structures that are easy to
-write in GCed languages are challenging in Rust. This provides the core
-motivation for GC in Rust.
-
 Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} (i.e.~an instance of a type) has a
-single owner (e.g.~a variable); an owner can \emph{move} a value to another owner
+single owner (e.g.~a variable); an owner can \emph{move} (i.e.~permanently
+transfer the ownership of) a value to another owner; and
 when a value's owner goes out of scope, the value's \lstinline{drop} method (its destructor)
-is run and its backing memory freed. An owner can pass \emph{references} to a value
-to other code, subject to the following static restrictions: there can be
-multiple read-only references (`\lstinline{&}') to a value, or a single
+is run and its backing memory reclaimed. An owner can pass \emph{references} to a value
+to other code, subject to these static restrictions: there can be
+multiple read-only references (`\lstinline{&}') to a value or a single
 read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
 
 These basic rules mean that many Rust programs are as succinct as their equivalents
-in GCed languages. However, data structures that require values to have more
-than one owner cannot
-be directly expressed in \emph{safe} Rust (i.e.~the subset of Rust that is fully
-statically checked by the compiler). Instead, one must resort to (possibly
-indirect) \emph{unsafe} (i.e.~not fully statically checked by the compiler)
-workarounds.
+in GCed languages. This suggests that the search for a good GC for Rust may be Quixotic:
+intellectually stimulating, but of no practical value.
 
-Perhaps the most widely used workaround is the reference counting type
-\lstinline{Rc<T>} in Rust's standard library. For many non-cyclic
-data-structures, reference counting is a reasonable solution, but using it for
-cyclic data-structures requires juggling strong and weak counts. This complicates
-the program (see~\cref{fig:rc_example}) and makes
+However, there are many programs which need to express data structures which
+are sound but which do not fit into the restrictions of affine types and
+ownerships. These are often described as `cyclic data-structures', though we
+prefer the more general wording of `values which may have more than one owner'
+(e.g.~interpreters for dynamically typed languages are examples of programs
+which are best thought of in the latter category). Rust cannot directly express
+such programs, forcing programmers to use various workarounds.
+
+Probably the most common -- or, at least, the most easily recognised in other's
+code -- workaround is the reference counting type \lstinline{Rc<T>} in Rust's
+standard library. For many data-structures, reference counting is a reasonable
+solution, but using it for values which may have multiple owners requires
+juggling strong and weak counts. This complicates the program (see~\cref{fig:rc_example}) and makes
 it easy for values to live for shorter or longer than intended.
 
-A similar solution are
-arenas which gradually accumulate multiple values but free all of them in one go: values
-can no longer be reclaimed too early, but equally individual values can not be
+Another common workaround is to store values in a vector and use
+integer indices into that vector. Such indices are then morally closer to
+machine level pointers than normal Rust references: the indices can become
+stale, dangle, or may never have been valid in the first place. The programmer
+must also manually deal with issues such as detecting unused values,
+compaction, and so on. In other words, such workarounds force the programmer
+to write a partial GC themselves. A variant on this idea are
+arenas, which gradually accumulate multiple values but free all of them in one go: values
+can no longer be reclaimed too early, but, equally, individual values can not be
 reclaimed until all values are determined to be unneeded.
 
-A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
-which allow cyclic data-structures to be built by statically guaranteeing that
+An interesting type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
+which allow data-structures that have multiple owners to be built
+by statically guaranteeing that
 there is a single owner for the entire data-structure at any point in the
-program. However, this prevents use cases where multiple owners (possibly,
-though not necessarily, in different threads) need to read or mutate different
-parts of a data-structure.
+program. However, this implicitly prevents multiple owners (e.g.~in different threads)
+from reading or mutating different parts of the structure.
+
+Although it is easily overlooked, some workarounds (e.g.~\lstinline{Rc<T>})
+rely on using \emph{unsafe} Rust (i.e.~parts of the language, often involving
+pointers, that are not fully statically checked by the compiler). It is reasonable
+to assume that widely used code, even if technically unsafe, has been pored
+over sufficiently that it is mostly, perhaps even wholly, reliable in practise. It
+is less reasonable to assume that `new' solutions that a programmer implements using
+unsafe Rust will immediately reach the same level of reliability. Our experience
+is that most Rust programmers will avoid writing new unsafe code if they can, even
+if doing so might in the long-term lead to a better system.
+
+While we do not believe that every Rust program would be improved by GC, the
+variety of workarounds already present in Rust code suggests that a substantial
+subset might benefit from GC.
 
 
 \subsection{GC terminology}
@@ -211,7 +232,7 @@ are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
-from the roots are \emph{reclaimed}. In contrast, a reference counting GC does
+from the roots can then be \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
 in most GC literature, henceforth we use `GC' to mean `tracing GC' unless
 explicitly stated otherwise.
