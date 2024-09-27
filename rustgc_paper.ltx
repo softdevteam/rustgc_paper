@@ -567,48 +567,6 @@ error: `Node{value: &*b, nbr: None}` cannot be safely
 \end{figure}
 
 
-\subsubsection{Destructors Must Be \lstinline{Send}able To Another Thread}
-
-It is common in many languages for finalisers to access fields from other
-objects or even global state. Since an object's finaliser is run at some unknown
-point in time once it is considered unreachable by the collector, it must be
-able to safely access such state without racing with the mutator.
-
-One possible solution might seem to be to prohibit finalisers from acquiring
-locks, however this can still cause race-like bugs because of how finalisers can
-interleave asynchronously with the mutator~\citep{niko13destructors}.
-
-In addition, \ourgc schedules all finalisers to run on a separate thread to the
-mutator. As with any GC, \ourgc can finalise objects at its leisure, with no
-way for the programmer to know when this will happen. Rust does not prevent
-users from writing code which deadlocks, but it does not make the situation
-worse. However, if \ourgc were to perform on-thread finalisation, it would open
-the possibility of previously non-deadlocking code deadlocking.
-
-\begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=10]{listings/finaliser_deadlock.rs}
-\captionof{lstlisting}{An example showing how a potential deadlock can be
-  caused if finalisers are run on the mutator thread. A shared counter is
-  created using a reference counted container, a reference to this is then
-  placed inside a garbage collected container. This is potentially short-lived,
-  as it is only reachable by the \lstinline{gc} variable until the end of the
-  inner scope. If \ourgc decides to schedule a collection after this then the
-  \lstinline{Rc} could be considered garbage, where a finaliser would run its
-  drop method (line 10). If this happens while the main mutator thread already
-  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
-  When finalisers are run on the same thread, there is nothing the programmer
-  can do in this situation to guarantee that this kind of deadlock does not
-  occur.}
-\label{fig:finaliser_deadlock}
-\end{figure}
-
-Unfortunately, finalising objects off-thread now means that shared data, or other
-objects accessed from a finaliser must be done in a thread-safe way. The problem
-with this is that in \ourgc, a finaliser calls a type's existing drop methods.
-Since \lstinline{Drop} was not originally defined in expectation of being
-called on a separate thread, it does not guarantee thread safety.
-
-
 \subsubsection{Finalisation order}
 
 Some GCs implementations guarantee a finalisation order, because for some
@@ -631,7 +589,7 @@ programmers can refactor the objects in order to break the finalisation
 cycle~\citep{boehm03destructors}. Another workaround is to allow users to use
 weak references to break cycles (similar to breaking reference count cycles).
 Unfortunately this is often difficult to implement
-correctly~\citep{jones16garbage}.
+correctly~\citep{jones16garbage} \laurie{we need a page reference for this}.
 
 \ourgc uses an alternative approach where it does not specify any finalisation
 order. This allows objects with cycles to be finalised but with a heavy
@@ -698,6 +656,48 @@ error: `n1` cannot be safely finalized.
   unsound when \ourgc does not use ordered finalisation as it may have already
   been collected.}
 \end{figure}
+
+
+\subsubsection{Destructors Must Be \lstinline{Send}able To Another Thread}
+
+It is common in many languages for finalisers to access fields from other
+objects or even global state. Since an object's finaliser is run at some unknown
+point in time once it is considered unreachable by the collector, it must be
+able to safely access such state without racing with the mutator.
+
+One possible solution might seem to be to prohibit finalisers from acquiring
+locks, however this can still cause race-like bugs because of how finalisers can
+interleave asynchronously with the mutator~\citep{niko13destructors}.
+
+In addition, \ourgc schedules all finalisers to run on a separate thread to the
+mutator. As with any GC, \ourgc can finalise objects at its leisure, with no
+way for the programmer to know when this will happen. Rust does not prevent
+users from writing code which deadlocks, but it does not make the situation
+worse. However, if \ourgc were to perform on-thread finalisation, it would open
+the possibility of previously non-deadlocking code deadlocking.
+
+\begin{figure}[t]
+\lstinputlisting[language=Rust, firstline=10]{listings/finaliser_deadlock.rs}
+\captionof{lstlisting}{An example showing how a potential deadlock can be
+  caused if finalisers are run on the mutator thread. A shared counter is
+  created using a reference counted container, a reference to this is then
+  placed inside a garbage collected container. This is potentially short-lived,
+  as it is only reachable by the \lstinline{gc} variable until the end of the
+  inner scope. If \ourgc decides to schedule a collection after this then the
+  \lstinline{Rc} could be considered garbage, where a finaliser would run its
+  drop method (line 10). If this happens while the main mutator thread already
+  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
+  When finalisers are run on the same thread, there is nothing the programmer
+  can do in this situation to guarantee that this kind of deadlock does not
+  occur.}
+\label{fig:finaliser_deadlock}
+\end{figure}
+
+Unfortunately, finalising objects off-thread now means that shared data, or other
+objects accessed from a finaliser must be done in a thread-safe way. The problem
+with this is that in \ourgc, a finaliser calls a type's existing drop methods.
+Since \lstinline{Drop} was not originally defined in expectation of being
+called on a separate thread, it does not guarantee thread safety.
 
 
 \subsection{The Analysis}
