@@ -360,60 +360,53 @@ on a separate thread (see \laurie{Section XYZ}).
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
-Rust uses destructors pervasively, in the form of \emph{drop methods} and
-\emph{drop glue}. Drop methods are hand-written methods that implement the
-\lstinline{Drop} trait that are called as the first stage of destruction. Drop
-glue recursively calls destructors of contained types (e.g.~fields in a
-\lstinline{struct}); it is automatically inserted by \rustc, and is run as the
-second, and final, stage of destruction \jake{This is true for drop on
-structs/enums (and I see what you're getting at here is an outside-in
-destruction order), but rustc refers to drop glue as the thing that inserts the
-original drop calls too. So drop glue is used to to insert drop calls to types
-for e.g. on-stack values `a', `b', and `c'. This would mean drop glue comes
-first.} Although it is common usage to map `destructor' in Rust to just `drop
-methods', `drop glue' is a vital part of a destructor: when a value is
-\emph{dropped} (e.g.~the value's owner went out of scope), both drop method and
-glue are executed.
+When a value in Rust is \emph{dropped} (e.g.~the value's owner went out of
+scope) its destructor is automatically run. Destructors are formed of two
+parts, run in the following order: a user-defined \emph{drop method}; and
+automatically inserted \emph{drop glue}. Users can optionally provide a drop
+method for a type by implementing the \lstinline{Drop} trait's \lstinline{drop}
+method. Drop glue recursively calls destructors of contained types (e.g.~fields
+in a \lstinline{struct}). Although it is common usage to map `destructor' in
+Rust to just drop methods, drop glue is an integral part of a Rust destructor.
 
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
 value is dropped, the underlying resources (e.g.~file handles or mutexes) it
 acquired when created are released. Whether one considers all such uses
-to be RAII or not, a brief perusal of Rust code will show that both that
+to be RAII or not, a brief perusal of Rust code will quickly show both that
 types that have drop methods are used frequently, and that users fairly often
-implement new drop methods.
+implement their own drop methods.
 
 Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalise} trait. If a user type needs to be finalised, then
 the user must provide an implementation of the \lstinline{Finalise} trait for that type.
 However, doing so introduces a number of problems:
-(1) one cannot automatically replicate drop glue for finalisers; (2) external libraries are
-unlikely to provide finalisers; (3) and Rust's \emph{orphan rule} \laurie{jake: is
+(1) external libraries are
+unlikely to provide finalisers; (2) Rust's \emph{orphan rule} \laurie{jake: is
 https://rust-lang.github.io/chalk/book/clauses/coherence.html the best
 reference for this?} prevents one implementing traits for types defined in
 external libraries (i.e.~unless a library's types were designed to support
-\lstinline{Gc<T>}, those types cannot be directly GCed).
+\lstinline{Gc<T>}, those types cannot be directly GCed); (3) one cannot
+automatically replicate drop glue for finalisers; and (4) one cannot replicate
+\rustc's refusal to allow calls to the equivalent of \lstinline{Drop::drop}.
 
-Programmers can workaround problems (2) and (3) in various ways. For example,
+Programmers can workaround problems (1) and (2) in various ways. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalisers on those instead. Doing so involves drudgery, but
 little conceptually difficulty.
 
-However, problem (1) cannot be fixed by drudgery or ingenuity, as the insertion
-of drop glue is outside of the user's control. There are additional subtleties.
-Because destruction is split into calling a drop method and then drop glue, a
-drop method does not take ownership of a value (as can be seen from the fact
-that \lstinline{Drop::drop} takes a value of type \lstinline{&mut self} rather
-than of type \lstinline{self}) --- in other words, a value is only `dropped'
-after both the drop method and drop glue have run. Splitting destruction
-in this way means that drop glue can be added without regard to the contents of
-a drop method. However, this split causes another problem:
-because \lstinline{Drop::drop} is a normal trait method, and trait methods
-can be called directly by the programmer as many times as they wish, one
-could end up with `partly dropped' values. To avoid
-this, \rustc special cases \lstinline{Drop::drop}, raising an error if it is
-called directly by the programmer.
+Problem (3) has partial solutions: for example, ~\cite{manish15rustgc} uses the
+\lstinline{Trace} macro to generate `finaliser glue' (our term) for
+\lstinline{struct} fields. This runs into an unsolvable variant of problem (2):
+types in external libraries will not implement this trait and cannot be
+recursively scanned for finaliser glue.
+
+Problem (4) is impossible to solve in Rust as-is. One cannot define a function
+that can never be called --- what use would such a function have? It might seem
+tempting to have the \lstinline{finalize} method take ownership of the value,
+but \lstinline{Drop::drop} does not do so because that would not allow drop
+glue to be run afterwards.
 
 In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
 maintain most if not all of those properties for finalisation; but some parts
