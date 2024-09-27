@@ -475,21 +475,27 @@ Our desire that \ourgc should use existing Rust destructors as finalisers whenev
 possible may thus seem out of reach. Indeed, in the nearest
 context to our work GC for C++ this solution was explicitly ruled out for GC for C++ as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
-problems down into three categories:
-(1) some safe destructors are not safe finalisers;
-(2) finalisers can be run too early;
-and (3) finalisers are prohibitively slower than destructors.
+problems down into four:
+(1) running finalisers on the same thread as a paused collector can cause deadlocks;
+(2) some safe destructors are not safe finalisers;
+(3) finalisers can be run too early;
+and (4) finalisers are prohibitively slower than destructors.
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
-\ourgc, allow us to address each challenge in a satisfying way. In the
-following sections, we tackle each of these challenges in detail.
+\ourgc, allow us to address each problem in a satisfying way. In the following
+section, we tackle these problem in order, noting that we tackle problems
+(1) and (2) in one go, solving (3) and (4) separately.
 
 
 \section{Finaliser Safety Analysis}
 
-In this section we address the challenge that some safe destructors are not
-safe finalisers by introducing the novel technique of \emph{finaliser safety
-analysis}. We extend Rust's static analyses, and alter the relevant parts
+In this section we address two problems: running finalisers on the same thread
+as a paused collector can cause deadlocks; and some safe destructors are not
+safe finalisers. Addressing the first problem is conceptually simple --
+finalisers must be run on a separate thread -- but we must ensure that doing so
+is sound. We therefore consider this a specific instance of the second problem.
+In this Section, we tackle these problems through the novel technique of
+\emph{finaliser safety analysis}. We extend Rust's static analyses, and alter the relevant parts
 of \rustc, to reject a type \lstinline{T}'s destructor if it
 is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 To the best of our knowledge, no other GCed language has an
