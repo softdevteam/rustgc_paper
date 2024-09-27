@@ -365,10 +365,15 @@ Rust uses destructors pervasively, in the form of \emph{drop methods} and
 \lstinline{Drop} trait that are called as the first stage of destruction. Drop
 glue recursively calls destructors of contained types (e.g.~fields in a
 \lstinline{struct}); it is automatically inserted by \rustc, and is run as the
-second, and final, stage of destruction. Although it is common usage to map
-`destructor' in Rust to just `drop methods', `drop glue' is a vital part of a
-destructor: when a value is \emph{dropped} (e.g.~the value's owner went out of
-scope), both drop method and glue are executed.
+second, and final, stage of destruction \jake{This is true for drop on
+structs/enums (and I see what you're getting at here is an outside-in
+destruction order), but rustc refers to drop glue as the thing that inserts the
+original drop calls too. So drop glue is used to to insert drop calls to types
+for e.g. on-stack values `a', `b', and `c'. This would mean drop glue comes
+first.} Although it is common usage to map `destructor' in Rust to just `drop
+methods', `drop glue' is a vital part of a destructor: when a value is
+\emph{dropped} (e.g.~the value's owner went out of scope), both drop method and
+glue are executed.
 
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
@@ -398,7 +403,11 @@ little conceptually difficulty.
 However, problem (1) cannot be fixed by drudgery or ingenuity, as the insertion
 of drop glue is outside of the user's control. There are additional subtleties.
 Because destruction is split into calling a drop method and then drop glue, a
-drop method does not actually drop a value (as can be seen from the fact
+drop method does not actually drop a value \jake{I think this is confusing. I
+think what you're trying to say is that drop does not take ownership and
+therefore end the scope of a value? What does drop mean? In Rust parlance it
+means that the drop method has been run, should we use the word destroyed
+instead?} (as can be seen from the fact
 \lstinline{drop} takes a value of \lstinline{&mut self}). Splitting destruction
 in this way means that drop glue can be added without regard to the contents of
 a drop method. However, because a drop method does not actually drop a value,
