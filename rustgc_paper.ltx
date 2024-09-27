@@ -403,17 +403,15 @@ little conceptually difficulty.
 However, problem (1) cannot be fixed by drudgery or ingenuity, as the insertion
 of drop glue is outside of the user's control. There are additional subtleties.
 Because destruction is split into calling a drop method and then drop glue, a
-drop method does not actually drop a value \jake{I think this is confusing. I
-think what you're trying to say is that drop does not take ownership and
-therefore end the scope of a value? What does drop mean? In Rust parlance it
-means that the drop method has been run, should we use the word destroyed
-instead?} (as can be seen from the fact
-\lstinline{drop} takes a value of \lstinline{&mut self}). Splitting destruction
+drop method does not take ownership of a value (as can be seen from the fact
+that \lstinline{Drop::drop} takes a value of type \lstinline{&mut self} rather
+than of type \lstinline{self}) --- in other words, a value is only `dropped'
+after both the drop method and drop glue have run. Splitting destruction
 in this way means that drop glue can be added without regard to the contents of
-a drop method. However, because a drop method does not actually drop a value,
-calling it more than once would often lead to semantic errors. This is a
-problem, because \emph{Drop::drop} is a normal trait method, and trait methods
-can be called directly by the programmer as many times as they wish. To avoid
+a drop method. However, this split causes another problem:
+because \lstinline{Drop::drop} is a normal trait method, and trait methods
+can be called directly by the programmer as many times as they wish, one
+could end up with `partly dropped' values. To avoid
 this, \rustc special cases \lstinline{Drop::drop}, raising an error if it is
 called directly by the programmer.
 
