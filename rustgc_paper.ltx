@@ -582,7 +582,12 @@ defines a \emph{marker} (i.e.~without methods) \emph{auto trait}
 (i.e.~automatically implemented for types which adhere to its restrictions)
 \lstinline{ReferenceFree}. \ourgc automatically implements
 \lstinline{ReferenceFree} for each type that does not itself contain a
-type that is not \lstinline{ReferenceFree}. Primitive types such as integers are \lstinline{ReferenceFree} by default; crucially (and at the risk of stating the obvious) references themselves are not \lstinline{ReferenceFree}. Thus a non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the manner we desire\footnote{\laurie{``As with all auto traits?``}, users can force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
+type that is not \lstinline{ReferenceFree}. Primitive types such as integers
+are \lstinline{ReferenceFree} by default; crucially (and at the risk of stating
+the obvious) references themselves are not \lstinline{ReferenceFree}. Thus a
+non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the
+manner we desire\footnote{\laurie{``As with all auto traits?``}, users can
+force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
 
 \laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?}
 
