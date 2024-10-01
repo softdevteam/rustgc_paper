@@ -462,7 +462,7 @@ viable GC for Rust needs to be able to use existing destructors as finalisers
 whenever possible; and that finalisers, even in existing GCs, cause
 various problems.
 
-Over time finalisers have come to be viewed with increasing suspicion. Java,
+Over time, finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}. It
@@ -494,7 +494,8 @@ as a paused collector can cause deadlocks; and some safe destructors are not
 safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the second problem.
-In this Section, we tackle these problems through the novel technique of
+
+Our solution is the novel technique of
 \emph{finaliser safety analysis}. We extend Rust's static analyses, and alter the relevant parts
 of \rustc, to reject a type \lstinline{T}'s destructor if it
 is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
@@ -507,31 +508,7 @@ would undermine safety, and the general rules for identifying the troublesome
 cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 
 
-\subsection{The Troublesome Cases}
-
-\subsubsection{Normal Rust References and Finalisers}
-
-As with other `smart pointers' such as \lstinline{Rc<T>}, a \lstinline{Gc} can store
-(indirectly or indirectly) ordinary Rust references (i.e.~\lstinline{&} and
-\lstinline{&mut}), subjecting the smart pointer to Rust's normal borrow
-checker rules: the smart pointer cannot outlive the value whose reference it
-now contains.
-
-Doing so is safe for \lstinline{Gc<T>} except when a finaliser accesses a
-stored reference, since the finaliser may (indeed, is likely to) be run after
-the reference is no longer valid.
-
-\laurie{we have a small but important discrepancy between text and figure: the
-text says ``you can't use references in a finaliser'' but the listing shows
-``you can't create a Gc with a reference in it''. the latter is clearly a (i
-believe strict) superset of the former. could we / should we only bork if the
-finaliser uses the reference? or is our argument ``it's simpler to just reject
-all references because doing so isn't useful anyway?''} \jake{Yes, this is unfortunate. We have to treat Rust references differently to other things in FSA because it's much harder to do a drop body per-line analysis on them. The rule for Rust references is essentially: Type containing ref. XOR drop method. In other words, if your type has a ref, you can't have a drop method, even if it doesn't use it. This is clearly not ideal, but the lack of def-use support in MIR meant that it's really hard to know whether a deref inside a drop was safe (e.g. \lstinline{&mut self.x.y.z}) or unsafe.}\laurie{so when we say ``gc can store ordinary rust references'', that's wrong?} \jake{A gc can store ordinary Rust references provided it does not have a finaliser. It can have one or the other, and this is checked statically when you try and put a value inside \lstinline{Gc::new}}
-However, using such references from a finaliser is unsound. This is because the
-collector may schedule the finaliser to run after the \lstinline{Gc}'d object is
-unreachable, when the reference would no longer be valid.
-\autoref{fig:dangling_reference} shows how a \lstinline{Gc} which dereferences
-a standard Rust reference inside a finaliser can cause a use-after-free.
+\subsection{Rust references}
 
 \begin{figure}[t]
 \centering
@@ -563,11 +540,98 @@ error: `Node{value: &*b, nbr: None}` cannot be safely
   because the collector is likely to schedule the finaliser to run after the
   \lstinline{Box<u64>} is freed when \lstinline{b} goes out of scope. The
   dereference on line 3 would thus access a dangling reference causing a
-  use-after-free.}
+  use-after-free.\laurie{this example slightly contradicts the text: is the
+  problem the existence of reference + finaliser OR the use of the reference in
+  drop? I'm pretty sure it's the first of these two possibilities, but
+  I'd like to check!}}
 \end{figure}
 
+A \lstinline{Gc<T>} can store (indirectly or indirectly) normal Rust references
+(i.e.~\lstinline{&} and \lstinline{&mut}), at which point the \lstinline{Gc<T>}
+is subject to Rust's normal borrow checker rules and cannot outlive the
+reference. Finalisers are fundamentally incompatible with this, because the
+finaliser will be run after the \lstinline{Gc<T>}'s owner has gone out of scope:
+if the finaliser were to make use (even indirectly) of a reference, we would
+have subverted the borrow checker.
 
-\subsubsection{Finalisation order}
+\ourgc's solution to this is simple: \lstinline{Gc<T>} can only include a
+reference iff \lstinline{T} does not need finalising. For example,
+\lstinline{Gc<&u8>} is permitted, because integers do not need finalising. However,
+\lstinline{Gc<Node<&Box<T>>>} is not permitted, because \lstinline{Box} needs
+its finaliser to be run in order to free its backing memory. \cref{fig:dangling_reference}
+shows the error that \ourgc raises in such a case.
+
+While we could somewhat relax this rule (e.g.~finalisers which provably do not,
+directly or indirectly, use a reference could be let through), there are few
+benefits to doing so: after all, \lstinline{Gc<T>} is explicitly designed to
+help users avoid ownership restrictions. That said, finaliser elision
+(see~\cref{XYZ}) does reduce the number of types which need finalisation, thus
+enabling more types to be embedded as references, for those who really want to.
+
+\laurie{this paragraph again suggests that we look into the finaliser, but
+elsewhere we suggest we don't look into the finaliser.}
+As with references, this same unsoundness can be caused by storing raw pointers
+inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
+\lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
+is sound even without enforcing this rule for raw pointers because dereferencing raw pointers
+is already not possible in safe Rust code, and programmers must ensure the
+reference is valid for each dereference anyway.
+
+To check whether a type passed to \lstinline{Gc} contains a reference, \ourgc
+defines a \emph{marker} (i.e.~without methods) \emph{auto trait}
+(i.e.~automatically implemented for types which adhere to its restrictions)
+\lstinline{ReferenceFree}. \ourgc automatically implements
+\lstinline{ReferenceFree} for each type that does not itself contain a
+type that is not \lstinline{ReferenceFree}. Primitive types such as integers are \lstinline{ReferenceFree} by default; crucially (and at the risk of stating the obvious) references themselves are not \lstinline{ReferenceFree}. Thus a non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the manner we desire\footnote{\laurie{``As with all auto traits?``}, users can force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
+
+\laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?}
+
+
+% \subsubsection{Need to introduce concurrency}
+% \label{sendsync}
+%
+% The Rust type system is able to guarantee statically that values are being used
+% in a thread-safe way. It does this with the use of two special "marker" traits:
+% \lstinline{Send} and \lstinline{Sync}.
+%
+% A value whose type implements the \lstinline{Send} trait can be transferred to
+% other threads. Almost all types in Rust implement the \lstinline{Send} trait
+% save for a few exceptions. One such exception is the \lstinline{Rc<T>}
+% (reference counting) type. This does \emph{not} implement \lstinline{Send}
+% because it does not perform count operations on its underlying contents
+% atomically. If it were sent to another thread, it could race if both threads
+% tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
+% type (an atomic implementation of \lstinline{Rc<T>}) does implement
+% \lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
+%
+% The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
+% implemented on types whose values perform mutation in a thread-safe manner. For
+% example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
+% exclusive access to its underlying data atomically. On the other hand, a
+% \lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
+% \lstinline{Sync} because it only provides single-threaded interior
+% mutability. This is because its underlying mechanism to increment and decrement
+% borrow counts are not performed atomically.
+%
+% The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
+% trait known as \emph{auto traits}. This means that they are automatically
+% implemented for every type, unless the type, or a type it contains, has
+% explicitly opted out. Types can be opted out via a \emph{negative impl}:
+
+% \begin{lstrustsmall}
+%     impl !Send for T {}
+% \end{lstrustsmall}
+
+% If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
+% from the example above, then the entire struct \lstinline{S} will also not
+% implement \lstinline{Send}.
+%
+% \lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
+% doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
+% is safe to use in a multi-threaded context.
+
+
+\subsection{Finalisation order}
 
 Some GCs implementations guarantee a finalisation order, because for some
 applications, this is important if one resource must be cleaned up before
@@ -707,118 +771,6 @@ Extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers. At compile-time, a static analysis is
 performed over the drop methods of each value used in a \lstinline{Gc}.
 
-\subsubsection{Preventing dangling references}
-
-For a \lstinline{Gc<T>} with a finaliser to be sound, it cannot be used with an
-object which contains ordinary Rust references. To guarantee this, FSA imposes a new static rule on Rust programs which states that that a type
-\lstinline{T} cannot be placed in a \lstinline{Gc} if both of the
-following definitions are true:
-
-\begin{definition}
-    \lstinline{T} (or any component type of \lstinline{T}) is of some type
-        \lstinline{&U} or \lstinline{&mut U}.
-\end{definition}
-\begin{definition}
-
-    \lstinline{T} is finalisable. In other words, \lstinline{T} (or
-      any component type of \lstinline{T}) has a drop method.
-\end{definition}
-
-As with references, this same unsoundness can be caused by storing raw pointers
-inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
-\lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
-is sound even without enforcing this rule for raw pointers because dereferencing raw pointers
-is already not possible in safe Rust code, and programmers must ensure the
-reference is valid for each dereference anyway.
-
-\ourgc checks that programs adhere to the \bor at compile-time, throwing an
-error for those programs which violate it.
-
-
-% To check whether a type passed to \lstinline{Gc} contains a reference, \ourgc
-% defines a marker trait with no methods called \lstinline{ReferenceFree} which is
-% used by the compiler to indicate that a value of a type does not contain
-% references.
-%
-% \lstinline{ReferenceFree} is defined as an \emph{auto trait} (see
-% \autoref{sendsync}), so it's implemented on every type in Rust by default.
-% \ourgc then explicitly unimplements \lstinline{ReferenceFree} on all reference
-% types:
-%
-% \begin{lstrustsmall}
-% impl !ReferenceFree for &T {}
-% impl !ReferenceFree for &mut T {}
-% \end{lstrustsmall}
-%
-% This means that if a type contains a \lstinline{&T} or a \lstinline{&mut T} for
-% any \lstinline{T} in
-% one of its component types, then it will not implement \lstinline{ReferenceFree}
-% either.
-%
-% Whether or not a type implements \lstinline{ReferenceFree} can then be checked
-% at compile-time: if \lstinline{T} implements \lstinline{ReferenceFree}, then
-% it's safe to use inside a \lstinline{Gc}. If \lstinline{T} does not implement
-% \lstinline{ReferenceFree}, and \lstinline{T} has a drop method, then it cannot
-% be used inside a \lstinline{Gc}. This is implemented with an extension to
-% finaliser safety analysis, where the type of \lstinline{T} is checked for an
-% implementation of \lstinline{ReferenceFree} if it has a finaliser during the
-% \lstinline{CheckCallsite} phase.
-
-% The \bor can be restrictive: in particular, a
-% \lstinline{Gc<T>} object which both contains references and has a finaliser, but
-% where the finaliser never uses the reference would be deemed invalid, even
-% though it is sound. \autoref{borsound} shows an example program which is sound, but fails to
-% compile due to the \bor.
-%
-% To allow the program in \autoref{borsound} to compile, one can explicitly
-% implement \lstinline{ReferenceFree} on \lstinline{Wrapper}:
-
-% \begin{lstrustsmall}
-% unsafe impl<'a> ReferenceFree for Wrapper<'a> {}
-% \end{lstrustsmall}
-
-% \subsubsection{Need to introduce concurrency}
-% \label{sendsync}
-%
-% The Rust type system is able to guarantee statically that values are being used
-% in a thread-safe way. It does this with the use of two special "marker" traits:
-% \lstinline{Send} and \lstinline{Sync}.
-%
-% A value whose type implements the \lstinline{Send} trait can be transferred to
-% other threads. Almost all types in Rust implement the \lstinline{Send} trait
-% save for a few exceptions. One such exception is the \lstinline{Rc<T>}
-% (reference counting) type. This does \emph{not} implement \lstinline{Send}
-% because it does not perform count operations on its underlying contents
-% atomically. If it were sent to another thread, it could race if both threads
-% tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
-% type (an atomic implementation of \lstinline{Rc<T>}) does implement
-% \lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
-%
-% The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
-% implemented on types whose values perform mutation in a thread-safe manner. For
-% example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
-% exclusive access to its underlying data atomically. On the other hand, a
-% \lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
-% \lstinline{Sync} because it only provides single-threaded interior
-% mutability. This is because its underlying mechanism to increment and decrement
-% borrow counts are not performed atomically.
-%
-% The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
-% trait known as \emph{auto traits}. This means that they are automatically
-% implemented for every type, unless the type, or a type it contains, has
-% explicitly opted out. Types can be opted out via a \emph{negative impl}:
-
-% \begin{lstrustsmall}
-%     impl !Send for T {}
-% \end{lstrustsmall}
-
-% If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
-% from the example above, then the entire struct \lstinline{S} will also not
-% implement \lstinline{Send}.
-%
-% \lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
-% doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
-% is safe to use in a multi-threaded context.
 
 \subsubsection{Ensuring thread-safety}
 
