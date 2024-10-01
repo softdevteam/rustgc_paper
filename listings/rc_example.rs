@@ -2,13 +2,13 @@ use std::rc::Rc;
 use std::rc::Weak;
 use std::cell::RefCell;
 
-struct Node { value: u8, nbr: Option<Weak<RefCell<Node>>> }
-impl Drop for Node { fn drop(&mut self) { println!("drop {}", self.value); } }
+struct RcNode { value: u8, nbr: Option<Weak<RefCell<RcNode>>> }
+impl Drop for RcNode { fn drop(&mut self) { println!("drop {}", self.value); } }
 
 fn main() {
-  let mut rc1 = Rc::new(RefCell::new(Node{value: 1, nbr: None}));
+  let mut rc1 = Rc::new(RefCell::new(RcNode{value: 1, nbr: None}));
   rc1.borrow_mut().nbr = Some(Rc::downgrade(&rc1));
-  let rc2 = Rc::new(RefCell::new(Node{value: 2, nbr: None}));
+  let rc2 = Rc::new(RefCell::new(RcNode{value: 2, nbr: None}));
   rc2.borrow_mut().nbr = Some(Rc::downgrade(&rc2));
   rc1 = Rc::clone(&rc2);
   println!("{} {}",

@@ -22,11 +22,11 @@ each of these problems.
 \begin{figure}[t]
 \lstinputlisting[language=Rust, firstline=6]{listings/first_example.rs}
 \captionof{lstlisting}{An \ourgc example, showing use of the \lstinline{Gc<T>}
-  type and destructors as finalisers. We create a type \lstinline{Node} which
+  type and destructors as finalisers. We create a type \lstinline{GcNode} which
   models a graph: it stores an 8 bit integer value and a reference (possibly
   null, via Rust's standard \lstinline{Option} type) to a neighbouring node
   (line 1). We add a normal Rust destructor which \ourgc is able to use as a
-  finaliser when \lstinline{Node} is used inside \lstinline{Gc<T>} (line 2).
+  finaliser when \lstinline{GcNode} is used inside \lstinline{Gc<T>} (line 2).
   Inside \lstinline{main} we create the first GCed node in the graph (line 5).
   We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
   (using the \lstinline{RefCell::borrow\_mut} method to dynamically detect mutation that
@@ -38,7 +38,7 @@ each of these problems.
   require careful, laborious programming to avoid memory leaks
   (see~\cref{fig:rc_example}). We then create a second cyclic graph (lines 7
   and 8), immediately assigning it to the \lstinline{gc1} variable (line 9).
-  Doing so means that the first cyclic graph \lstinline{Node\{value: 1, ..\}}
+  Doing so means that the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
   is no longer reachable, so when we force a collection (line 10) that node
   will be recognised as collectable; its finaliser is scheduled to be run (causing
   \lstinline{drop 1} to be printed out at a later point), and when done so the backing
@@ -590,6 +590,11 @@ manner we desire\footnote{\laurie{``As with all auto traits?``}, users can
 force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
 
 \laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?}
+
+
+\subsection{Finalisation Order}
+
+
 
 
 % \subsubsection{Need to introduce concurrency}
