@@ -476,15 +476,228 @@ possible may thus seem out of reach. Indeed, in the nearest
 context to our work GC for C++ this solution was explicitly ruled out for GC for C++ as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
-(1) running finalisers on the same thread as a paused collector can cause deadlocks;
-(2) some safe destructors are not safe finalisers;
-(3) finalisers can be run too early;
-and (4) finalisers are prohibitively slower than destructors.
+(1) finalisers are prohibitively slower than destructors;
+(2) finalisers can be run too early;
+(3) running finalisers on the same thread as a paused collector can cause deadlocks;
+(4) some safe destructors are not safe finalisers;
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
 \ourgc, allow us to address each problem in a satisfying way. In the following
-section, we tackle these problem in order, noting that we tackle problems
-(1) and (2) in one go, solving (3) and (4) separately.
+section, we tackle these problems in order, noting that we tackle problems
+(1) and (2) separately, and (3) and (3) together.
+
+
+\section{Finaliser Elision}
+
+For performance reasons, many GC'd languages discourage programmers from using finalisers.
+In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
+finalisers therefore have a high performance overhead.
+
+\subsection{Solution (3) Finaliser Elision}
+
+Statically optimises away finalisers if the destructor that is their basis
+simply frees heap memory.
+
+To claw back this performance hit, we implement a new optimisation called
+\textit{finaliser elision}. This optimisation is based on the observation that
+sometimes only the top-most object in a \lstinline{Gc} graph needs to have a
+finaliser. Consider the following example:
+
+\begin{lstrustsmall}
+let a = Box::new(123);
+let b = Gc::new(a);
+\end{lstrustsmall}
+
+Here \lstinline{a} refers to a boxed integer on the heap which is not managed by
+the collector. It is placed inside a \lstinline{Gc}, which has the following
+representation in memory:
+
+\begin{center}
+\includegraphics[width=0.75\textwidth]{images/finaliser_elision_1}
+\end{center}
+
+Before the \lstinline{Gc} referenced by \lstinline{b} is collected, its
+finaliser is called, which calls drop on the non-GC'd box:
+
+\begin{center}
+\includegraphics[width=0.75\textwidth]{images/finaliser_elision_2}
+\end{center}
+
+This is inefficient because the collector would have later reclaimed the
+\lstinline{Box}, since all references to it would be lost. In other words,
+neither \lstinline{a}'s finaliser nor \lstinline{b}'s drop method need
+to be called for the memory to be reclaimed.
+
+Since sweeping is cheaper than finalisation, finaliser elision aims to identify
+other cases where finalisation can be avoided. It is a powerful optimisation,
+but not applicable everywhere as this example shows:
+
+\begin{lstrustsmall}
+struct HasDrop(u64);
+
+impl Drop for HasDrop {
+    fn drop(&mut self) {
+        println!("Dropping HasDrop");
+    }
+}
+
+let a = Gc::new(HasDrop(123));
+\end{lstrustsmall}
+
+Here \lstinline{a} refers to a \lstinline{Gc} containing an integer, which has
+the following representation in memory:
+
+\begin{center}
+\includegraphics[width=0.5\textwidth]{images/finaliser_elision_3}
+\end{center}
+
+We are not able to elide the finaliser for this \lstinline{Gc} because, unlike
+the previous example, the drop method does more than just drop another heap
+object in this case printing to stdout.
+
+\subsubsection{When can a finaliser be elided?}
+
+The foundation of finaliser elision lies with the
+\lstinline{FinalizerOptional} trait, which is used to determine if a type needs
+finalising. If a type \lstinline{T} implements \lstinline{Drop}, but also
+implements \lstinline{FinalizerOptional}, then \lstinline{Gc<T>} won't be
+finalised. For example we can adjust our earlier example as follows:
+
+\begin{lstrustsmall}
+struct HasDrop;
+
+impl Drop for HasDrop {
+    fn drop(&mut self) {
+        println!("Dropping HasDrop");
+    }
+}
+
+unsafe impl FinalizerOptional for HasDrop {}
+
+let a = Gc::new(HasDrop(123));
+\end{lstrustsmall}
+
+This informs \ourgc that \lstinline{HasDrop} does not need a finaliser
+when placed inside a \lstinline{Gc}, even though \lstinline{HasDrop}
+implements the \lstinline{Drop} trait. When a \lstinline{Gc} is constructed
+with a value of this type, it no longer has a finaliser:
+
+\begin{center}
+\includegraphics[width=0.5\textwidth]{images/finaliser_elision_4}
+\end{center}
+
+\lstinline{FinalizerOptional} is particularly powerful when used
+with container types. For example, consider the standard Rust
+\lstinline{Box<T>} type. Its heap memory can be automatically reclaimed by the
+allocator, but depending on the type \lstinline{T}, we may
+need to call a finaliser. Thus we cannot simply always remove a \lstinline{Box}'s finaliser.
+Fortunately we can easily tell Rust's type system that we want to make
+\lstinline{Box<T>} be \lstinline{FinalizerOptional} if \lstinline{T}
+is also \lstinline{FinalizerOptional} with:
+
+\begin{lstrustsmall}
+unsafe impl<T> FinalizerOptional for Box<T> {}
+\end{lstrustsmall}
+
+This tells \ourgc that it's safe to elide the finaliser for \lstinline{Box<T>}
+if \lstinline{T} does not need finalising. When \ourgc discovers a type which
+implements \lstinline{FinalizerOptional}, it will treat it as if it does not
+implement \lstinline{Drop}, but continue on checking all its component types.
+
+\ourgc implements \lstinline{FinalizerOptional} on the following heap allocating
+standard library types: \lstinline{Box<T>}, \lstinline{Vec<T>},
+\lstinline{RawVec<T>}, \lstinline{HashMap<T>}. This is enough to elide a
+significant amount of finalisers without any extra effort required by the user
+(see \autoref{fincost}). If the user defines their own heap
+allocating types which use drop to deallocate, they can implement
+\lstinline{FinalizerOptional} on it so that it can also benefit from finaliser
+elision.
+
+
+\subsubsection{Finaliser elision algorithm}
+
+The exact algorithm for finaliser elision detection is defined as follows:
+
+\begin{algorithm}
+\begin{algorithmic}
+\Function{NeedsFinaliser}{$type$}
+    \If {\Call{Impls}{$type$, $Drop$} \AND \NOT \Call{Impls}{$type$, $FinalizerOptional$}}
+        \State \Return{true}
+    \EndIf
+\ForEach {$component \in type$}
+    \If{\Call{NeedsFinaliser}{$component$}}
+        \State \Return{true}
+    \EndIf
+\EndFor
+\State \Return{false}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}
+    \centering
+    \subfloat[\centering \lstinline{Gc<Box<u64>>}]{\includegraphics[width=0.3\textwidth]{images/finaliser_elision_5}}
+    \hfill\hspace{0.2\textwidth}
+    \subfloat[\centering \lstinline{Gc<Box<Box<u64>>>}]{\includegraphics[width=0.3\textwidth]{images/finaliser_elision_7}} \\
+    \vspace{30px}
+    \subfloat[\centering \lstinline{Gc<Box<HasDrop>>}]{\includegraphics[width=0.4\textwidth]{images/finaliser_elision_6}}
+    \hfill
+    \subfloat[\centering \lstinline{Gc<Box<Box<HasDrop>>>}]{\includegraphics[width=0.4\textwidth]{images/finaliser_elision_8}}
+    \caption{The memory layout of various \lstinline{Gc} types.
+    \textbf{(a)} and \textbf{(b)} do not need a finaliser because the \lstinline{Box} implements
+    \lstinline{FinalizerOptional} and \lstinline{u64} does not need finalising.
+    \textbf{(c)} and \textbf{(d)} do need a finaliser because in
+    each example, a \lstinline{Box} contains a \lstinline{HasDrop}, which needs
+    finalising because it has a drop method. Notice that for \textbf{(c)} and
+    \textbf{(d)}, the finaliser calls the drop methods for each component type --
+    even the boxes which are marked \lstinline{FinalizerOptional}. This is
+    because finaliser elision does not do partial elision of finalisers.}
+\label{fig:finaliser_elision}
+\end{figure}
+
+\autoref{fig:finaliser_elision} shows various examples of when finaliser
+elision can remove a finaliser, and when it cannot. What's important to note
+here is that if a type \lstinline{T} is marked \lstinline{FinalizerOptional},
+but has fields which need finalising, then \lstinline{T} will still be
+finalised.
+
+The algorithm for finaliser elision is implemented as a compiler intrinsic,
+\lstinline{needs_finalizer<T>()} which returns true if \lstinline{Gc<T>} needs a
+finaliser. This intrinsic is then called during the construction of new
+\lstinline{Gc} objects (inside \lstinline{Gc::new}):
+
+\begin{lstrustsmall}
+impl Gc<T> {
+    pub fn new(value: T) -> Self {
+        ...
+        if needs_finalizer::<T>() {
+            Gc<T>::new_with_finalizer(value)
+        } else {
+            Gc<T>::new_without_finalizer(value)
+        }
+        ...
+    }
+}
+\end{lstrustsmall}
+
+\lstinline{needs_finalizer<T>} is marked as a special type of Rust function,
+called a \emph{const} function, which means that it is evaluated at compile
+time, this means that the conditional on line 4 has no runtime cost.
+
+\subsubsection{Sweeping objects with elided finalisers}
+
+Once an object's finaliser has been elided, \ourgc needs to be responsible for
+managing its memory. This is achieved with a modification to the global
+allocator in Rust. Every heap allocation in Rust programs compiled with \ourgc
+is allocated using BDWGC's \lstinline{GC_malloc} function --- even those which
+are not part of a \lstinline{Gc}. For values which are allocated using Rust's RAII
+approach, they are manually deallocated with calls to \lstinline{GC_free}. For
+non-GC'd heap allocations, this is semantically equivalent to a regular
+\lstinline{malloc} call: there will always be a reference preventing them from
+being collected, and RAII ensures that the corresponding \lstinline{GC_free} is
+called the moment they go out of scope. However, when such allocations are owned
+by a \lstinline{Gc}, they will be freed by the collector along with the
+\lstinline{Gc}.
 
 
 \section{Finaliser Safety Analysis}
@@ -1199,218 +1412,6 @@ After this pass, we call the Rust compiler's existing \emph{simplify mir} pass,
 which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
 
-
-\section{Finaliser Elision}
-
-For performance reasons, many GC'd languages discourage programmers from using finalisers.
-In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
-finalisers therefore have a high performance overhead.
-
-\subsection{Solution (3) Finaliser Elision}
-
-Statically optimises away finalisers if the destructor that is their basis
-simply frees heap memory.
-
-To claw back this performance hit, we implement a new optimisation called
-\textit{finaliser elision}. This optimisation is based on the observation that
-sometimes only the top-most object in a \lstinline{Gc} graph needs to have a
-finaliser. Consider the following example:
-
-\begin{lstrustsmall}
-let a = Box::new(123);
-let b = Gc::new(a);
-\end{lstrustsmall}
-
-Here \lstinline{a} refers to a boxed integer on the heap which is not managed by
-the collector. It is placed inside a \lstinline{Gc}, which has the following
-representation in memory:
-
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/finaliser_elision_1}
-\end{center}
-
-Before the \lstinline{Gc} referenced by \lstinline{b} is collected, its
-finaliser is called, which calls drop on the non-GC'd box:
-
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/finaliser_elision_2}
-\end{center}
-
-This is inefficient because the collector would have later reclaimed the
-\lstinline{Box}, since all references to it would be lost. In other words,
-neither \lstinline{a}'s finaliser nor \lstinline{b}'s drop method need
-to be called for the memory to be reclaimed.
-
-Since sweeping is cheaper than finalisation, finaliser elision aims to identify
-other cases where finalisation can be avoided. It is a powerful optimisation,
-but not applicable everywhere as this example shows:
-
-\begin{lstrustsmall}
-struct HasDrop(u64);
-
-impl Drop for HasDrop {
-    fn drop(&mut self) {
-        println!("Dropping HasDrop");
-    }
-}
-
-let a = Gc::new(HasDrop(123));
-\end{lstrustsmall}
-
-Here \lstinline{a} refers to a \lstinline{Gc} containing an integer, which has
-the following representation in memory:
-
-\begin{center}
-\includegraphics[width=0.5\textwidth]{images/finaliser_elision_3}
-\end{center}
-
-We are not able to elide the finaliser for this \lstinline{Gc} because, unlike
-the previous example, the drop method does more than just drop another heap
-object in this case printing to stdout.
-
-\subsubsection{When can a finaliser be elided?}
-
-The foundation of finaliser elision lies with the
-\lstinline{FinalizerOptional} trait, which is used to determine if a type needs
-finalising. If a type \lstinline{T} implements \lstinline{Drop}, but also
-implements \lstinline{FinalizerOptional}, then \lstinline{Gc<T>} won't be
-finalised. For example we can adjust our earlier example as follows:
-
-\begin{lstrustsmall}
-struct HasDrop;
-
-impl Drop for HasDrop {
-    fn drop(&mut self) {
-        println!("Dropping HasDrop");
-    }
-}
-
-unsafe impl FinalizerOptional for HasDrop {}
-
-let a = Gc::new(HasDrop(123));
-\end{lstrustsmall}
-
-This informs \ourgc that \lstinline{HasDrop} does not need a finaliser
-when placed inside a \lstinline{Gc}, even though \lstinline{HasDrop}
-implements the \lstinline{Drop} trait. When a \lstinline{Gc} is constructed
-with a value of this type, it no longer has a finaliser:
-
-\begin{center}
-\includegraphics[width=0.5\textwidth]{images/finaliser_elision_4}
-\end{center}
-
-\lstinline{FinalizerOptional} is particularly powerful when used
-with container types. For example, consider the standard Rust
-\lstinline{Box<T>} type. Its heap memory can be automatically reclaimed by the
-allocator, but depending on the type \lstinline{T}, we may
-need to call a finaliser. Thus we cannot simply always remove a \lstinline{Box}'s finaliser.
-Fortunately we can easily tell Rust's type system that we want to make
-\lstinline{Box<T>} be \lstinline{FinalizerOptional} if \lstinline{T}
-is also \lstinline{FinalizerOptional} with:
-
-\begin{lstrustsmall}
-unsafe impl<T> FinalizerOptional for Box<T> {}
-\end{lstrustsmall}
-
-This tells \ourgc that it's safe to elide the finaliser for \lstinline{Box<T>}
-if \lstinline{T} does not need finalising. When \ourgc discovers a type which
-implements \lstinline{FinalizerOptional}, it will treat it as if it does not
-implement \lstinline{Drop}, but continue on checking all its component types.
-
-\ourgc implements \lstinline{FinalizerOptional} on the following heap allocating
-standard library types: \lstinline{Box<T>}, \lstinline{Vec<T>},
-\lstinline{RawVec<T>}, \lstinline{HashMap<T>}. This is enough to elide a
-significant amount of finalisers without any extra effort required by the user
-(see \autoref{fincost}). If the user defines their own heap
-allocating types which use drop to deallocate, they can implement
-\lstinline{FinalizerOptional} on it so that it can also benefit from finaliser
-elision.
-
-
-\subsubsection{Finaliser elision algorithm}
-
-The exact algorithm for finaliser elision detection is defined as follows:
-
-\begin{algorithm}
-\begin{algorithmic}
-\Function{NeedsFinaliser}{$type$}
-    \If {\Call{Impls}{$type$, $Drop$} \AND \NOT \Call{Impls}{$type$, $FinalizerOptional$}}
-        \State \Return{true}
-    \EndIf
-\ForEach {$component \in type$}
-    \If{\Call{NeedsFinaliser}{$component$}}
-        \State \Return{true}
-    \EndIf
-\EndFor
-\State \Return{false}
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-\begin{figure}
-    \centering
-    \subfloat[\centering \lstinline{Gc<Box<u64>>}]{\includegraphics[width=0.3\textwidth]{images/finaliser_elision_5}}
-    \hfill\hspace{0.2\textwidth}
-    \subfloat[\centering \lstinline{Gc<Box<Box<u64>>>}]{\includegraphics[width=0.3\textwidth]{images/finaliser_elision_7}} \\
-    \vspace{30px}
-    \subfloat[\centering \lstinline{Gc<Box<HasDrop>>}]{\includegraphics[width=0.4\textwidth]{images/finaliser_elision_6}}
-    \hfill
-    \subfloat[\centering \lstinline{Gc<Box<Box<HasDrop>>>}]{\includegraphics[width=0.4\textwidth]{images/finaliser_elision_8}}
-    \caption{The memory layout of various \lstinline{Gc} types.
-    \textbf{(a)} and \textbf{(b)} do not need a finaliser because the \lstinline{Box} implements
-    \lstinline{FinalizerOptional} and \lstinline{u64} does not need finalising.
-    \textbf{(c)} and \textbf{(d)} do need a finaliser because in
-    each example, a \lstinline{Box} contains a \lstinline{HasDrop}, which needs
-    finalising because it has a drop method. Notice that for \textbf{(c)} and
-    \textbf{(d)}, the finaliser calls the drop methods for each component type --
-    even the boxes which are marked \lstinline{FinalizerOptional}. This is
-    because finaliser elision does not do partial elision of finalisers.}
-\label{fig:finaliser_elision}
-\end{figure}
-
-\autoref{fig:finaliser_elision} shows various examples of when finaliser
-elision can remove a finaliser, and when it cannot. What's important to note
-here is that if a type \lstinline{T} is marked \lstinline{FinalizerOptional},
-but has fields which need finalising, then \lstinline{T} will still be
-finalised.
-
-The algorithm for finaliser elision is implemented as a compiler intrinsic,
-\lstinline{needs_finalizer<T>()} which returns true if \lstinline{Gc<T>} needs a
-finaliser. This intrinsic is then called during the construction of new
-\lstinline{Gc} objects (inside \lstinline{Gc::new}):
-
-\begin{lstrustsmall}
-impl Gc<T> {
-    pub fn new(value: T) -> Self {
-        ...
-        if needs_finalizer::<T>() {
-            Gc<T>::new_with_finalizer(value)
-        } else {
-            Gc<T>::new_without_finalizer(value)
-        }
-        ...
-    }
-}
-\end{lstrustsmall}
-
-\lstinline{needs_finalizer<T>} is marked as a special type of Rust function,
-called a \emph{const} function, which means that it is evaluated at compile
-time, this means that the conditional on line 4 has no runtime cost.
-
-\subsubsection{Sweeping objects with elided finalisers}
-
-Once an object's finaliser has been elided, \ourgc needs to be responsible for
-managing its memory. This is achieved with a modification to the global
-allocator in Rust. Every heap allocation in Rust programs compiled with \ourgc
-is allocated using BDWGC's \lstinline{GC_malloc} function --- even those which
-are not part of a \lstinline{Gc}. For values which are allocated using Rust's RAII
-approach, they are manually deallocated with calls to \lstinline{GC_free}. For
-non-GC'd heap allocations, this is semantically equivalent to a regular
-\lstinline{malloc} call: there will always be a reference preventing them from
-being collected, and RAII ensures that the corresponding \lstinline{GC_free} is
-called the moment they go out of scope. However, when such allocations are owned
-by a \lstinline{Gc}, they will be freed by the collector along with the
-\lstinline{Gc}.
 
 \section{Lots of stuff}
 
