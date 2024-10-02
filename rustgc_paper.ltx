@@ -489,9 +489,31 @@ section, we tackle these problems in order, noting that we tackle problems
 
 \section{Finaliser Elision}
 
-For performance reasons, many GC'd languages discourage programmers from using finalisers.
-In Rust, since \lstinline{drop} is ubiquitous, mapping drop methods to
-finalisers therefore have a high performance overhead.
+Finalisers are slower to run than destructors. As we shall see in
+\laurie{sec.~experiment}, were \ourgc to run every Rust destructor as a
+finaliser, the performance penalty would often be prohibitive. There are
+multiple reasons behind this slowdown: whether a finaliser needs to be run is a
+fully dynamic decision whereas destructors are statically determined; a queue
+of finalisers must be maintained, whereas destructors can be run immediately;
+finalisers run some time after the rest of the code on an object, and are more
+likely to have cache misses; and so on.
+
+For \ourgc to have a chance of being useful, it must do something about the
+performance penalty of finalisers. While it is likely that we could somewhat
+optimise \boehm and \ourgc in this regard, it seems unlikely that we can claw
+back much of the performance penalty of running a finaliser.
+
+Fortunately, a simple observation means that we can often elide finalisers
+entirely: many destructors do work that the GC does anyway and can be elided.
+The obvious example of this is Rust's \lstinline{Box<T>} type, which allocates
+heap memory: its drop method simply deallocates heap memory. In \ourgc the heap
+memory allocated is under \boehm's control anyway (since \boehm is the sole
+allocator in \ourgc), and will thus be freed by \boehm. Not only is the drop
+method not needed, but it will cause the memory to be freed at a later point
+than if it was not present! However, there is a catch: while
+\lstinline{Box<T>}'s drop method might be pointless, the contained type
+\lstinline{T} (called by drop glue) might have a destructor that must be run.
+
 
 \subsection{Solution (3) Finaliser Elision}
 
