@@ -2325,61 +2325,55 @@ introduces bugs in non-GC related code.
 \section{Related work}
 \label{sec:related_work}
 
-\subsection{How other languages deal with finalisers}
-
-The D programming language uses a conservative mark-sweep GC for heap
-allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
-not specify an order for finalisers. Users can specify their own allocators for
-RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
-calls.
-
-Oilpan, the conservative mark-sweep garbage collector in Chrome's rendering
-engine, Blink, uses two levels of finalisation: full finalisation, which happen
-off-thread after a GC cycle has completed but do not allow object fields to be
-dereferenced; and pre-finalisers, which happen during the sweep phase, but allow
-all of an objects fields to be dereferenced. Pre-finalisers are generally
-avoided because of their performance overhead since they cannot be scheduled to
-run on other threads and increase the stop-the-world time.
-
-\jake{TODO: Nim}
-
-
-\subsection{GC in Rust}
-
 Throughout Rust's history, there have been several attempts to introduce some
 form of tracing garbage collection~\citep{felix15specifying, felix16roots,
-manish16gc}. In fact, early versions of Rust explored
-using a form of this as a first class feature of the language through the use of
-\emph{managed pointers} (with the syntax \lstinline{@T}). This was removed
-fairly early in Rust's development before the first stable release, and was only
-implemented as reference counting. Since then, there have been
-several attempts at a more advanced form of GC than the reference counting
-library \lstinline{Rc} to the language.\laurie{cite the last commit which removes it} \jake{This one? \lstinline{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}}
+manish16gc}. In fact, early versions of Rust explored using a form of this as a
+first class feature of the language through the use of \emph{managed pointers}
+(with the syntax \lstinline{@T}).\jake{cite: } This was removed early in Rust's
+development before the first stable release \jake{cite removal commit
+\lstinline{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}}.
 
-\laurie{what does \rustbacon do with finalisers?} \jake{For non-cyclic structures, this will use rust drop the same way that \lstinline{Rc} does. During the \lstinline{collect_cycles} method, after the dead cycles have been identified, there is a phase which calls all their drop methods. Once all drop methods are called, a final phase deallocates the objects.}
-\rustbacon~\citep{rustbacon} is a Rust library implementation of the Bacon-Rajan
-cycle collecting reference counting implementation~\citep{bacon01concurrent}.
-\rustbacon is single-threaded, and provides thread-local reference counted boxes
-using a \lstinline{Cc<T>} smart pointer. Though not intended as a general
-purpose GC, it is designed to make it easier to manage cyclic data structures in
-Rust. When a reference in \rustbacon is decremented to a non-zero value, it is
-added to a worklist so that it can later be checked for potential cycles when
-the user manually invokes the \lstinline{collect_cycles} function.
+\citep{rustbacon} is a Rust library implementation of~\citep{bacon01concurrent}
+which provides reference counting with tracing cycle collection. Like \ourgc it
+introduces a user-visible type (\lstinline{Cc<T>}) for managing memory. The
+underlying memory of a \lstinline{Cc<T>} object is reference counted, however,
+when the reference count is decremented to a non-zero value, it is added to a
+worklist so that it can later be checked for potential cycles (by a user
+invoked \lstinline{collect_cycles} function). This performs a local trace .
 
-The major limitation of \rustbacon is that it is limited to a single thread
-(though a concurrent cycle detection algorithm is
-possible~\citep{bacon01concurrent}). However, unlike \ourgc, \rustbacon is
-purely library based: it does not require any modifications to the Rust compiler
-to work. In addition, as a reference counted approach, it still maintains the
-advantages and disadvantages of reference counting over \ourgc's tracing GC --
-except, of course, that it can collect cycles \laurie{if it can collect cycles,
-then it has none of the disadvantages of Rc, surely?}! \jake{Poor phrasing perhaps, but it has the other disadvantages of RC: incref/decref cost; machine word for strong count; read-only operations become writes (cache implications) etc}
+Unlike \ourgc, destruction in \citep{rustbacon} is deterministic: it occurs as
+soon as an object's last owner is gone; in the case of cyclic garbage, this
+means after the user calls \lstinline{collect_cycles}. However, like \ourgc it
+relies on the \lstinline{Drop} trait for destruction and does not implement
+it's own \lstinline{Finalize} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
+This prevents the trapdoor reference in finalisers problem explained in
+\jake{section FSA}.
 
-\rustgc~\citep{rustgc} is library for Rust which provides optional
-single-threaded mark-sweep GC with the \lstinline{Gc<T>} type. The API for
-\rustgc is similar to \ourgc, with the notable exception that \lstinline{Gc} in
-\rustgc does not implement the \lstinline{Copy} trait. This means that in order
-to obtain additional pointers to garbage-collected objects, the \lstinline{Gc}
+There are several advantages of \citep{rustbacon} over \ourgc: first, it is
+purely library based, requiring no modifications to the Rust compiler to work;
+second, for non-cyclic data, values will be dropped immediately like
+\lstinline{Rc}; third, the deterministic nature of drop methods means that it
+does not need to be run on a separate thread, eliminating a whole class of
+synchronisation and concurrency errors present in traditional tracing-based
+finalisation \jake{cite fsa section}.
+
+It has several limitations when compared to \ourgc. First, it is single-thread
+(though a concurrent cycle detection algorithm is theoretically
+possible~\citep{bacon01concurrent}). Second, a \lstinline{Trace} trait,
+detailing how to traverse an objects fields during cycle detection must be
+manually implemented for any \lstinline{T} used inside a \lstinline{Cc}. This
+means that it cannot be used with types from external crates without the
+new-type workaround. Third, since drop methods are called on cyclic garbage,
+drop methods which dereference fields of other \lstinline{Cc} objects will
+result in a crash at runtime. \ourgc, on the other hand, will prevent such
+programs from compiling with FSA.
+
+In \autoref{sec:destructor challenges}, we introduced the most well-known tracing
+GC option in Rust \citep{rustgc}. \jake{That section already discusses the
+finalisation differences, so I won't repeat them here} The API for \rustgc is
+similar to \ourgc, with the notable exception that \lstinline{Gc} in \rustgc
+does not implement the \lstinline{Copy} trait. This means that in order to
+obtain additional pointers to garbage-collected objects, the \lstinline{Gc}
 must be cloned.
 
 \laurie{what is the practical difference between \rustbacon and \rustgc?
@@ -2592,6 +2586,27 @@ recorded before and after each process execution using the multitime tool.
          \label{table:binary_trees}
      \end{center}
 \end{table*}
+
+\subsection{How other languages deal with finalisers}
+
+The D programming language uses a conservative mark-sweep GC for heap
+allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
+not specify an order for finalisers. Users can specify their own allocators for
+RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
+calls.
+
+Oilpan, the conservative mark-sweep garbage collector in Chrome's rendering
+engine, Blink, uses two levels of finalisation: full finalisation, which happen
+off-thread after a GC cycle has completed but do not allow object fields to be
+dereferenced; and pre-finalisers, which happen during the sweep phase, but allow
+all of an objects fields to be dereferenced. Pre-finalisers are generally
+avoided because of their performance overhead since they cannot be scheduled to
+run on other threads and increase the stop-the-world time.
+
+\jake{TODO: Nim}
+
+
+\subsection{GC in Rust}
 
 \subsection{Results}
 
