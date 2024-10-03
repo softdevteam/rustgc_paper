@@ -361,13 +361,14 @@ on a separate thread (see \laurie{Section XYZ}).
 \label{sec:destructor challenges}
 
 When a value in Rust is \emph{dropped} (e.g.~the value's owner went out of
-scope) its destructor is automatically run. Destructors are formed of two
+scope) its destructor is automatically run. Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
-automatically inserted \emph{drop glue}. Users can optionally provide a drop
-method for a type by implementing the \lstinline{Drop} trait's \lstinline{drop}
+automatically inserted \emph{drop glue}. Drop methods are optional; users
+can provide one for a type by implementing the \lstinline{Drop} trait's \lstinline{drop}
 method. Drop glue recursively calls destructors of contained types (e.g.~fields
-in a \lstinline{struct}). Although it is common usage to map `destructor' in
-Rust to just drop methods, drop glue is an integral part of a Rust destructor.
+in a \lstinline{struct}). Although it is common usage to conflate `destructor' in
+Rust with drop methods, drop glue is an integral part of a Rust destructor:
+we therefore use `destructor' as the umbrella term for both drop methods and drop glue.
 
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
