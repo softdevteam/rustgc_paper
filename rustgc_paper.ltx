@@ -484,36 +484,63 @@ problems down into four:
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
 \ourgc, allow us to address each problem in a satisfying way. In the following
-section, we tackle these problems in order, noting that we tackle problems
-(1) and (2) separately, and (3) and (3) together.
+section, we tackle these problems in the order above, noting that we tackle problems
+(1) and (2) separately, and (3) and (4) together.
 
 
 \section{Finaliser Elision}
 
-Finalisers are slower to run than destructors. As we shall see in
+Finalisers are slower to run than destructors --- as we shall see in
 \laurie{sec.~experiment}, were \ourgc to run every Rust destructor as a
-finaliser, the performance penalty would often be prohibitive. There are
-multiple reasons behind this slowdown: whether a finaliser needs to be run is a
-fully dynamic decision whereas destructors are statically determined; a queue
-of finalisers must be maintained, whereas destructors can be run immediately;
-finalisers run some time after the rest of the code on an object, and are more
-likely to have cache misses; and so on.
+finaliser, the performance penalty would be prohibitive \laurie{give rough
+figures e.g.~a range}.
 
-For \ourgc to have a chance of being useful, it must do something about the
-performance penalty of finalisers. While it is likely that we could somewhat
-optimise \boehm and \ourgc in this regard, it seems unlikely that we can claw
-back much of the performance penalty of running a finaliser.
+A variety of factors, mostly in \boehm, play a part in this performance
+penalty, such as: whether a finaliser needs to be run is a fully dynamic
+decision whereas destructors are statically determined; a queue of finalisers
+must be maintained, whereas destructors can be run immediately; finalisers run
+some time after the rest of the code on an object, and are more likely to have
+cache misses; and so on. While some of these factors probably do have some
+optimisation potential, \boehm is a mature, widely used piece of software that
+has already seen much optimisation work upon it: it is unlikely that
+optimisations of the scale we desire remain.
 
-Fortunately, a simple observation means that we can often elide finalisers
-entirely: many destructors do work that the GC does anyway and can be elided.
-The obvious example of this is Rust's \lstinline{Box<T>} type, which allocates
-heap memory: its drop method simply deallocates heap memory. In \ourgc the heap
-memory allocated is under \boehm's control anyway (since \boehm is the sole
-allocator in \ourgc), and will thus be freed by \boehm. Not only is the drop
-method not needed, but it will cause the memory to be freed at a later point
-than if it was not present! However, there is a catch: while
-\lstinline{Box<T>}'s drop method might be pointless, the contained type
-\lstinline{T} (called by drop glue) might have a destructor that must be run.
+Instead, \ourgc approaches the problem in a very different way: whenever
+possible it \emph{elides} finalisers so that they do not need to be run at all.
+The basis of finaliser elision is the observation that many destructors do work
+that the GC would do anyway, and are thus unnecessary in the context of a
+conservative GC.
+
+Consider the type \lstinline{Box<T>} which heap allocates space for a value;
+when the \lstinline{Box<T>} value is dropped, the heap allocation will be freed
+by \lstinline{Box}'s drop method. In a naive implementation,
+\lstinline{Gc<Box<T>>} will, when no GC values remain, run a finaliser which
+then runs \lstinline{Box}'s destructor, including its drop method.
+
+We then make two observations. First, all that
+\lstinline{Box<T>}'s drop method does is call \lstinline{free}\footnote{The
+function in the Rust API is actually called \lstinline{deallocate}, but that
+jars with the terminology we use elsewhere.}. Second, while we informally say
+that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
+on the `GC heap', there is really only one heap, and it is under \boehm's
+control. Thus all allocations are fully controlled by \boehm: in \ourgc,
+\lstinline{Box<T>}'s drop method is unneeded, as the underlying memory will
+naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
+calls \lstinline{free}, the resulting finaliser causes the underlying
+allocation to live longer than if the finaliser was not present!}.
+
+This means that there is no need to run a finaliser for a type such as
+\lstinline{Gc<Box<u8>>} and we can statically elide it. However, we can not
+elide every \lstinline{Gc<Box<T>}: for example, \lstinline{Gc<Box<Rc<u8>>}
+requires a finaliser because \lstinline{Rc<T>} needs to decrement a reference
+count. This may seem confusing, because in both cases \lstinline{Box<T>}'s drop
+method is the same: however, the drop glue added for \lstinline{Box<Rc<u8>}
+causes \lstinline{Rc<T>}'s destructor to be run. We thus see the need not to
+conflate `destructor' in Rust with just `drop method'.
+
+The aim of finaliser elision is thus to statically determine which destructors
+do not require corresponding finalisers, remove those, but retain finalisers in
+all other cases.
 
 
 \subsection{Solution (3) Finaliser Elision}
