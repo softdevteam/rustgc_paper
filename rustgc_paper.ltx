@@ -439,10 +439,7 @@ A less obvious difference relates to where destructors and finalisers are run.
 Destructors are run in the thread that the last owner of the value ran in.
 However, running finalisers in the same thread as the last owner of the value
 ran in can cause race conditions and deadlocks if one or more finalisers try to access a resource that the mutator
-expects to have exclusive access too~\cite{niko13destructors}\laurie{is there a
-citation for this in the boehm paper?}\jake{yes
-\cite[section~3.3]{boehm03destructors} talks about how you should use locking
-to prevent those kinds of races, which then exacerbates the deadlock problem}}.
+expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
 Although such problems can
 affect destructors, it is a clear case of programmer error, since they should
 have taken into account the predictable execution point of destructors. Since
