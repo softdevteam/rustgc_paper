@@ -360,7 +360,7 @@ on a separate thread (see \laurie{Section XYZ}).
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
-When a value in Rust is \emph{dropped} (e.g.~the value's owner went out of
+When a value in Rust is \emph{dropped} (e.g.~the value's owner went out of lexical
 scope) its destructor is automatically run. Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
 automatically inserted \emph{drop glue}. Drop methods are optional; users
@@ -372,11 +372,11 @@ we therefore use `destructor' as the umbrella term for both drop methods and dro
 
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
-value is dropped, the underlying resources (e.g.~file handles or mutexes\jake{nit: mutex guards}) it
+value is dropped, the underlying resources (e.g.~file handles or mutexes) it
 acquired when created are released. Whether one considers all such uses
 to be RAII or not, a brief perusal of Rust code will quickly show both that
 types that have drop methods are used frequently, and that users fairly often
-implement their own drop methods.\jake{I think we need to explicitly state somewhere here that drop methods are automatically inserted by the compiler at the end of the lexical scope.}
+implement their own drop methods.
 
 Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
@@ -438,8 +438,8 @@ even though some of its constituent parts are still being used.
 A less obvious difference relates to where destructors and finalisers are run.
 Destructors are run in the thread that the last owner of the value ran in.
 However, running finalisers in the same thread as the last owner of the value
-ran in can cause deadlocks if a finaliser tries to access a resource that the mutator has locked
-(see~\cref{finaliser_thread} for more details). \jake{It can also cause race conditions, where asynchronous, interleaving finalisers may update some shared resource while the mutator expects exclusivity see \cite{niko13destructors}} Although such problems can
+ran in can cause race conditions and deadlocks if one or more finalisers try to access a resource that the mutator
+expects to have exclusive access too~\cite{niko13destructors}\laurie{is there a citation for this in the boehm paper?}. Although such problems can
 affect destructors, it is a clear case of programmer error, since they should
 have taken into account the predictable execution point of destructors. Since
 finalisers have no such predictable execution point, there is no way for finalisers
@@ -448,10 +448,9 @@ problems can only be avoided by running
 finalisers on a non-mutator thread: however, not all Rust destructors
 are safe to run on another thread.
 
-Perhaps surprisingly, given that one of GC's selling points is its ability to
-deal with cycles, is that finalisation and cycles are problematic\jake{sentence hard to parse}. Finalisers
-can reference values that are partly, or wholly, `finalised', which is rarely
-safe or defined behaviour.\jake{I think this understates it. Finalisers can reference other values which may have been reclaimed, which is unsound} A related, but
+Perhaps surprisingly, finalisation and cycles are problematic: finalisers
+can reference other GCed values that are partly, or wholly, `finalised' and may
+even have had their backing memory freed or reused. A related, but
 distinct, problem is the ability of finalisers to `resurrect' values by
 copying the reference passed to the finaliser and storing it somewhere.
 
@@ -479,7 +478,7 @@ problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run too early;
-(3) running finalisers on the same thread as a paused collector can cause deadlocks;\jake{and race conditions}
+(3) running finalisers on the same thread as a paused collector can cause race conditions and deadlocks;
 (4) some safe destructors are not safe finalisers;
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
