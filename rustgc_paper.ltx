@@ -490,30 +490,27 @@ section, we tackle these problems in the order above, noting that we tackle prob
 
 \section{Finaliser Elision}
 
-Finalisers are slower to run than destructors --- as we shall see in
-\laurie{sec.~experiment}, were \ourgc to run every Rust destructor as a
-finaliser, the performance penalty would be prohibitive \laurie{give rough
-figures e.g.~a range}. In this section we show how we are able to sidestep
-the problem in many practical situations.
+Finalisers are slower to run than destructors --- running every Rust destructor
+as a GC finaliser in \ourgc is prohibitively slow (\laurie{give rough figures
+e.g.~a range}). In this section we show how to sidestep this problem in many
+practical situations.
 
-A variety of factors contribute to the performance
-penalty of finalisers, such as: a queue of finalisers
+A variety of factors contribute to the performance overhead of finalisers, such as:
+a queue of finalisers
 must be maintained, whereas destructors can be run immediately; since finalisers run
 some time after the last access of a value, they are more likely to cause
 cache misses; and so on. Most of these factors are inherent to any GC and
-there is no reason to believe that \boehm -- a mature, widely used GC -- particularly
-exacerbates any of them. In other words, it is unlikely that \boehm could be
-sufficiently optimised to overcome the inherent performance penalty of finalisers.
+our experience of using and working on \boehm -- a mature, widely used GC -- does
+not suggest that major optimisation potential remains. In other words, it is unlikely that \boehm could be
+sufficiently optimised to overcome the performance penalty of finalisers we observe.
 
 Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not need to be run at all.
-In particular, many Rust destructors
-only do work that a conservative GC naturally does anyway --- when used as finalisers,
-such destructors are unnecessary. Note there is a subtle asymmetry here: we
-cannot elide the destructors themselves, as they are still necessary to ensure
-predictable destruction in non-\lstinline{Gc<T>} Rust code.
+We are able to do this because many Rust destructors
+solely do work that a conservative GC does anyway --- when used as finalisers,
+such destructors are thus unnecessary and can be elided.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
-when the \lstinline{Box<T>} value is dropped, the heap allocation will be freed
+when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
 by \lstinline{Box}'s drop method. In a naive implementation,
 \lstinline{Gc<Box<T>>} will, when no GC values remain, run a finaliser which
 then runs \lstinline{Box}'s destructor.
@@ -523,9 +520,11 @@ Finaliser elision rests on two observations. First,
 function in the Rust API is actually called \lstinline{deallocate}, but that
 jars with the terminology we use elsewhere.}. Second, while we informally say
 that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
-on the `GC heap', there is actually a single shared heap, and it is under \boehm's
-control. Thus all allocations are fully controlled by \boehm: in \ourgc,
-\lstinline{Box<T>}'s drop method is unneeded, as the underlying memory will
+on the `GC heap', all allocations are made through \boehm and stored in
+a single heap. Thus, when used as a finaliser,
+\lstinline{Box<T>}'s drop method is unneeded\footnote{There is a subtle asymmetry here: we
+cannot elide the destructors themselves, as they are still necessary to ensure
+predictable destruction in non-\lstinline{Gc<T>} Rust code.}, as the underlying memory will
 naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
 calls \lstinline{free}, any resulting finaliser would cause the underlying
 allocation to live longer than if the finaliser was not present!}.
@@ -545,12 +544,12 @@ causes \lstinline{Rc<T>}'s destructor to be run.
 \caption{Finaliser Elision}
 \label{alg:elision}
 \begin{algorithmic}
-\Function{NeedsFinalizer}{$T$}
-    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, $FinalizerElidable$}}
+\Function{RequiresFinalizer}{$T$}
+    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, $DropMethodFinalizerElidable$}}
         \State \Return{true}
     \EndIf
 \ForEach {$field \in type$}
-    \If{\Call{NeedsFinaliser}{$field$}}
+    \If{\Call{RequiresFinaliser}{$field$}}
         \State \Return{true}
     \EndIf
 \EndFor
@@ -565,32 +564,32 @@ must deal correctly with nested data types.
 The high-level algorithm is shown in~\cref{alg:elision}.
 
 In essence, the algorithm has to consider three things. First, types that do not
-implement the \lstinline{Drop} are clearly candidates for elision. Second,
+implement the \lstinline{Drop} trait are clearly candidates for elision. Second,
 some types that implement the \lstinline{Drop} trait are also candidates
-for elision (e.g.~\lstinline{Box<T>}:
-those must be manually signified to \ourgc by the user implementing the new
+for elision (e.g.~\lstinline{Box<T>}), but these cannot be automatically determined,
+as it would require fully understanding the logic inside the type's drop method.
+The user must manually signify to \ourgc by the user implementing the new
 unsafe \emph{marker trait} (i.e.~a trait without methods that \ourgc can recognise)
-\lstinline{FinalizerMaybe}:
+\lstinline{DropMethodFinalizerElidable}:
 
 \begin{lstrustsmall}
-unsafe impl<T> FinalizerMaybe for Box<T> {}
+unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \end{lstrustsmall}
 
-Third, we must recursively check a type's fields to see if any require finalisation.
-A type \lstinline{T<U>} might implement the
-\lstinline{FinalizerMaybe} trait, but if its type parameter \lstinline{U} does
-not, and \lstinline{U} implements the \lstinline{Drop} trait, then
-\lstinline{T<U>} must have its finaliser run. This explains the `Maybe' part of
-\lstinline{FinalizerMaybe}'s name: it only covers a type's drop method, but not
-its drop glue.
+\lstinline{DropMethodFinalizerElidable} requires a careful understanding of a
+type's drop method: incorrectly implementing this trait will change a program's
+semantics.
 
-\lstinline{FinalizerMaybe} is not automatically implemented for any type
-because it requires careful understanding of a type's drop method: incorrectly
-implementing \lstinline{FinalizerMaybe} would change a program's semantics.
+Third, we must recursively check a type's fields to see if any require
+finalisation --- in other words, we check what the drop glue for a type will do.
+A type \lstinline{T<U>} might implement the
+\lstinline{DropMethodFinalizerElidable} trait, but if its type parameter \lstinline{U} does
+not, and \lstinline{U} implements the \lstinline{Drop} trait, then
+\lstinline{T<U>} must have its finaliser run.
 
 \ourgc modifies the standard Rust library to implement
-\lstinline{FinalizerMaybe} on the following types: \lstinline{Box<T>},
-\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{HashMap<T>}. As these
+\lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
+\lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. As these
 types are widely used in real Rust code, this often leads to significant
 numbers of finalisers being elided.
 
@@ -599,13 +598,13 @@ numbers of finalisers being elided.
     label={listing:elision_in_rustc}, caption={
       Finaliser elision inside \ourgc itself. A new \lstinline{const}
       (i.e.~compile-time evaluated) compiler intrinsic
-      \lstinline{needs_finalizer} returns true if a finaliser is needed for a
+      \lstinline{requires_finalizer} returns true if a finaliser is required for a
       type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
-      value is registered as needing a finaliser.
+      value is registered as requiring a finaliser.
     }]
 impl<T> Gc<T> {
   pub fn new(value: T) -> Self {
-    if needs_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
+    if requires_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
     else { Gc<T>::new_without_finalizer(value) }
     ...
   }
@@ -615,12 +614,12 @@ impl<T> Gc<T> {
 
 \cref{listing:elision_in_rustc} shows how finaliser elision is used inside the compiler. \ourgc
 introduces a new \lstinline{const} compiler intrinsinc
-\lstinline{needs_finalizer} (based on~\cref{alg:elision}) which returns true if a finaliser is needed for a
+\lstinline{requires_finalizer} (based on~\cref{alg:elision}) which returns true if a finaliser is required for a
 type. \lstinline{Gc<T>}'s constructor uses this intrinsic to decide whether a
-finaliser needs to be registered or not. Because \lstinline{needs_finalizer} is
-evaluated at compile-time, it tends to be inlined into \lstinline{Gc::new},
-which also tends to remove the associated conditional too. In other words --
-compiler optimisations allowing -- the `does this specific type need a
+finaliser must be registered or not. Because \lstinline{requires_finalizer} is
+evaluated at compile-time, it can be inlined into \lstinline{Gc::new},
+allowing the associated conditional to be removed too. In other words --
+compiler optimisations allowing -- the `does this specific type require a
 finaliser' checks have no run-time cost at all.
 
 
