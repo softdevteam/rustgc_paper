@@ -90,7 +90,7 @@ explicitly ruled out as the problems were thought
 insoluble~\cite[p.~32]{boehm09garbage}. We break these problems down into three
 categories:
 (1) some safe destructors are not safe finalisers;
-(2) finalisers can be run too early;
+(2) finalisers can be run prematurely;
 and (3) finalisers are prohibitively slower than destructors. All are,
 at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of (2), has
@@ -103,7 +103,7 @@ in order, are:
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers;
-(2) \emph{early finaliser prevention} automatically inserts barriers to prevent
+(2) \emph{premature finaliser prevention} automatically inserts barriers to prevent
 optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead;
 and (3) \emph{finaliser elision} statically optimises away finalisers if the
@@ -191,7 +191,7 @@ must also manually deal with issues such as detecting unused values,
 compaction, and so on. In other words, such workarounds force the programmer
 to write a partial GC themselves. A variant on this idea are
 arenas, which gradually accumulate multiple values but free all of them in one go: values
-can no longer be reclaimed too early, but, equally, individual values can not be
+can no longer be reclaimed too early, but, equally, individual values cannot be
 reclaimed until all values are determined to be unneeded.
 
 A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
@@ -430,10 +430,13 @@ are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalisers run at an unspecified point in time
-after the last reference to a GCed value is removed. However, in some situations
-finalisers can be run too early: valid optimisations (e.g~scalar replacement)
-can cause a value to appear to be unused, and thus ready for finalisation,
-even though some of its constituent parts are still being used.
+after the last reference to a GCed value is lost. Surprisingly, however,
+this point in time can be before the equivalent destructor would be
+run~\cite[section~3.4]{boehm03destructors}. We call this \emph{premature}
+finalisation. One way for this to happen is scalar replacement, which extracts
+some or all parts of a combined structure in registers and not on the heap: this
+can cause the last pointer to the struct to be lost, at which point the GC
+can run its finaliser, even though some components are still in use.
 
 A less obvious difference relates to where destructors and finalisers are run.
 Destructors are run in the thread that the last owner of the value ran in.
@@ -449,7 +452,7 @@ problems can only be avoided by running
 finalisers on a non-mutator thread: however, not all Rust destructors
 are safe to run on another thread.
 
-Perhaps surprisingly, finalisation and cycles are problematic: finalisers
+Finalisation and cycles are not happy bedfellows: finalisers
 can reference other GCed values that are partly, or wholly, `finalised' and may
 even have had their backing memory freed or reused. A related, but
 distinct, problem is the ability of finalisers to `resurrect' values by
@@ -478,7 +481,7 @@ context to our work GC for C++ this solution was explicitly ruled out for GC for
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
 (1) finalisers are prohibitively slower than destructors;
-(2) finalisers can be run too early;
+(2) finalisers can be run prematurely;
 (3) running finalisers on the same thread as a paused collector can cause race conditions and deadlocks;
 (4) some safe destructors are not safe finalisers;
 
@@ -623,7 +626,7 @@ compiler optimisations allowing -- the `does this specific type require a
 finaliser' checks have no run-time cost at all.
 
 
-\section{Early Finaliszer Prevention}
+\section{Premature Finaliser Prevention}
 
 Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
 are called by a garbage collector non-deterministically. They can run at the
