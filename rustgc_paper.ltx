@@ -688,7 +688,7 @@ use a normal \lstinline{Box<T>} without wrapping it in a \lstinline{Gc<T>}, the
 destructor would be run at the end of \lstinline{main}.
 
 Even more fortunately for us, \rustc inserts calls to \lstinline{drop} at such
-points already, including for \lstinline{Gc<T>}.\jake{We need to mention that implementing \lstinline{Drop} for \lstinline{Gc} requires a hack to the type system, this is because \lstinline{Gc} is \lstinline{Copy} and Copy/Drop implementations on types are mutually exclusive. We special-case the \lstinline{Gc} type inside the compiler}\laurie{where do we special case this? are there any consequences or is it fairly simple?}   All we need to do is insert a
+points already, including for \lstinline{Gc<T>}.\jake{We need to mention that implementing \lstinline{Drop} for \lstinline{Gc} requires a hack to the type system, this is because \lstinline{Gc} is \lstinline{Copy} and Copy/Drop implementations on types are mutually exclusive. We special-case the \lstinline{Gc} type inside the compiler}\laurie{where do we special case this? are there any consequences or is it fairly simple?} \jake{\lstinline{https://github.com/softdevteam/alloy/commit/e9da091931162a55a14cb537c815ab4a5ce85385#diff-7d0a0274c5ae7a50dfd6d4081f4109e969f80d2f32f49d588b5b7c3e605919a4R66} It's a fairly trivial change without any implications. Obviously it means that now Gc's drop method could do nasty unsound things because the type is copyable, but we only use it to insert a barrier} All we need to do is insert a
 \emph{compiler barrier} (i.e.~a function which prevents a compiler from
 optimising a value) into \lstinline{Gc<T>}'s drop method. Compiler barriers are
 highly platform specific: we use \boehm's \lstinline{GC_keep_alive} compiler
@@ -750,7 +750,7 @@ those \lstinline{Gc<T>} types that do not need a formaliser.
 
 \laurie{do we remove the call to drop or the drop method itself? i think the
 former, but the text suggests both at different points? i also wondered why
-we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?}
+we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?} \jake{Exactly!}
 Adjusting \rustc to perform this optimisation requires iterating over all calls
 to \lstinline{drop} in a program and removing those that call a
 \lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
