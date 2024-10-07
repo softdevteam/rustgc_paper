@@ -121,7 +121,7 @@ likely to generalise to other ownership-based languages.
 This paper's high-level structure is: background (\cref{sec:background});
 \ourgc's design (\cref{sec:alloy_design}); destructor and finaliser challenges
 and solutions (\cref{sec:destructor challenges}); and evaluation
-(\laurie{XYZ}). The first three of these parts have the challenge that our work
+(\cref{sec:evaluation}). The first three of these parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
 tried to provide sufficient material for readers expert in one of these
 areas to gain adequate familiarity with the other, without undue prolixity, but perfection is beyond our
@@ -154,7 +154,7 @@ comfortable with.
 \label{fig:rc_example}
 \end{figure}
 
-Rust uses affine types~\citep{pierce04advanced} and \emph{ownership}
+Rust uses affine types~\citep[p.~5]{pierce04advanced} and \emph{ownership}
 to statically guarantee that: a \emph{value} (i.e.~an instance of a type) has a
 single owner (e.g.~a variable); an owner can \emph{move} (i.e.~permanently
 transfer the ownership of) a value to another owner; and
@@ -165,7 +165,7 @@ multiple read-only references (`\lstinline{&}') to a value or a single
 read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
 
 These basic rules mean that many Rust programs are as succinct as their equivalents
-in GCed languages. This suggests that the search for a good GC for Rust may be Quixotic:
+in GCed languages. This suggests that the search for a good GC for Rust may be Quixotic\jake{well done for making me get my dictionary out but is this supposed to be lowercase?}:
 intellectually stimulating, but of no practical value.
 
 However, there are many programs which need to express data structures which
@@ -174,7 +174,12 @@ ownerships. These are often described as `cyclic data-structures', though we
 prefer the more general wording of `values which may have more than one owner'
 (e.g.~interpreters for dynamically typed languages are examples of programs
 which are best thought of in the latter category). Rust cannot directly express
-such programs, forcing programmers to use various workarounds.
+such programs, forcing programmers to use various workarounds. \jake{I think
+there's a subtle distinction here though. values which may have more than one
+owner can be acyclic, and its not difficult to express this using
+\lstinline{Rc}. However, it's when it becomes cyclic that it becomes a pain,
+and that's when you need to juggle strong and weak counts as written below. I
+think the current wording implies such pain even with acyclic graphs.}
 
 Probably the most common -- or, at least, the most easily recognised in other's
 code -- workaround is the reference counting type \lstinline{Rc<T>} in Rust's
@@ -284,9 +289,13 @@ back (\lstinline{from_raw}). Though many programmers do not directly
 encounter these functions, they are a crucial link between Rust's high and
 low-level features (e.g.~being used for the C Foreign Function Interface
 (FFI)). We believe that a viable GC for Rust must include this same
-ability, but doing so has a profound impact: Rust allows raw pointers to be converted to
-the integer type \lstinline{usize} and back\footnote{Although it is outside the
-scope of this paper, it would arguably
+ability, but doing so has a profound impact: Rust allows raw pointers to be
+converted to the integer type \lstinline{usize} and back\jake{It's possible to
+get a raw pointer directly from a Rust reference though: \lstinline{(*gc1) as
+*const InnerValue}. So while these \lstinline{from/to_raw} APIs provide a good
+segue to the next crucial detail, they're not strictly necessary for it to be a
+problem.}\footnote{Although it is outside the scope of this paper, it would
+arguably
 be preferable for Rust to have different integer types for `data width' and
 `address'. Modern C, for example, does this with the \lstinline{size_t} and
 \lstinline{uintptr_t} types respectively. Rust now has a provenance lint to
@@ -307,17 +316,19 @@ programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
 rarely a problem in practise.
 
 Conservative GC occupies a grey zone in programming language semantics. In most
-languages -- including the semantics of most compiler Intermediate
-Representations (IRs) -- conservative GC relies on undefined behaviour, and
-some languages allow arbitrary `bit fiddling' on pointers that temporarily
+languages -- including the semantics of most compiler \textit{intermediate
+representations} (IRs) -- conservative GC relies on undefined behaviour, and
+some languages (including Rust) allow arbitrary `bit fiddling' on pointers that temporarily
 obscures the address they are referring to. \ourgc's use of conservative GC means that it
 is, formally speaking, unsound. However, conservative GC is widely used,
-including in the two most widespread web browsers: Chrome uses it in its Blink rendering
-engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM JavaScriptCore~\citep{pizlo17riptide}.
-Even in 2024, we lack good alternatives to conservative GC: there is no cross-platform API for precise GC; and while some
-compilers such as LLVM provide some support for GC features, we have found them
-incomplete and buggy. Despite the potential soundness
-worries, conservative GC thus remains a widely used technique.
+including in the two most widespread web browsers: Chrome uses it in its Blink
+rendering engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM
+JavaScriptCore~\citep{pizlo17riptide}. Even in 2024, we lack good alternatives
+to conservative GC: there is no cross-platform API for precise GC; and while
+some compilers such as LLVM provide some support for GC
+features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
+Despite the potential soundness worries, conservative GC thus remains a widely
+used technique.
 
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust whose \lstinline{Gc<T>} is only \emph{cloneable}. Such types can be duplicated, but doing
@@ -382,20 +393,19 @@ Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalise} trait. If a user type needs to be finalised, then
 the user must provide an implementation of the \lstinline{Finalise} trait for that type.
-However, doing so introduces a number of problems:
-(1) external libraries are
-unlikely to provide finalisers; (2) Rust's \emph{orphan rule} \laurie{jake: is
-https://rust-lang.github.io/chalk/book/clauses/coherence.html the best
-reference for this?} prevents one implementing traits for types defined in
-external libraries (i.e.~unless a library's types were designed to support
-\lstinline{Gc<T>}, those types cannot be directly GCed); (3) one cannot
-automatically replicate drop glue for finalisers; and (4) one cannot replicate
-\rustc's refusal to allow calls to the equivalent of \lstinline{Drop::drop}.
+However, doing so introduces a number of problems: (1) external libraries are
+unlikely to provide finalisers; (2) Rust's \emph{orphan
+rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
+types defined in external libraries (i.e.~unless a library's types were
+designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
+(3) one cannot automatically replicate drop glue for finalisers; and (4) one
+cannot replicate \rustc's refusal to allow calls to the equivalent of
+\lstinline{Drop::drop}.
 
 Programmers can workaround problems (1) and (2) in various ways. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
-and implement finalisers on those instead. Doing so involves drudgery, but
-little conceptually difficulty.
+and implement finalisers on those instead~\cite[Section~19.3]{klabnik18rust}.
+Doing so involves drudgery, but little conceptually difficulty.
 
 Problem (3) has partial solutions: for example, ~\cite{manish15rustgc} uses the
 \lstinline{Trace} macro to generate `finaliser glue' (our term) for
@@ -497,8 +507,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 
 Finalisers are slower to run than destructors --- running every Rust destructor
 as a GC finaliser in \ourgc is prohibitively slow (roughly
-\somrselision{felide}{richards}{speedup} -
-\somrselision{felide}{whileloop}{speedup}$\times$ slower \laurie{this will need to become a geomean}). In this section we show how
+\somrselision{felide}{all}{percent} slower). In this section we show how
 to sidestep this problem in many practical situations.
 
 A variety of factors contribute to the performance overhead of finalisers, such as:
@@ -514,7 +523,7 @@ Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not 
 We are able to do this for two reasons. First, all allocations in \ourgc use
 \boehm, whether or not those allocations are directly used for GC purposes or not.
 Second, many Rust destructors
-exclusively do work that a conservative \jake{why is the conservative qualification necessary?}\laurie{imho a non-conservative GC would probably not auto-free \lstinline{Box<T>}} GC will do anyway --- when used as finalisers,
+exclusively do work that a conservative \jake{why is the conservative qualification necessary?}\laurie{imho a non-conservative GC would probably not auto-free \lstinline{Box<T>}}\jake{I don't think that's true. I can't see why it's related?} GC will do anyway --- when used as finalisers,
 such destructors are unnecessary and can be elided.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
@@ -597,7 +606,7 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
 not only are these types drop methods compatible as-is with \lstinline{DropMethodFinalizerElidable},
-but these types are widely used in real Rust code: as we shall see in \laurie{sec:eval},
+but these types are widely used in real Rust code: as we shall see in \cref{sec:evaluation},
 they are part of allowing us to elide significant numbers of finalisers in real code.
 
 \begin{figure}[t]
@@ -2413,7 +2422,8 @@ transferred between other arenas.
 Because \gcarena is so different in nature to the other GCs described in this
 chapter, it is difficult to compare it ergonomically to other approaches.
 
-\section{New performance numbers}
+\section{Performance Evaluation}
+\label{sec:evaluation}
 \subsection{Performance}
 \begin{figure}[t!]
     \centering
