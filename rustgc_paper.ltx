@@ -648,7 +648,7 @@ finaliser' checks have no run-time cost at all.
     then obtain a Rust reference to the inner integer (line 5), which at
     run-time will be a pointer to the \lstinline{Box<T>} on the heap. At this
     point, the compiler can realise that the \lstinline{Gc<T>} is no longer
-    used and overwrite \lstinline{root}'s pointer on the stack (or similar). If
+    used and overwrite \lstinline{root}'s pointer (which may be in a register). If
     a GC cycle then occurs, a finaliser might run \lstinline{S}'s drop method;
     the program will then print `0' instead of the expected `1' (line 7).},
     label={fig:premature_finalisation}]
@@ -662,148 +662,52 @@ fn main()  {
 }
 \end{lstlisting}
 \end{figure}
-Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
-are called by a garbage collector non-deterministically. They can run at the
-collector's leisure; often this means that they run later than desired, however,
-in rare cases, an object can be finalised while it is still being used by the
-mutator! This is because compiler optimisations -- unaware of the presence of a
-GC -- can remove the single reference to an object which is keeping it alive. An
-outer object can therefore be considered unreachable while its inner object is
-still in use. An unfortunately timed GC cycle could  end up finalising the outer
-object, and run its finaliser. This can lead to subtle races in programs where
-the finaliser interleaves execution with the mutator.
 
-For this reason, VM specifications do not commit to running finalisers at a
-specific time. This includes allowing an object's finaliser to be run while the
-mutator is potentially still using it. For the reasons outlined in
-\autoref{bg:synchronisation}, GC implementations must synchronise access to
-objects inside a finaliser. \citet[p~.218]{jones16garbage} suggests this can be
-used to defer finalisation until later if a finaliser attempts to acquire an
-object lock which is already held by the mutator.
+The conventional view of finalisers is that they are called later than the
+equivalent destructors. As described in~\cite[section~3.4]{boehm03destructors},
+it is possible for finalisers to be called prematurely --- that is, before the
+equivalent destructor. As described thus far, premature finalisation is also
+possible in \ourgc: see~\cref{fig:premature_finalisation} for an example. The
+possibility of premature finalisation undermines soundness.
 
-More generally, however, the fundamental problem is that the compiler optimises
-away the reference to the object too soon. C\#'s .NET runtime
-provides a \lstinline{gc.KeepAlive} function as a solution to this.
-\lstinline{gc.KeepAlive} is an opaque empty function which the compiler cannot
-optimise away. The idea is that a reference to an object can be passed to
-\lstinline{gc.KeepAlive}, ensuring it lives long enough so that the collector
-does not deem it unreachable and finalise it too soon. This mitigation is
-limited, however, as it is up to the user to call \lstinline{gc.KeepAlive} when
-they require it.
+There are two underlying causes of premature finalisation. First, language
+specifications do not generally define when the earliest point that a value can
+be finalised is. Second, compiler optimisations are `finaliser unaware' ---
+they optimise code in a way that can make GCed values appear finalisable, even
+though they should not be. In some cases, such as C\#, users may find themselves
+having to use a \lstinline{keep_alive} function to force values to live for the
+length of time they expect \laurie{cite} \laurie{what is the situation with
+java? surely they've done something about this in the 21 papers since the boehm
+paper?}.
 
-A fundamental assumption in Rust's destructor semantics is that dropping a value
-is the last thing to happen to it. The Rust compiler prevents using a value
-after it has been dropped as this would cause unsoundness. For \lstinline{Gc}
-values in \ourgc, the same must be true for finalisers. If a finaliser is able
-to run before the mutator has finished using it, this would also be
-unsound.
+Fortunately in \ourgc, a relatively simple definition makes sense: a finaliser
+must not be run before the equivalent destructor would have run. We therefore
+need to enforce on \lstinline{Gc<T>} the same scoping rules as for
+\lstinline{T}. For example, if we changed \cref{fig:premature_finalisation} to
+use a normal \lstinline{Box<T>} without wrapping it in a \lstinline{Gc<T>}, the
+destructor would be run at the end of \lstinline{main}.
 
-In \autoref{bg:early_finalisation}, I explain how finalisers can run earlier
-than expected because compiler optimisations -- unaware of the presence of a GC
--- can cause GC objects to become unreachable earlier than expected. If this is
-paired with an unfortunately timed GC cycle, the object's finaliser could run
-while the object is still in use by the mutator. Rust and \ourgc is no
-different: the Rust compiler is allowed to perform any optimisation that does
-not change the observable behaviour of the program, and such optimisations are
-not aware of the retro-fitted collector.
+Even more fortunately for us, \rustc inserts calls to \lstinline{drop} at such
+points already, including for \lstinline{Gc<T>}. All we need to do is insert a
+\emph{compiler barrier}\footnote{The particular compiler barrier we use on x64
+Linux is \lstinline{asm("":::"memory")}.} (i.e.~a function which prevents a
+compiler from optimising a value) into \lstinline{Gc<T>}'s drop method:
 
-A finaliser which runs early can cause finalisation code to interleave
-unexpectedly with the mutator~\citep{boehm03destructors}. But, even worse, in \ourgc early
-finalisation can even lead to a memory safety violation. Consider the following
-example, which shows how a finaliser which runs early could cause a
-use-after-free:
-
-Assuming that the compiler clobbers the reference the \lstinline{Gc} stored in
-variable \lstinline{a}, this program can be represented as follows:
-
-\begin{center}
-\includegraphics[width=0.75\textwidth]{images/early_finalisation}
-\end{center}
-
-In this program, semantically, both \lstinline{a} and \lstinline{box_ptr} live
-until the end of \lstinline{main}. However, the compiler may decide to reuse the
-register holding the reference at \lstinline{a} any time after line 3 as it is
-no longer used. An unfortunately timed GC cycle which happens immediately
-afterwards would consider the \lstinline{Gc} object unreachable. Its finaliser
-will then be run, freeing the Box. This would happen even though there is still
-a reference (\lstinline{box_ptr}) to the inner \lstinline{Box} value. This
-reference is now a dangling reference, and its use on line 10 would constitute a
-use-after-free.
-
-The possibility of early finalisation has led many VMs to specify that finalisers
-can happen at any time -- even earlier than when an object becomes unreachable
-(see \autoref{bg:early_finalisation}). One way of preventing early
-finalisation in \ourgc would be to prevent \lstinline{Gc}
-objects from owning non garbage collected objects, but this would render
-\ourgc almost unusable. Fortunately, we can do better.
-
-\subsection{Solution (2): Early Finaliser Prevention}
-
-Inserts barriers that prevent optimisations or register allocation from
-`tricking' the GC into collecting values before they are dead, but does so in a
-way that obviously pointless barriers are elided.
-
-\ourgc takes advantage of two observations: Rust already inserts calls to \lstinline{drop} at
-the same point in a function where we want to insert compiler barriers;
-and we only need to insert barriers for variables of type \lstinline{Gc}.
-However, since \lstinline{Gc} is a \lstinline{Copy} type, Rust prevents
-us from adding a \lstinline{drop} method to \lstinline{Gc}.
-
-Fortunately, since \ourgc already alters the Rust compiler, it is easy
-to add a further modification. I thus modify the Rust
-compiler to allow for simultaneous implementation of \lstinline{Copy} and
-\lstinline{Drop} for \lstinline{Gc} types only, with the following drop
-implementation:
-
-\begin{lstrustsmall}
+\begin{lstlisting}[language=Rust]
 impl<T: ?Sized> Drop for Gc<T> {
-    fn drop(&mut self) {
-        unsafe {
-            COMPILER_BARRIER(self)
-        }
-    }
+    fn drop(&mut self) { unsafe { COMPILER_BARRIER(self); }
 }
-\end{lstrustsmall}
-
-The \lstinline{COMPILER_BARRIER(a)} includes inline assembly using Rust's
-\lstinline{asm!} macro to create a read of the \lstinline{Gc}'s \lstinline{self}
-reference after a compiler barrier. This is platform specific: for x86 it
-translates to the following:
-
-\begin{lstlisting}
-asm("":::"memory")
 \end{lstlisting}
 
-Although the compiler barrier does not contain platform instructions, its
-format is still platform dependent: other platforms such as AArch64 may
-require a slightly different \lstinline{asm} statement.
 
-However, the compiler barrier by definition prevents the compiler from
-performing some of its normal optimisations --- it is an expensive solution to a
-rare problem. In our performance analysis, this had roughly a 2-3\% slowdown. In
-\autoref{optimising_early_finalisers} I describe how I optimise this approach,
-removing barriers where it can be statically determined that they are
-unnecessary.
+\subsection{Optimising premature finaliser prevention}
 
-Early finalisation prevention (\autoref{early_finaliser_prevention})
-overapproximates the places where early finalisation can happen, which can have
-a significant impact on performance. Fortunately, the finaliser elision
-optimisation in \autoref{finaliser_elision} shows that many finalisers never
-need to be called, at which point we also no longer have to worry early
-finalisation! Where this is the case, we are able to remove the drop method for
-the \lstinline{Gc<T>} pointers which contain compiler barriers during
-compilation.
-
-All \lstinline{Gc} values have drop methods with barriers by default. During
-compilation, barriers which we can prove are unnecessary are removed. This is
-done once the Rust compiler has generated its mid-level IR (MIR). Like finaliser
-safety analysis (\autoref{fsa}), we perform an in-order traversal on the control
-flow graph represented by the MIR for each function with the following
-algorithm:
-
-\begin{algorithm}
+\begin{algorithm}[t]
+\caption{Removing compiler barriers for elided finalisers}
+\label{alg:barrier_removal}
 \begin{algorithmic}
 \Function{BarrierRemoval}{$callsite$}
+  \laurie{what is `callsite'? should it be `prog'}
     \ForEach {$mir\_body \in prog$}
         \ForEach {$basic\_blocks \in mir\_body$}
             \ForEach {$block \in basic\_blocks$}
@@ -820,17 +724,7 @@ algorithm:
         \EndFor
     \EndFor
 \EndFunction
-\end{algorithmic}
-\end{algorithm}
 
-This iterates over all drop methods in the entire program, identifying those
-which belong to a \lstinline{Gc<T>}. If found, the drop call is removed if the
-Gc reference points to an object which does not need finalising. The drop method
-is removed by patching the terminator of the block which calls drop with the
-terminator at the end of the drop body:
-
-\begin{algorithm}
-\begin{algorithmic}
 \Function{RemoveDrop}{$block$}
     \State $drop\_mir \gets$ \Call{GetDropMirBody}{$block.terminator$}
     \State $last\_block \gets$ \Call{GetLastBlock}{$drop\_mir$}
@@ -839,10 +733,31 @@ terminator at the end of the drop body:
 \end{algorithmic}
 \end{algorithm}
 
-After this pass, we call the Rust compiler's existing \emph{simplify mir} pass,
+Our simple solution completely prevents premature finalisation --- but it comes
+at a cost. Compiler barriers, by definition, prevent many normal optimisations,
+and our insertion of a compiler barrier above is no different. In many
+programs, the cost is negligible, but as we shall later see it can be up to
+\laurie{something\%}. Our belief is that this is a case where the worst case is
+particularly important.
+
+Fortunately, we are able to largely optimise away the costs of compiler
+barriers thanks to finaliser elision: intuitively, if a finaliser can be
+elided, there is no finaliser to be called prematurely, and no need for a
+barrier. Practically speaking, \ourgc removes calls to \lstinline{drop} for
+those \lstinline{Gc<T>} types that do not need a formaliser.
+
+\laurie{do we remove the call to drop or the drop method itself? i think the
+former, but the text suggests both at different points? i also wondered why
+we don't just delete the drop method.}
+Adjusting \rustc to perform this optimisation requires iterating over all calls
+to \lstinline{drop} in a program and removing those that call a
+\lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
+outlines the basic approach. Note that the drop method is removed by patching
+the terminator of the block which calls drop with the terminator at the end of
+the drop body. After this pass, we call the Rust compiler's existing
+\emph{simplify mir} pass,
 which tidies up the control flow graph by removing the empty blocks which were
 created as a result of drop removal.
-
 
 
 \section{Finaliser Safety Analysis}
