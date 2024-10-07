@@ -581,13 +581,13 @@ trait but not the \lstinline{DropMethodFinalizerElidable} trait, then the
 top-level type still requires finalisation. This latter qualification is
 necessary to deal with drop glue.
 
-\lstinline{DropMethodFinalizerElidable} requires a careful understanding of a
-type's drop method as incorrect use can change a program's semantics.\jake{I
-don't really like this sentence. Finalisers are not guaranteed to run at all,
-so with this in mind one could argue it doesn't really change the programs
-semantics at all, but in practice they do run, and getting this wrong can cause
-surprising changes.} \laurie{`not guaranteed to run' is semi-misleading, in the sense that a GC that ran no finalisers would be considered unusable. i think the guarantee is more `the finaliser will be run if the program runs long enough'. for example, if i impl'd DropMethodFinalizerElidable for MutexGuard, programs would eventually deadlock} It is therefore an unsafe trait that requires explicitly
-opting in to unsafe Rust:
+Even though neither normal Rust destructors or \ourgc finalisers are guaranteed
+to run, a program whose destructors or finalisers never run would probably not
+be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We have
+therefore chosen to make \lstinline{DropMethodFinalizerElidable} an unsafe
+trait, because implementing it inappropriately is likely to lead undesired
+(though not incorrect!) behaviour at run-time. To implement it one therefore
+needs to opt in to unsafe Rust:
 
 \begin{lstrustsmall}
 unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
