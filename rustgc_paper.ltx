@@ -672,8 +672,8 @@ possibility of premature finalisation undermines soundness.
 
 There are two underlying causes of premature finalisation. First, language
 specifications do not generally define when the earliest point that a value can
-be finalised is. Second, compiler optimisations are `finaliser unaware' \jake{Worse, they are GC unaware, early finalisation is just one consequence of this} ---
-they optimise code in a way that can make GCed values appear finalisable, even
+be finalised is. Second, compiler optimisations are `GC unaware', and one way
+this manifests is optimisations that make GCed values appear finalisable, even
 though they should not be. In some cases, such as C\#, users may find themselves
 having to use a \lstinline{keep_alive} function to force values to live for the
 length of time they expect \laurie{cite} \laurie{what is the situation with
@@ -688,10 +688,12 @@ use a normal \lstinline{Box<T>} without wrapping it in a \lstinline{Gc<T>}, the
 destructor would be run at the end of \lstinline{main}.
 
 Even more fortunately for us, \rustc inserts calls to \lstinline{drop} at such
-points already, including for \lstinline{Gc<T>}.\jake{We need to mention that implementing \lstinline{Drop} for \lstinline{Gc} requires a hack to the type system, this is because \lstinline{Gc} is \lstinline{Copy} and Copy/Drop implementations on types are mutually exclusive. We special-case the \lstinline{Gc} type inside the compiler}   All we need to do is insert a
-\emph{compiler barrier}\footnote{The particular compiler barrier we use on x64
-Linux is \lstinline{\__asm\__ \__volatile\__(" " : : "X"(ptr) : "memory").}} (i.e.~a function which prevents a
-compiler from optimising a value) into \lstinline{Gc<T>}'s drop method\jake{We call out to bdwgc to do this because it has compiler barriers for different platforms}:
+points already, including for \lstinline{Gc<T>}.\jake{We need to mention that implementing \lstinline{Drop} for \lstinline{Gc} requires a hack to the type system, this is because \lstinline{Gc} is \lstinline{Copy} and Copy/Drop implementations on types are mutually exclusive. We special-case the \lstinline{Gc} type inside the compiler}\laurie{where do we special case this? are there any consequences or is it fairly simple?}   All we need to do is insert a
+\emph{compiler barrier} (i.e.~a function which prevents a compiler from
+optimising a value) into \lstinline{Gc<T>}'s drop method. Compiler barriers are
+highly platform specific: we use \boehm's \lstinline{GC_keep_alive} compiler
+barrier which abstracts away these details for us. Thus \lstinline{Gc<T>}'s
+implementation of the \lstinline{Drop} trait looks as follows:
 
 \begin{lstlisting}[language=Rust]
 impl<T: ?Sized> Drop for Gc<T> {
@@ -748,7 +750,7 @@ those \lstinline{Gc<T>} types that do not need a formaliser.
 
 \laurie{do we remove the call to drop or the drop method itself? i think the
 former, but the text suggests both at different points? i also wondered why
-we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)}
+we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?}
 Adjusting \rustc to perform this optimisation requires iterating over all calls
 to \lstinline{drop} in a program and removing those that call a
 \lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
