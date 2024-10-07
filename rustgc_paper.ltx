@@ -548,7 +548,7 @@ FSA warning).}
 
 \subsection{Implementing finaliser elision}
 
-\begin{algorithm}
+\begin{algorithm}[t]
 \caption{Finaliser Elision}
 \label{alg:elision}
 \begin{algorithmic}
@@ -606,11 +606,13 @@ they are part of allowing us to elide significant numbers of finalisers in real 
 \begin{figure}[t]
   \begin{lstlisting}[language=Rust, numbers=none,
     label={listing:elision_in_rustc}, caption={
-      Finaliser elision inside \ourgc itself. A new \lstinline{const}
-      (i.e.~compile-time evaluated) compiler intrinsic
+      A simplified view of how finalisers are elided inside \ourgc. The new compiler intrinsic
       \lstinline{requires_finalizer} returns true if a finaliser is required for a
       type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
-      value is registered as requiring a finaliser.
+      value is registered as requiring a finaliser. Because \lstinline{requires_finalizer}
+      is a \lstinline{const} function, with optimisations turned on, it is inlined
+      and the branch optimised away. In other words, the seemingly dynamic, branching code
+      in \lstinline{Gc::new} turns into static, branchless code.
     }]
 impl<T> Gc<T> {
   pub fn new(value: T) -> Self {
