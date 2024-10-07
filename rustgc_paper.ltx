@@ -237,16 +237,16 @@ not scan memory, and thus cannot free objects that form a cycle. As is common
 in most GC literature, henceforth we use `GC' to mean `tracing GC' unless
 explicitly stated otherwise.
 
-We refer to memory which is solely under
-the control of the GC as the \emph{GC heap}, though this may in practise be
-intermingled with non-GCed memory. We use the term `GC value' to refer both to the pointer wrapped in a
+We refer to memory which is allocated via \lstinline{Gc<T>} as being on
+the \emph{GC heap}, though in practise all heap memory in \ourgc is allocated by the
+same conservative GC. We use the term `GC value' to refer both to the pointer wrapped in a
 \lstinline{Gc<T>} and the underlying value on the GC heap, even though multiple
 pointers / wrappers can refer to a single value on the heap, unless doing so
 would lead to ambiguity.
 
 We use ``\ourgc'' to refer to the combination of: our extension to the Rust
 language; our modifications to the \lstinline{rustc} compiler; and our
-integration of the Boehm-Demers-Weiser (BDW) GC into the runtime of programs
+integration of the Boehm-Demers-Weiser GC (\boehm) into the runtime of programs
 compiled with our modified \lstinline{rustc}.
 
 
@@ -456,7 +456,7 @@ are safe to run on another thread.
 
 Finalisation and cycles are not happy bedfellows: finalisers
 can reference other GCed values that are partly, or wholly, `finalised' and may
-even have had their backing memory freed or reused. A related, but
+even have had their backing memory reused. A related, but
 distinct, problem is the ability of finalisers to `resurrect' values by
 copying the reference passed to the finaliser and storing it somewhere.
 
@@ -498,25 +498,24 @@ section, we tackle these problems in the order above, noting that we tackle prob
 Finalisers are slower to run than destructors --- running every Rust destructor
 as a GC finaliser in \ourgc is prohibitively slow (roughly
 \somrselision{felide}{richards}{speedup} -
-\somrselision{felide}{whileloop}{speedup}$\times$ slower). In this section we show how
+\somrselision{felide}{whileloop}{speedup}$\times$ slower \laurie{this will need to become a geomean}). In this section we show how
 to sidestep this problem in many practical situations.
 
 A variety of factors contribute to the performance overhead of finalisers, such as:
 a queue of finalisers
-must be maintained, whereas destructors can be run immediately; \jake{is this
-the overhead of the GCs queue implementation? Or the fact that finalisation
-which frees e.g. memory leads to heap drag as they are not immediate? Both I
-guess} since finalisers run
-some time after the last access of a value, they are more likely to cause
+must be maintained, whereas destructors can be run immediately; since finalisers run
+some time after the last access of a value, running them is more likely to involve
 cache misses; and so on. Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that major missing optimisations that would allow this
 performance penalty to be overcome.
 
 Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not need to be run at all.
-We are able to do this because many Rust destructors
-exclusively do work that a conservative \jake{why is the conservative qualification necessary?} GC does anyway --- when used as finalisers,
-such destructors are thus unnecessary and can be elided.
+We are able to do this for two reasons. First, all allocations in \ourgc use
+\boehm, whether or not those allocations are directly used for GC purposes or not.
+Second, many Rust destructors
+exclusively do work that a conservative \jake{why is the conservative qualification necessary?}\laurie{imho a non-conservative GC would probably not auto-free \lstinline{Box<T>}} GC will do anyway --- when used as finalisers,
+such destructors are unnecessary and can be elided.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
@@ -530,21 +529,19 @@ a single heap. Thus, when used as a finaliser,
 \lstinline{Box<T>}'s drop method is unneeded\footnote{There is a subtle asymmetry here: we
 cannot elide the destructors themselves, as they are still necessary to ensure
 predictable destruction in non-\lstinline{Gc<T>} Rust code.}, as the underlying memory will
-naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
+naturally be freed by \boehm anyway. Indeed, since the drop method only
 calls \lstinline{free}, any resulting finaliser would cause the underlying
-allocation to live longer than if the finaliser was not present!}.
+allocation to live longer than if the finaliser was not present!
 
 This means that there is no need to run a finaliser for a type such as
 \lstinline{Gc<Box<u8>>} and we can statically elide it. However, we can not
-elide every \lstinline{Gc<Box<T>>} finaliser: for example, \lstinline{Gc<Box<Rc<u8>>}
-requires a finaliser because \lstinline{Rc<T>} needs to decrement a reference
+elide every \lstinline{Gc<Box<T>>} finaliser: for example, \lstinline{Gc<Box<Arc<u8>>}
+(where \lstinline{Arc<T>} is the thread-safe version of \lstinline{Rc<T>})
+requires a finaliser because \lstinline{Arc<T>} needs to decrement a reference
 count. This may seem confusing, because in both cases \lstinline{Box<T>}'s drop
-method is the same: however, the drop glue added for \lstinline{Box<Rc<u8>>}
-causes \lstinline{Rc<T>}'s destructor to be run. \jake{I wonder if it would be
-better to use \lstinline{Arc}, it's actually illegal to use a
-\lstinline{Gc<Box<Rc>>>} for correctness reasons which are not interesting to
-this example but are addressed later on by FSA (non-atomic decrement causes an
-FSA warning).}
+method is the same: however, the drop glue added for \lstinline{Box<Arc<u8>>}
+causes \lstinline{Arc<T>}'s destructor to be run.
+
 
 \subsection{Implementing finaliser elision}
 
@@ -589,7 +586,7 @@ type's drop method as incorrect use can change a program's semantics.\jake{I
 don't really like this sentence. Finalisers are not guaranteed to run at all,
 so with this in mind one could argue it doesn't really change the programs
 semantics at all, but in practice they do run, and getting this wrong can cause
-surprising changes.} It is therefore an unsafe trait that requires explicitly
+surprising changes.} \laurie{`not guaranteed to run' is semi-misleading, in the sense that a GC that ran no finalisers would be considered unusable. i think the guarantee is more `the finaliser will be run if the program runs long enough'. for example, if i impl'd DropMethodFinalizerElidable for MutexGuard, programs would eventually deadlock} It is therefore an unsafe trait that requires explicitly
 opting in to unsafe Rust:
 
 \begin{lstrustsmall}
@@ -635,13 +632,6 @@ this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
 finaliser' checks have no run-time cost at all.
 
-Finally, at runtime we need to ensure that the collector reclaims objects which
-had their finaliser elided (since they will no longer be freed by a finaliser
-call). We do this by ensuring that every heap object (including regular Rust
-ones) are allocated in the GC heap. This is fine because when they're never
-used within GC objects, they'll be freed regularly with regular
-\lstinline{free} calls (and never be reclaimed early because there will always
-be a valid pointer to them).
 
 \section{Premature Finaliser Prevention}
 
