@@ -626,6 +626,31 @@ finaliser' checks have no run-time cost at all.
 
 \section{Premature Finaliser Prevention}
 
+\begin{figure}[tb]
+\begin{lstlisting}[
+  language=Rust,
+  caption={An example of code that, when fully optimised, can cause premature
+    finalisation. We create a new struct \lstinline{S} that wraps an integer
+    (line 1) with a drop method that sets the integer to zero (line 2). In the
+    main method, we first move an instance of the struct into a
+    \lstinline{Box<T>}, then move that into a \lstinline{Gc<T>} (line 4). We
+    then obtain a Rust reference to the inner integer (line 5), which at
+    run-time will be a pointer to the \lstinline{Box<T>} on the heap. At this
+    point, the compiler can realise that the \lstinline{Gc<T>} is no longer
+    used and overwrite \lstinline{root}'s pointer on the stack (or similar). If
+    a GC cycle then occurs, a finaliser might run \lstinline{S}'s drop method;
+    the program will then print `0' instead of the expected `1' (line 7).},
+    label={fig:premature_finalisation}]
+struct S { value: u8 }
+impl Drop for S { fn drop(&mut self) { self.value = 0; } }
+fn main()  {
+  let root = Gc::new(Box::new(S{ value: 1 }));
+  let inner: &u8 = &**root.value;
+  force_gc();
+  println!("{}", *inner);
+}
+\end{lstlisting}
+\end{figure}
 Unlike RAII-like destructors found in languages such as C++ and Rust, finalisers
 are called by a garbage collector non-deterministically. They can run at the
 collector's leisure; often this means that they run later than desired, however,
@@ -676,22 +701,6 @@ unexpectedly with the mutator~\citep{boehm03destructors}. But, even worse, in \o
 finalisation can even lead to a memory safety violation. Consider the following
 example, which shows how a finaliser which runs early could cause a
 use-after-free:
-
-\begin{lstlisting}[
-  language=Rust,
-  caption={An example of unsoundness caused by a finaliser running earlier than expected.},
-  label={fig:early_finaliser_unsoundness_example}]
-fn main()  {
-    let root = Gc::new(Box::new(123));
-    let inner: &usize = &**root;
-
-    GcAllocator::force_gc();
-    thread::sleep(time::Duration::from_secs(1));
-
-    // Invalid read
-    read(inner);
-}
-\end{lstlisting}
 
 Assuming that the compiler clobbers the reference the \lstinline{Gc} stored in
 variable \lstinline{a}, this program can be represented as follows:
