@@ -496,13 +496,17 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \section{Finaliser Elision}
 
 Finalisers are slower to run than destructors --- running every Rust destructor
-as a GC finaliser in \ourgc is prohibitively slow (\laurie{give rough figures
-e.g.~a range}). In this section we show how to sidestep this problem in many
-practical situations.
+as a GC finaliser in \ourgc is prohibitively slow (roughly
+\somrselision{felide}{richards}{speedup} -
+\somrselision{felide}{whileloop}{speedup}$\times$ slower). In this section we show how
+to sidestep this problem in many practical situations.
 
 A variety of factors contribute to the performance overhead of finalisers, such as:
 a queue of finalisers
-must be maintained, whereas destructors can be run immediately; since finalisers run
+must be maintained, whereas destructors can be run immediately; \jake{is this
+the overhead of the GCs queue implementation? Or the fact that finalisation
+which frees e.g. memory leads to heap drag as they are not immediate? Both I
+guess} since finalisers run
 some time after the last access of a value, they are more likely to cause
 cache misses; and so on. Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
@@ -511,7 +515,7 @@ performance penalty to be overcome.
 
 Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not need to be run at all.
 We are able to do this because many Rust destructors
-exclusively do work that a conservative GC does anyway --- when used as finalisers,
+exclusively do work that a conservative \jake{why is the conservative qualification necessary?} GC does anyway --- when used as finalisers,
 such destructors are thus unnecessary and can be elided.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
@@ -536,8 +540,11 @@ elide every \lstinline{Gc<Box<T>>} finaliser: for example, \lstinline{Gc<Box<Rc<
 requires a finaliser because \lstinline{Rc<T>} needs to decrement a reference
 count. This may seem confusing, because in both cases \lstinline{Box<T>}'s drop
 method is the same: however, the drop glue added for \lstinline{Box<Rc<u8>>}
-causes \lstinline{Rc<T>}'s destructor to be run.
-
+causes \lstinline{Rc<T>}'s destructor to be run. \jake{I wonder if it would be
+better to use \lstinline{Arc}, it's actually illegal to use a
+\lstinline{Gc<Box<Rc>>>} for correctness reasons which are not interesting to
+this example but are addressed later on by FSA (non-atomic decrement causes an
+FSA warning).}
 
 \subsection{Implementing finaliser elision}
 
@@ -566,11 +573,11 @@ is then implemented as a compiler intrinsic \lstinline{requires_finalizer} insid
 our fork of \rustc.
 
 In essence, \cref{alg:elision} says that any type which implements
-\lstinline{Drop} trait requires finalisation unless it also implements the
+the \lstinline{Drop} trait requires finalisation unless it also implements the
 \lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
 trait without methods). The latter trait is defined by \ourgc, and must be
 manually implemented by users: it signifies that a type's drop method need
-not be called if they type is placed inside a \lstinline{Gc<T>}. However,
+not be called if the type is placed inside a \lstinline{Gc<T>}. However,
 \lstinline{DropMethodFinalizerElidable} only refers to the `top-level' type: if
 a transitively reachable field has a type which implements the \lstinline{Drop}
 trait but not the \lstinline{DropMethodFinalizerElidable} trait, then the
@@ -578,9 +585,12 @@ top-level type still requires finalisation. This latter qualification is
 necessary to deal with drop glue.
 
 \lstinline{DropMethodFinalizerElidable} requires a careful understanding of a
-type's drop method as incorrect use can change a program's
-semantics. It is therefore an unsafe trait that requires explicitly opting
-in to unsafe Rust:
+type's drop method as incorrect use can change a program's semantics.\jake{I
+don't really like this sentence. Finalisers are not guaranteed to run at all,
+so with this in mind one could argue it doesn't really change the programs
+semantics at all, but in practice they do run, and getting this wrong can cause
+surprising changes.} It is therefore an unsafe trait that requires explicitly
+opting in to unsafe Rust:
 
 \begin{lstrustsmall}
 unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
@@ -623,6 +633,13 @@ this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
 finaliser' checks have no run-time cost at all.
 
+Finally, at runtime we need to ensure that the collector reclaims objects which
+had their finaliser elided (since they will no longer be freed by a finaliser
+call). We do this by ensuring that every heap object (including regular Rust
+ones) are allocated in the GC heap. This is fine because when they're never
+used within GC objects, they'll be freed regularly with regular
+\lstinline{free} calls (and never be reclaimed early because there will always
+be a valid pointer to them).
 
 \section{Premature Finaliser Prevention}
 
