@@ -111,7 +111,7 @@ underlying destructor duplicates work the GC does anyway.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust.
 Although \ourgc is not production ready, it has good enough performance
-(across a number of benchmarks, its performance is \laurie{XYZ}) and
+(across a number of benchmarks, its performance is \laurie{XYZ}\somrsperf{gc}{all}{speedup}$\times$ reference counting on the \somrs benchmark suite) and
 other polish (e.g.~good quality error messages) that we believe it shows
 a plausible path forwards for those who may wish to follow it. Furthermore,
 although \ourgc is necessarily tied to Rust, we believe that most of the

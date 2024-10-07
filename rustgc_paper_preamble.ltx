@@ -20,6 +20,7 @@
 \usepackage{subcaption}
 \usepackage{tikz}
 \usepackage{xspace}
+\usepackage{ifthen}
 
 % Must be loaded last
 \usepackage[capitalise]{cleveref}
@@ -120,7 +121,6 @@
 \newcommand\wlambdaalloy{\textsc{WLambda-alloy}\xspace}
 \newcommand\yksom{\textsc{yksom}\xspace}
 \newcommand\yksomnaive{\textsc{YKSOM$_{\textrm{Naive}}$}\xspace}
-\newcommand\yksomelision{\textsc{YKSOM$_{\textrm{FinaliserElision}}$}\xspace}
 \newcommand\yksomnobarriers{\textsc{BarriersNone}\xspace}
 \newcommand\yksomallbarriers{\textsc{BarriersAll}\xspace}
 \newcommand\yksomoptbarriers{\textsc{BarriersOpt}\xspace}
@@ -128,6 +128,8 @@
 \newcommand\mem{\textsc{mem}\xspace}
 
 \newcommand\rustcversion{1.79.0\xspace}
+
+\include{experiment_stats}
 
 \title{Garbage Collection for Rust: The Finaliser Frontier}
 
