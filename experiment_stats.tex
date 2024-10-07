@@ -235,14 +235,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-336.60}%
+\ifthenelse{\equal{#3}{geomean}}{%
+274.09}%
 {\ifthenelse{\equal{#3}{diff}}{%
-1490.51}%
+1089.57}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-5.43}%
+4.98}%
+{\ifthenelse{\equal{#3}{percent}}{%
+79.90\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{fnaive}}{%
@@ -481,14 +483,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-1827.11}%
+\ifthenelse{\equal{#3}{geomean}}{%
+1363.66}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
 {\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
+{\ifthenelse{\equal{#3}{percent}}{%
+0.00\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\error{Invalid argument}%
@@ -730,14 +734,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-336.17}%
+\ifthenelse{\equal{#3}{geomean}}{%
+272.07}%
 {\ifthenelse{\equal{#3}{diff}}{%
--34.42}%
+-23.11}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-0.90}%
+0.92}%
+{\ifthenelse{\equal{#3}{percent}}{%
+9.28\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{rc}}{%
@@ -926,6 +932,7 @@
 311.18}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
+{\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
 {\error{Invalid argument}%
 }}}}%
@@ -975,16 +982,20 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-301.75}%
+\ifthenelse{\equal{#3}{geomean}}{%
+248.95}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
 {\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
+{\ifthenelse{\equal{#3}{percent}}{%
+0.00\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
+{\error{Invalid argument}%
+}}}%
 \newcommand{\somrsbarriers}[3]{%
 \ifthenelse{\equal{#1}{bnaive}}{%
 \ifthenelse{\equal{#2}{bounce}}{%
@@ -1222,14 +1233,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-2278.56}%
+\ifthenelse{\equal{#3}{geomean}}{%
+1209.56}%
 {\ifthenelse{\equal{#3}{diff}}{%
-284.90}%
+26.30}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-1.13}%
+1.02}%
+{\ifthenelse{\equal{#3}{percent}}{%
+2.13\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{bnone}}{%
@@ -1468,14 +1481,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-2563.47}%
+\ifthenelse{\equal{#3}{geomean}}{%
+1235.86}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
 {\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
+{\ifthenelse{\equal{#3}{percent}}{%
+0.00\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{bopt}}{%
@@ -1714,14 +1729,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-2236.77}%
+\ifthenelse{\equal{#3}{geomean}}{%
+1387.51}%
 {\ifthenelse{\equal{#3}{diff}}{%
-326.70}%
+-151.65}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-1.15}%
+0.89}%
+{\ifthenelse{\equal{#3}{percent}}{%
+12.27\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\error{Invalid argument}%
@@ -1963,14 +1980,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-65.27}%
+\ifthenelse{\equal{#3}{geomean}}{%
+43.20}%
 {\ifthenelse{\equal{#3}{diff}}{%
-467.57}%
+245.59}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-8.16}%
+6.68}%
+{\ifthenelse{\equal{#3}{percent}}{%
+85.04\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{fnaive}}{%
@@ -2209,14 +2228,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-532.84}%
+\ifthenelse{\equal{#3}{geomean}}{%
+288.80}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
 {\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
+{\ifthenelse{\equal{#3}{percent}}{%
+0.00\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\error{Invalid argument}%
@@ -2458,14 +2479,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-558.59}%
+\ifthenelse{\equal{#3}{geomean}}{%
+309.97}%
 {\ifthenelse{\equal{#3}{diff}}{%
--43.79}%
+-27.30}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-0.92}%
+0.91}%
+{\ifthenelse{\equal{#3}{percent}}{%
+9.66\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{bnone}}{%
@@ -2704,14 +2727,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-514.80}%
+\ifthenelse{\equal{#3}{geomean}}{%
+282.67}%
 {\ifthenelse{\equal{#3}{diff}}{%
 0.00}%
 {\ifthenelse{\equal{#3}{speedup}}{%
 1.00}%
+{\ifthenelse{\equal{#3}{percent}}{%
+0.00\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\ifthenelse{\equal{#1}{bopt}}{%
@@ -2950,14 +2975,16 @@
 {\error{Invalid argument}%
 }}}}%
 {\ifthenelse{\equal{#2}{all}}{%
-\ifthenelse{\equal{#3}{mean}}{%
-534.46}%
+\ifthenelse{\equal{#3}{geomean}}{%
+271.96}%
 {\ifthenelse{\equal{#3}{diff}}{%
--19.67}%
+10.71}%
 {\ifthenelse{\equal{#3}{speedup}}{%
-0.96}%
+1.04}%
+{\ifthenelse{\equal{#3}{percent}}{%
+3.79\%}%
 {\error{Invalid argument}%
-}}}}%
+}}}}}%
 {\error{Invalid argument}%
 }}}}}}}}}}}}}}}}}}}}}}}}}}}}%
 {\error{Invalid argument}%
