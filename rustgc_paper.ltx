@@ -430,16 +430,18 @@ are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalisers run at an unspecified point in time
-after the last reference to a GCed value is lost. Surprisingly, however,
-this point in time can be before the equivalent destructor would be
-run~\cite[section~3.4]{boehm03destructors}. We call this \emph{premature}
-finalisation. One way for this to happen is scalar replacement, which extracts
+after the last reference to a GCed value is lost. Normally this means
+that finalisers are run considerably after the point in a program
+that the equivalent destructor would have run. However, it is possible
+for a finaliser to run \emph{prematurely}, that is before the equivalent
+destructor~\cite[section~3.4]{boehm03destructors}. This can happen as
+a result of compiler optimisations such as `scalar replacement', which extracts
 some or all parts of a combined structure in registers and not on the heap: this
 can cause the last pointer to the struct to be lost, at which point the GC
 can run its finaliser, even though some components are still in use.
 
 A less obvious difference relates to where destructors and finalisers are run.
-Destructors are run in the thread that the last owner of the value ran in.
+Destructors run in the same thread as the last owner of a value.
 However, running finalisers in the same thread as the last owner of the value
 ran in can cause race conditions and deadlocks if one or more finalisers try to access a resource that the mutator
 expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
