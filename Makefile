@@ -59,8 +59,9 @@ rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx
 	  pdftex -ini -jobname="${@:.fmt=}" "&pdflatex" mylatexformat.ltx $${tmpltx}; \
 	  rm $${tmpltx}
 
-bib.bib: softdevbib/softdev.bib
+bib.bib: softdevbib/softdev.bib local.bib
 	softdevbib/bin/prebib softdevbib/softdev.bib > bib.bib
+	softdevbib/bin/prebib local.bib >> bib.bib
 
 softdevbib/softdev.bib:
 	git submodule init
