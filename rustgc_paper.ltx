@@ -24,7 +24,7 @@ each of these problems.
 \captionof{lstlisting}{An \ourgc example, showing use of the \lstinline{Gc<T>}
   type and destructors as finalisers. We create a type \lstinline{GcNode} which
   models a graph: it stores an 8 bit integer value and a reference (possibly
-  null, via Rust's standard \lstinline{Option} type) to a neighbouring node
+  null\jake{can we say \lstinline{None}? I know what you mean but null references are not a thing in Rust} , via Rust's standard \lstinline{Option} type) to a neighbouring node
   (line 1). We add a normal Rust destructor which \ourgc is able to use as a
   finaliser when \lstinline{GcNode} is used inside \lstinline{Gc<T>} (line 2).
   Inside \lstinline{main} we create the first GCed node in the graph (line 5).
@@ -33,14 +33,14 @@ each of these problems.
   would undermine Rust's static borrow checker rules)
   and pointed to itself (line 6): i.e.~we create a cycle using
   \lstinline{Gc<T>}. Cycles such as this cannot be created in the base Rust
-  language without \lstinline{unsafe} code. One can create cycles with standard
+  language without \lstinline{unsafe} code.\jake{I'm not sure about this. Rc is available in libcore/liballoc (i.e. no\_std) so it's basically an allocation primitive. If we're excluding it from such a definition of the safe base language then we also can't allow Box / RefCell / etc} One can create cycles with standard
   library types such as the reference counting \lstinline{Rc<T>}, though these
   require careful, laborious programming to avoid memory leaks
   (see~\cref{fig:rc_example}). We then create a second cyclic graph (lines 7
   and 8), immediately assigning it to the \lstinline{gc1} variable (line 9).
   Doing so means that the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
   is no longer reachable, so when we force a collection (line 10) that node
-  will be recognised as collectable; its finaliser is scheduled to be run (causing
+  will be recognised as collectable\jake{can we weaken this to ``may be'' recognised as collectable? it may linger for the duration of the stack frame in this case because the \lstinline{gc1 = gc2} assignment may not overwrite \lstinline{gc1}'s stack slot} ; its finaliser is scheduled to be run (causing
   \lstinline{drop 1} to be printed out at a later point), and when done so the backing
   memory can be reclaimed. The print statement outputs \lstinline{2 2} (line 11).}
 \label{fig:first_example}
@@ -73,7 +73,7 @@ We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
 API; and how to make \emph{finalisation} (i.e.~the code that is run just before a
 values collected by the GC) safe, performant, and ergonomic. We show that
-using conservative GC is necessary and sufficient to solve the API challenge,
+using conservative\jake{We don't actually define what conservative means until section3.1. Are we assuming the readers will be familiar with this term? Or should we have a brief distinction between conservative / precise in the GC terminology section and then add a forward reference?} GC is necessary and sufficient to solve the API challenge,
 but the finalisation challenge is more difficult.
 
 In existing GCs for Rust, if a user needs values of type \lstinline{T} to cause a
@@ -85,9 +85,9 @@ provide finalisers for types in external libraries.
 
 The `obvious' solution to this problem is to allow existing Rust destructors to
 be automatically used as finalisers. However, this introduces a number of
-problems. In the nearest context to our work, GC for C++, this solution was
+problems. In the nearest context to our work, GC \jake{proposal} for C++, this solution was
 explicitly ruled out as the problems were thought
-insoluble~\cite[p.~32]{boehm09garbage}. We break these problems down into three
+insoluble~\cite[p.~32]{boehm09garbage}. \jake{todo: we should probably have this match the order of appearance in the paper. leave this red for now until we settle on it} We break these problems down into three
 categories:
 (1) some safe destructors are not safe finalisers;
 (2) finalisers can be run prematurely;
@@ -96,10 +96,10 @@ at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of (2), has
 existing solutions.
 
-We introduce novel solutions, relying at least in part on Rust's unusual static
+We introduce novel solutions, relying at least in part \jake{can we drop ``at least in part'' now? since our discussion about premature finalisation earlier we are now confident that all three make use of Rust borrow rules} on Rust's unusual static
 guarantees, to each of these problems. We thus gain not just a better GC for
 Rust, but also solutions to open GC problems. Our solutions to the problems,
-in order, are:
+in order, are:\jake{again, todo: ordering}
 (1) \emph{finaliser safety analysis}
 extends Rust's type system to reject programs whose destructors are not
 provably safe to be used as finalisers;
@@ -111,7 +111,7 @@ underlying destructor duplicates work the GC does anyway.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust.
 Although \ourgc is not production ready, it has good enough performance
-(across a number of benchmarks, its performance is \laurie{XYZ}\somrsperf{gc}{all}{speedup}$\times$ reference counting on the \somrs benchmark suite) and
+(across a number of benchmarks, its performance is \jake{geomean over whole suite}) and
 other polish (e.g.~good quality error messages) that we believe it shows
 a plausible path forwards for those who may wish to follow it. Furthermore,
 although \ourgc is necessarily tied to Rust, we believe that most of the
@@ -162,7 +162,7 @@ when a value's owner goes out of scope, the value's destructor
 is run and its backing memory reclaimed. An owner can pass \emph{references} to a value
 to other code, subject to these static restrictions: there can be
 multiple read-only references (`\lstinline{&}') to a value or a single
-read-write reference (`\lstinline{&mut}'); and references cannot outlast the owner.
+read-write \jake{should we stick with Rust parlance here? (immutable/mutable), that's what people are familiar with, however, if you think we should use read-write etc instead, then we need to update it across the paper} reference (`\lstinline{&mut}'); and references cannot outlast the owner.
 
 These basic rules mean that many Rust programs are as succinct as their equivalents
 in GCed languages. This suggests that the search for a good GC for Rust may be quixotic:
@@ -179,7 +179,7 @@ such programs, forcing programmers to use various workarounds
 
 Probably the most common -- or, at least, the most easily recognised in other's
 code -- workaround is the reference counting type \lstinline{Rc<T>} in Rust's
-standard library. For many data-structures, reference counting is a reasonable
+standard library\jake{should we say core library? its more correct but probably unfamiliar to non-rust people}. For many data-structures, reference counting is a reasonable
 solution, but using it for values which may have multiple owners requires
 juggling strong and weak counts. This complicates the program (see~\cref{fig:rc_example}) and makes
 it easy for values to live for shorter or longer than intended.
@@ -310,10 +310,10 @@ rarely a problem in practise.
 
 Conservative GC occupies a grey zone in programming language semantics. In most
 languages -- including the semantics of most compiler \textit{intermediate
-representations} (IRs) -- conservative GC relies on undefined behaviour, and
+representations} (IRs) \jake{i'm not really sure what this means? is this about how optimisers are GC-unaware?} -- conservative GC relies on undefined behaviour, and
 some languages (including Rust) allow arbitrary `bit fiddling' on pointers that temporarily
 obscures the address they are referring to. \ourgc's use of conservative GC means that it
-is, formally speaking, unsound. However, conservative GC is widely used,
+is, formally speaking, unsound. \jake{in the interest of fairness, should we cite that chromium css bug?} However, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink
 rendering engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM
 JavaScriptCore~\citep{pizlo17riptide}. Even in 2024, we lack good alternatives
@@ -391,7 +391,7 @@ a \lstinline{Finalise} trait. If a user type needs to be finalised, then
 the user must provide an implementation of the \lstinline{Finalise} trait for that type.
 However, doing so introduces a number of problems: (1) external libraries are
 unlikely to provide finalisers; (2) Rust's \emph{orphan
-rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
+rule}~\cite[Section~6.12]{rustlangref}\jake{Why does latex think this ref is undefined?!?} prevents one implementing traits for
 types defined in external libraries (i.e.~unless a library's types were
 designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
 (3) one cannot automatically replicate drop glue for finalisers; and (4) one
@@ -438,7 +438,7 @@ lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalisers run at an unspecified point in time
 after the last reference to a GCed value is lost. Normally this means
 that finalisers are run considerably after the point in a program
-that the equivalent destructor would have run. However, it is possible
+that the equivalent destructor would have run.\jake{this didn't make sense to me until much later on, when you explained that equivalent destructor means the drop method for T if it was run as a regular destructor} However, it is possible
 for a finaliser to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}. This can happen as
 a result of compiler optimisations such as `scalar replacement', which extracts
@@ -452,7 +452,7 @@ However, running finalisers in the same thread as the last owner of the value
 ran in can cause race conditions and deadlocks if one or more finalisers try to access a resource that the mutator
 expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
 Although such problems can
-affect destructors, it is a clear case of programmer error, since they should
+affect destructors, this is a clear case of programmer error, since they should
 have taken into account the predictable execution point of destructors. Since
 finalisers have no such predictable execution point, there is no way for finalisers
 to safely access shared resources if they are run on the same thread. Such
@@ -704,7 +704,7 @@ finalisation is \emph{almost} equivalent to saying that the finalisation of a
 destructors\footnote{This restriction was needed in Rust's past when `dynamic
 drops' (roughly speaking, the dropping of partially initialised values) led to
 a value's backing memory being `nulled out' (or `zeroed') when dropped. That has not been the case
-since 2016~\cite{klock14nonzeroing} \laurie{the reference is from 2014?} and
+since 2016~\cite{klock14nonzeroing} \laurie{the reference is from 2014?}\jake{The RFC is yes, but the actual changes finally landed in 2016.} and
 the `copyable types cannot have destructors' restriction has been unnecessary
 since.}. By removing this restriction, we can then use the existence of a destructor
 for \lstinline{Gc<T>} to prevent premature finalisation.
@@ -774,10 +774,7 @@ impl<T: ?Sized> Drop for Gc<T> {
   being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
   the drop terminator can be replaced. We can then replace these terminators by
   ``leaping over'' the drop method and patching it to the next basic block in
-  the chain.
-  point in \rustc where \textit{prog} is represented as Mid-Level IR (MIR): a
-  control-flow graph structure where functions are comprised of basic blocks,
-  connected by edges called \textit{terminators}. MIR }
+  the control flow.}
   \label{alg:barrier_removal}
 \end{figure}
 
@@ -791,7 +788,7 @@ optimise values of other types as it so wishes.
 However, our approach still imposes a performance overhead on code that uses
 \lstinline{Gc<T>}. In the worst case in our benchmark suite, the overhead is
 \somrsbarriers{bnaive}{fibonacci}{speedup}. Our belief is that this is a case
-where the worst case is particularly important, and so further optimisations
+where the worst case is particularly important\jake{why exactly}, and so further optimisations
 are necessary if premature finaliser prevention is to be practical.
 
 Fortunately, premature finaliser prevention can piggy-back on finaliser
