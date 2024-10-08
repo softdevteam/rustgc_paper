@@ -674,7 +674,7 @@ see~\cref{fig:premature_finalisation} for an example.
 There are two underlying causes of premature finalisation. First, language
 specifications have often not thought to define when the earliest point that a value can
 be finalised is \laurie{the boehm paper is 21 years old, so we can cite it, but we need
-some evidence that this is still a problem in 2024}. Second, compiler optimisations are `GC unaware', and one way
+some evidence that this is still a problem in 2024}. \jake{There are two relevant citations. Java: \cite{shipilev20local}, and the C++ finalisation proposal: \cite{boehm07optimization}, both are relevant, maybe cite both?} Second, compiler optimisations are `GC unaware', and one way
 this manifests is optimisations that make GCed values appear finalisable, even
 though they should not be.
 
@@ -685,6 +685,15 @@ if we changed \cref{fig:premature_finalisation} to use a normal
 \lstinline{Box<T>}, without wrapping it in a \lstinline{Gc<T>}, the
 destructor would be run at the end of \lstinline{main}.
 
+\jake{Following our offline conversation. I think we can make the claim that
+our approach is an improvement on previous discussions around this.
+\cite[Solution~1]{boehm07optimization} states that for a C++ program, you'd
+need to keep alive all pointers -- including ones seemingly unrelated to GC! In
+our approach though, we only need to do this for \lstinline{Gc<T>}s (as we do
+with drop), but also, because of Rust's borrow rules, we can assume that inner
+values fall out of the hat (because they cannot outlive their enclosing
+\lstinline{Gc}). This is another example of how our approach is very Rust specific.}
+
 The basis of our solution is the observation that our definition of premature
 finalisation is \emph{almost} equivalent to defining that the finalisation of a
 \lstinline{Gc<T>} value must not occur before the destruction of that
@@ -693,7 +702,7 @@ finalisation is \emph{almost} equivalent to defining that the finalisation of a
 destructors\footnote{This restriction was needed in Rust's past when `dynamic
 drops' (roughly speaking, the dropping of partially initialised values) caused
 a value's backing memory to be zeroed when dropped. That has not been the case
-since 2016 \laurie{cite a commit or rust version} and, to the best of our knowledge,
+since 2016~\cite{klock14nonzeroing} and, to the best of our knowledge,
 the `copyable types cannot have destructors' restriction has been unnecessary
 since.}.
 
@@ -727,42 +736,50 @@ impl<T: ?Sized> Drop for Gc<T> {
 
 \subsection{Optimising premature finaliser prevention}
 
-\begin{algorithm}[t]
-\caption{Removing compiler barriers for elided finalisers}
-\label{alg:barrier_removal}
+\begin{figure}[t]
+% \begin{algorithm}
 \begin{algorithmic}
-\Function{BarrierRemoval}{$callsite$}
-  \laurie{what is `callsite'? should it be `prog'}
-    \ForEach {$mir\_body \in prog$}
-        \ForEach {$basic\_blocks \in mir\_body$}
-            \ForEach {$block \in basic\_blocks$}
-                \If {\Call{CallsDrop}{$block.terminator$}}
-                    \State $arg \gets$ \Call{GetFirstArg}{$block.terminator$}
-                    \State $arg\_ty \gets$ \Call{GetType}{$arg$}
-                    \If {\Call{IsGC}{$arg\_ty$}}
-                        \If {\NOT \Call{NeedsFinaliser}{$arg\_ty$}}
-                            \State \Call{RemoveDrop}{$projection$}
-                        \EndIf
+\Function{BarrierRemovalPass}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinaliser}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
                     \EndIf
                 \EndIf
-            \EndFor
-        \EndFor
-    \EndFor
+            \EndIf
+      \EndFor
 \EndFunction
-
-\Function{RemoveDrop}{$block$}
-    \State $drop\_mir \gets$ \Call{GetDropMirBody}{$block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBlock}{$drop\_mir$}
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
     \State $block.terminator \gets last\_block.terminator$
 \EndFunction
 \end{algorithmic}
-\end{algorithm}
+% \end{algorithm}
+  \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
+  for types with elided finalisers. This pass is registered inside \rustc,
+  where it is invoked on all \textit{func}s in the program. The
+  \textit{BarrierRemovalPass} iteratess each basic block in a function in order
+  to inspect whether the terminator is a call to a drop method as these are the
+  only terminators of interest in this pass. If a ``drop terminator'' is found,
+  then we check the type of the value being dropped. If the type of the value
+  being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
+  the drop terminator can be replaced. We can then replace these terminators by
+  ``leaping over'' the drop method and patching it to the next basic block in
+  the chain.
+  point in \rustc where \textit{prog} is represented as Mid-Level IR (MIR): a
+  control-flow graph structure where functions are comprised of basic blocks,
+  connected by edges called \textit{terminators}. MIR }
+  \label{alg:barrier_removal}
+\end{figure}
 
 Using a keep-alive function in \lstinline{Gc<T>}'s drop method prevents
 premature finalisation but imposes a performance overhead because keep-alive functions
 necessarily inhibit many standard compile-time and run-time optimisations. In many
 programs, the cost is negligible, but as we shall later see it can be up to
-\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}\jake{I didn't commit the new graph. oops!}\laurie{ok, but now list is 300\% slower, so the 2\% figure still seems incorrect}. Our belief is that this is a case where the worst case is
+\jake{fixme: have this show the slowdown as a percentage}\somrsbarriers{bnaive}{fibonacci}{speedup}. Our belief is that this is a case where the worst case is
 particularly important.
 
 We reduce the deleterious performance effects of the keep-alive function by
@@ -773,6 +790,27 @@ for \lstinline{Gc<T>} types that do not require finalisation. However, because
 of \rustc's pipeline, we have to generate drop methods for all
 \lstinline{Gc<T>} types and later remove those we do not want: the end effect
 is the same, though the implementation is different.
+
+We implement this by modifying \rustc to include an optimisation pass which
+removes these unnecessary drop methods. As a program is compiled in \rustc, it
+is lowered through various intermediate representations. One such IR is Rust's
+Mid-Level IR (MIR): a control flow graph used for various control flow senitive
+optimisations and analyses phases (e.g. one such pass is borrow checking).
+
+When a program is lowered to MIR, it is represented as a collection of function
+bodies, which are made up of basic blocks connected by edges. During this
+lowering, the compiler-inserted calls to drop methods are represented as
+terminators (i.e. the directional edges) which join basic blocks together.
+
+After a program is lowered to MIR, it undergoes various transformations via an
+ordered list of ``MIR passes''. The ordering is important because some of these
+passes depend on other passes having already been completed. We introduce a MIR
+pass (shown in \cref{alg:barrier_removal}) for removal these unnecessary drops
+on \lstinline{Gc<T>}. This pass is introduced as one of the final optimisation
+passes performed on the MIR. This is because previous optimisations may
+introduce temporary copies of local values, which, for \lstinline{Gc<T>}s,
+could end up inserting new drop calls at the end of those temporaries'
+lifetimes. This would mean we would need to run our pass again to clean up after them.
 
 \laurie{jake: we need a full explanation here, because at the moment our story
 is muddled. as a i current read it the story seems to be: (1) in an early-ish
@@ -788,7 +826,7 @@ pass iterates over every basic block in the compiled program looking \laurie{and
 
 \laurie{do we remove the call to drop or the drop method itself? i think the
 former, but the text suggests both at different points? i also wondered why
-we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?} \jake{Exactly!}
+we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?} \jake{after some investigation i dont think this did what we expected. the goal of simplifycfg is to remove dead basic blocks which had all its incoming edges removed after some transformation. The idea for our pass was that after we have patched some block terminators to ``jump over'' the calls to drop, we would use simplifycfg to remove the drop method itself. However, the drop method is not a basic block, it is a function (i.e. MIR body) and i don't believe this gets removed by simplifycfg. In fact, I don't think dead drops get GC'd at all (see \lstinline{https://godbolt.org/z/dKhYbv9EY})}
 Adjusting \rustc to perform this optimisation requires iterating over all calls
 to \lstinline{drop} in a program and removing those that call a
 \lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
@@ -1233,83 +1271,64 @@ rare in practice.
 
 \subsubsection{How it works}
 
-The first stage of FSA is to identify calls to \lstinline{Gc::new}\footnote{In
-\ourgc, a \lstinline{Gc} object can only be created through the
-\lstinline{Gc::new} constructor. We mark the definition of this function with a
-special label, known as a \emph{diagnostic label}, so that it can be easily
-referred to during the FSA phase of Rust compilation.}:
 
-\begin{algorithm}
+\begin{figure}[t]
+% \begin{algorithm}
 \begin{algorithmic}
+  \tiny
 \Function{FinaliserSafetyAnalysis}{$prog$}
-    \ForEach {$mir\_body \in prog$}
-        \ForEach {$basic\_blocks \in mir\_body$}
-            \ForEach {$block \in basic\_blocks$}
-                \If {\Call{IsCallToGcConstructor}{$block.terminator$}}
-                    \State \Call{CheckCallsiteForDropImpl}{$block.terminator$}
-                \EndIf
-            \EndFor
+    \ForEach {$func \in prog$}
+        \ForEach {$basic\_block \in func$}
+              \If {\Call{IsCallToGcConstructor}{$basic_block.terminator$}}
+                  \State \Call{CheckCallsiteForDropImpl}{$basic_block.terminator$}
+              \EndIf
         \EndFor
     \EndFor
 \EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-This checks every statement in the MIR for a call to \lstinline{Gc<T>::new}
-constructor. If found, we check if \lstinline{T} implements \lstinline{Drop}. If
-it does, then \lstinline{Gc<T>} needs finalising, so the MIR body for
-\lstinline{T}'s drop method is checked for soundness violations. FSA only
-considers a drop method sound if fields which are dereferenced implement the
-\lstinline{FinalizerSafe} trait. In Rust's MIR terminology,
-such a field access would constitute a \emph{place projection}, where a place is
-a memory location (or lvalue), and a projection is a field access. A single MIR
-statement can contain more than one field projection
-(e.g.~\lstinline{self.foo.bar.baz}).
-
-This part of the analysis happens in the \lstinline{CheckCallsite} function:
-
-\begin{algorithm}
-\begin{algorithmic}
+\State{}
 \Function{CheckCallsiteForDropImpl}{$callsite$}
     \State $arg\_ty \gets$ \Call{GetTypeOfFirstArg}{$callsite$}
     \If { \NOT \Call{Impls}{$arg\_ty$, $Drop$}}
         \State \Return
     \EndIf
-    \State $drop\_body \gets$ \Call{GetDropMirBody}{$arg\_ty$}
-    \ForEach {$basic\_blocks \in drop\_body$}
-        \ForEach {$block \in basic\_blocks$}
-            \ForEach {$statement \in block$}
-                \If {\Call{HasPlaceProjection}{$statement$}}
-                    \ForEach {$projection \in statement$}
-                        \State \Call{CheckProjection}{$projection$}
-                    \EndFor
-                \EndIf
-            \EndFor
+    \State $func \gets$ \Call{GetDropFuncIR}{$arg\_ty$}
+    \ForEach {$basic\_block \in func$}
+        \ForEach {$statement \in block$}
+            \If {\Call{HasPlaceProjection}{$statement$}}
+                \ForEach {$projection \in statement$}
+                    \State \Call{CheckProjection}{$projection$}
+                \EndFor
+            \EndIf
         \EndFor
     \EndFor
 \EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-If a projection is found, its type is checked for an implementation of the
-\lstinline{FinalizerSafe} trait:
-
-\begin{algorithm}
-\begin{algorithmic}
+\State{}
 \Function{CheckProjection}{$projection$}
-    \Comment{A projection elem is the RHS of a field access.}
     \State $projection\_ty \gets$ \Call{GetType}{$projection.elem$}
     \If{ \NOT \Call{Impls}{$arg\_ty$, $FinalizerSafe$}}
         \State \Return{\Call{Error}{}}
     \EndIf
 \EndFunction
 \end{algorithmic}
-\end{algorithm}
+% \end{algorithm}
+\caption{The finaliser safety analysis algorithm. The first stage of FSA is to
+  identify calls to \lstinline{Gc::new}. This checks every statement in the MIR
+  for a call to \lstinline{Gc<T>::new} constructor. If found, we check if
+  \lstinline{T} implements \lstinline{Drop}. If it does, then \lstinline{Gc<T>}
+  needs finalising, so the MIR body for \lstinline{T}'s drop method is checked
+  for soundness violations. FSA only considers a drop method sound if fields
+  which are dereferenced implement the \lstinline{FinalizerSafe} trait. In
+  Rust's MIR terminology, such a field access would constitute a \emph{place
+  projection}, where a place is a memory location (or lvalue), and a projection
+  is a field access. A single MIR statement can contain more than one field
+  projection (e.g.~\lstinline{self.foo.bar.baz}). If
+  \lstinline{CheckProjection} discovers a field access of a field which does
+  not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
+  does not halt the analysis, so multiple lines in drop methods which perform
+  unsound field accesses will be caught in a single FSA pass.}
+\end{figure}
 
-If \lstinline{CheckProjection} discovers a field access of a field which does
-not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
-does not halt the analysis, so multiple lines in drop methods which perform
-unsound field accesses will be caught in a single FSA pass.
+
 
 
 
