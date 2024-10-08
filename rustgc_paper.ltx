@@ -20,7 +20,7 @@ each of these problems.
 \section{Introduction}
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=6]{listings/first_example.rs}
+\lstinputlisting[language=Rust, firstline=6, basicstyle=\footnotesize\ttfamily]{listings/first_example.rs}
 \captionof{lstlisting}{An \ourgc example, showing use of the \lstinline{Gc<T>}
   type and destructors as finalisers. We create a type \lstinline{GcNode} which
   models a graph: it stores an 8 bit integer value and a reference (possibly
@@ -135,7 +135,7 @@ comfortable with.
 \subsection{Does Rust need a GC?}
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=5]{listings/rc_example.rs}
+\lstinputlisting[language=Rust, firstline=5, basicstyle=\footnotesize\ttfamily]{listings/rc_example.rs}
 \captionof{lstlisting}{
   A version of~\cref{fig:first_example} using Rust's standard reference
   counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
@@ -604,7 +604,7 @@ but these types are widely used in real Rust code: as we shall see in \cref{sec:
 they are part of allowing us to elide significant numbers of finalisers in real code.
 
 \begin{figure}[t]
-  \begin{lstlisting}[language=Rust, numbers=none,
+  \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily,
     label={listing:elision_in_rustc}, caption={
       A simplified view of how finalisers are elided inside \ourgc. The new compiler intrinsic
       \lstinline{requires_finalizer} returns true if a finaliser is required for a
@@ -640,7 +640,7 @@ finaliser' checks have no run-time cost at all.
 
 \begin{figure}[tb]
 \begin{lstlisting}[
-  language=Rust,
+  language=Rust, basicstyle=\footnotesize\ttfamily,
   caption={An example of code that, when fully optimised, can cause premature
     finalisation. We create a new struct \lstinline{S} that wraps an integer
     (line 1) with a drop method that sets the integer to zero (line 2). In the
@@ -713,7 +713,7 @@ system, and CPU) specific: we use \boehm's \lstinline{GC_keep_alive} function
 which abstracts over these details. \lstinline{Gc<T>}'s
 implementation of the \lstinline{Drop} trait therefore looks as follows:
 
-\begin{lstlisting}[language=Rust]
+\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
 impl<T: ?Sized> Drop for Gc<T> {
    fn drop(&mut self) { unsafe { bdwgc::GC_keep_alive(self as *mut u8) }; }
 }
@@ -822,7 +822,7 @@ cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 \begin{figure}[t]
 \centering
 \begin{minipage}{0.50\textwidth}
-\lstinputlisting[language=Rust,firstline=9,lastline=18]{listings/dangling_reference.rs}
+\lstinputlisting[language=Rust,firstline=9,lastline=18, basicstyle=\footnotesize\ttfamily]{listings/dangling_reference.rs}
 \subcaption{}
 \end{minipage}%
 \begin{minipage}{0.50\textwidth}
@@ -1007,7 +1007,7 @@ structures will be finalised `outside-in'.
 \begin{figure}[t]
 \centering
 \begin{minipage}{0.50\textwidth}
-\lstinputlisting[language=Rust,firstline=5]{listings/finalisation_cycle.rs}
+\lstinputlisting[language=Rust,firstline=5, basicstyle=\footnotesize\ttfamily]{listings/finalisation_cycle.rs}
 \subcaption{}
 \end{minipage}%
 \begin{minipage}{0.50\textwidth}
