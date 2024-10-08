@@ -492,7 +492,7 @@ problems down into four:
 (4) some safe destructors are not safe finalisers;
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
-\ourgc, allow us to address each problem in a satisfying way. In the following
+\ourgc, allow us to address each problem in novel, satisfying, ways. In the following
 section, we tackle these problems in the order above, noting that we tackle problems
 (1) and (2) separately, and (3) and (4) together.
 
@@ -808,14 +808,10 @@ safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the second problem.
 
-Our solution is the novel technique of
-\emph{finaliser safety analysis}. We extend Rust's static analyses, and alter the relevant parts
+We extend Rust's static analyses, and alter the relevant parts
 of \rustc, to reject a type \lstinline{T}'s destructor if it
-is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
-To the best of our knowledge, no other GCed language has an
-equivalent of finaliser safety analysis: indeed, we rely on some of Rust's less
-common static guarantees.
-
+is not provably safe to be used as a finaliser in a \lstinline{Gc<T>} resulting
+in \emph{finaliser safety analysis}.
 In this section we first define the ways that reusing destructors as finalisers
 would undermine safety, and the general rules for identifying the troublesome
 cases. We then explain how we changed \rustc to implement these rules in \ourgc.
@@ -859,8 +855,8 @@ error: `Node{value: &*b, nbr: None}` cannot be safely
   I'd like to check!}}
 \end{figure}
 
-A \lstinline{Gc<T>} can store (indirectly or indirectly) normal Rust references
-(i.e.~\lstinline{&} and \lstinline{&mut}), at which point the \lstinline{Gc<T>}
+\lstinline{Gc<T>} can store, directly or indirectly, normal Rust references
+(i.e.~\lstinline{&} and \lstinline{&mut}), at which point it
 is subject to Rust's normal borrow checker rules and cannot outlive the
 reference. Finalisers are fundamentally incompatible with this, because the
 finaliser will be run after the \lstinline{Gc<T>}'s owner has gone out of scope:
@@ -870,9 +866,13 @@ have subverted the borrow checker.
 \ourgc's solution to this is simple: \lstinline{Gc<T>} can only include a
 reference iff \lstinline{T} does not need finalising. For example,
 \lstinline{Gc<&u8>} is permitted, because integers do not need finalising. However,
-\lstinline{Gc<Node<&Box<T>>>} is not permitted, because \lstinline{Box} needs
-its finaliser to be run in order to free its backing memory. \cref{fig:dangling_reference}
-shows the error that \ourgc raises in such a case.
+\lstinline{Gc<&GcNode<u8>>} is not permitted, because \lstinline{GcNode}'s destructor
+requires a corresponding finaliser. \cref{fig:dangling_reference}
+shows the error that \ourgc raises in such a case \laurie{jake: can we update this with \lstinline{Gc<&GcNode<u8>>} please}.
+
+\laurie{does finaliser elision happen `before' FSA such that FSA can take
+advantage of it? or does it use the compiler intrinsic and infer that elision
+would therefore happen? or ...?}
 
 While we could somewhat relax this rule (e.g.~finalisers which provably do not,
 directly or indirectly, use a reference could be let through), there are few
