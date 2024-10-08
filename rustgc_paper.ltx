@@ -689,30 +689,27 @@ The basis of our solution is the observation that our definition of premature
 finalisation is \emph{almost} equivalent to defining that the finalisation of a
 \lstinline{Gc<T>} value must not occur before the destruction of that
 \lstinline{Gc<T>} value. We say `almost' because \lstinline{Gc<T>} is copyable
-(see~\cref{gc_is_copyable}) and copyable types in Rust cannot have destructors
-\laurie{obvious question: why? is it just ``because''? are there other
-consequences we haven't thought of?}. \jake{There seems to be some historical
-context here. In theory there's nothing wrong drop methods on copyable types --
-provided that the drop method is idempotent. In the early days of Rust, dynamic
-drop flags were stored in the object itself and the object was zeroed on drop.
-This zeroing caused codegen issues with Copy + Drop types, so they disallowed
-it on the basis that idempotent drops are a pretty niche usecase anyway. The
-zeroing behaviour was removed in 2016 and my guess is that we're now just stuck
-with the rule.}
-
+(see~\cref{gc_is_copyable}) and copyable types in Rust cannot have
+destructors\footnote{This restriction was needed in Rust's past when `dynamic
+drops' (roughly speaking, the dropping of partially initialised values) caused
+a value's backing memory to be zeroed when dropped. That has not been the case
+since 2016 \laurie{cite a commit or rust version} and, to the best of our knowledge,
+the `copyable types cannot have destructors' restriction has been unnecessary
+since.}.
 
 We therefore modify both Rust's type system and \rustc so that
 \lstinline{Gc<T>} is allowed to have a destructor: fortunately, this is a
-relatively simple change, requiring changing only a handful of lines of code
-inside \rustc itself. \laurie{presumably we stop drop glue being generated for
-fields inside \lstinline{Gc<T>}?}\jake{The only field inside is a raw pointer to \lstinline{GcBox<T>}, so no drop glue would be generated for that anyway because raw pointers cannot have drop methods}
+relatively simple change to both the type system and the implementation,
+requiring changing only a handful of lines of code. There is an implicit
+restriction on the resulting destructor: since it may be called multiple times
+for the `same' value, it must be idempotent. We are helped by the fact that
+\lstinline{Gc<T>} has no drop glue, since it wraps a single pointer type:
+therefore we only need to make sure we adhere to this restriction in
+\lstinline{Gc<T>}'s drop method.
 
-Once \lstinline{Gc<T>} is allowed to have a destructor, we can then define a
-drop method for it. Because we have changed the type system, we have to be
-careful about what is put in the drop method: \laurie{i'm not totally certain
-what `rules' we have to follow here. we should give readers a hint}. \jake{It must be idempotent. So e.g. it could print its fields but it couldn't free some memory because that could cause a double free}
-Fortunately, all we want to do is use the drop method to inhibit finalisation:
-we achieve this with a memory \emph{fence} in the form of a \emph{keep-alive}
+Fortunately, an idempotent drop method is exactly what we need: we do not
+want the drop method to have behaviour per se, but simply to inhibit finalisation.
+We achieve this with a memory fence in the form of a \emph{keep-alive}
 function. Keep-alive functions serve both compile-time and run-time purposes:
 they prevent a compiler from changing the lifetime of a value (i.e.~it cannot
 be moved earlier or later); and prevent a CPU from reordering computation
@@ -761,12 +758,11 @@ impl<T: ?Sized> Drop for Gc<T> {
 \end{algorithmic}
 \end{algorithm}
 
-Using a keep-alive function in \lstinline{Gc<T>}'s drop method completely prevents
-premature finalisation but imposes a performance overhead. Keep-alive functions
-frustrate many standard compile-time and run-time, and our use of a keep-alive
-function in \lstinline{Gc<T>}'s drop method is no different. In many
+Using a keep-alive function in \lstinline{Gc<T>}'s drop method prevents
+premature finalisation but imposes a performance overhead because keep-alive functions
+necessarily inhibit many standard compile-time and run-time optimisations. In many
 programs, the cost is negligible, but as we shall later see it can be up to
-\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}\jake{I didn't commit the new graph. oops!}. Our belief is that this is a case where the worst case is
+\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}\jake{I didn't commit the new graph. oops!}\laurie{ok, but now list is 300\% slower, so the 2\% figure still seems incorrect}. Our belief is that this is a case where the worst case is
 particularly important.
 
 We reduce the deleterious performance effects of the keep-alive function by
