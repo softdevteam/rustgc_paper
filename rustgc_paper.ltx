@@ -669,14 +669,28 @@ equivalent destructors. As described in~\cite[section~3.4]{boehm03destructors},
 it is possible for finalisers to be called prematurely -- that is, before the
 equivalent destructor -- which undermines soundness. As described thus far,
 premature finalisation is also possible in \ourgc:
-see~\cref{fig:premature_finalisation} for an example.
+see~\cref{fig:premature_finalisation} for an example. In this section we
+explain the problem in greater problem and explain how we are able to take
+a seemingly impractical solution and make it perform adequately thanks to
+a new design that takes advantage of Rust's ownership rules.
 
 There are two underlying causes of premature finalisation. First, language
-specifications have often not thought to define when the earliest point that a value can
-be finalised is \laurie{the boehm paper is 21 years old, so we can cite it, but we need
-some evidence that this is still a problem in 2024}. \jake{There are two relevant citations. Java: \cite{shipilev20local}, and the C++ finalisation proposal: \cite{boehm07optimization}, both are relevant, maybe cite both?} Second, compiler optimisations are `GC unaware', and one way
+specifications often do define not precisely when the earliest point that a value can
+be finalised is; while this means that, formally, there is no `premature' finalisation,
+in practise it leads to surprising results (see e.g.~this example in
+Java~\cite{shipilev20local}). Second, compiler optimisations are `GC unaware', and one way
 this manifests is optimisations that make GCed values appear finalisable, even
 though they should not be.
+
+One suggested fix for this problem in GC for C++ is to ensure that all
+pointers, whether they refer to GCed objects or not, are kept alive for their
+full lexical scope~\cite[Solution~1]{boehm07optimization}. As we shall see
+later, this would almost certainly come with an unacceptable performance overhead,
+and be particularly frustrating for those parts of a program that a programmer
+knows, but a static analysis cannot prove, will not store GC pointers.
+
+
+\subsubsection{An outline of the solution}
 
 In the context of Rust, we can trivially define premature finalisation: a
 finaliser for \lstinline{Gc<T>} must not be run before the equivalent
@@ -684,15 +698,6 @@ destructor would have been run if the type was just \lstinline{T}. For example,
 if we changed \cref{fig:premature_finalisation} to use a normal
 \lstinline{Box<T>}, without wrapping it in a \lstinline{Gc<T>}, the
 destructor would be run at the end of \lstinline{main}.
-
-\jake{Following our offline conversation. I think we can make the claim that
-our approach is an improvement on previous discussions around this.
-\cite[Solution~1]{boehm07optimization} states that for a C++ program, you'd
-need to keep alive all pointers -- including ones seemingly unrelated to GC! In
-our approach though, we only need to do this for \lstinline{Gc<T>}s (as we do
-with drop), but also, because of Rust's borrow rules, we can assume that inner
-values fall out of the hat (because they cannot outlive their enclosing
-\lstinline{Gc}). This is another example of how our approach is very Rust specific.}
 
 The basis of our solution is the observation that our definition of premature
 finalisation is \emph{almost} equivalent to defining that the finalisation of a
@@ -702,7 +707,7 @@ finalisation is \emph{almost} equivalent to defining that the finalisation of a
 destructors\footnote{This restriction was needed in Rust's past when `dynamic
 drops' (roughly speaking, the dropping of partially initialised values) caused
 a value's backing memory to be zeroed when dropped. That has not been the case
-since 2016~\cite{klock14nonzeroing} and, to the best of our knowledge,
+since 2016~\cite{klock14nonzeroing} \laurie{the reference is from 2014?} and, to the best of our knowledge,
 the `copyable types cannot have destructors' restriction has been unnecessary
 since.}.
 
@@ -777,10 +782,15 @@ impl<T: ?Sized> Drop for Gc<T> {
 
 Using a keep-alive function in \lstinline{Gc<T>}'s drop method prevents
 premature finalisation but imposes a performance overhead because keep-alive functions
-necessarily inhibit many standard compile-time and run-time optimisations. In many
-programs, the cost is negligible, but as we shall later see it can be up to
+necessarily inhibit many standard compile-time and run-time optimisations.
+
+Our design naturally bypasses one of the problems that would be associated with
+an equivalent solution in, say, C++: we only have to keep-alive
+\lstinline{Gc<T>} values, so other parts of the code suffer no performance
+impact at all. However, this alone is not enough: in the worst case in our
+benchmark suite, our keep-alive solution a slowdown of
 \jake{fixme: have this show the slowdown as a percentage}\somrsbarriers{bnaive}{fibonacci}{speedup}. Our belief is that this is a case where the worst case is
-particularly important.
+particularly important, and so further optimisations are necessary.
 
 We reduce the deleterious performance effects of the keep-alive function by
 piggy-backing on finaliser elision: if a finaliser can be
