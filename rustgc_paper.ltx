@@ -323,6 +323,7 @@ features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
 Despite the potential soundness worries, conservative GC thus remains a widely
 used technique.
 
+\label{gc_is_copyable}
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
 most other GCs for Rust whose \lstinline{Gc<T>} is only \emph{cloneable}. Such types can be duplicated, but doing
 so requires executing arbitrary user code. To make the possible run-time cost of this clear, Rust has
@@ -663,37 +664,54 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-The conventional view of finalisers is that they are called later than the
+The folk view of finalisers is that they are called later than the
 equivalent destructors. As described in~\cite[section~3.4]{boehm03destructors},
-it is possible for finalisers to be called prematurely --- that is, before the
-equivalent destructor. As described thus far, premature finalisation is also
-possible in \ourgc: see~\cref{fig:premature_finalisation} for an example. The
-possibility of premature finalisation undermines soundness.
+it is possible for finalisers to be called prematurely -- that is, before the
+equivalent destructor -- which undermines soundness. As described thus far,
+premature finalisation is also possible in \ourgc:
+see~\cref{fig:premature_finalisation} for an example.
 
 There are two underlying causes of premature finalisation. First, language
-specifications do not generally define when the earliest point that a value can
-be finalised is. Second, compiler optimisations are `GC unaware', and one way
+specifications have often not thought to define when the earliest point that a value can
+be finalised is \laurie{the boehm paper is 21 years old, so we can cite it, but we need
+some evidence that this is still a problem in 2024}. Second, compiler optimisations are `GC unaware', and one way
 this manifests is optimisations that make GCed values appear finalisable, even
-though they should not be. In some cases, such as C\#, users may find themselves
-having to use a \lstinline{keep_alive} function to force values to live for the
-length of time they expect \laurie{cite} \laurie{what is the situation with
-java? surely they've done something about this in the 21 papers since the boehm
-paper?}.
+though they should not be.
 
-Fortunately in \ourgc, a relatively simple definition makes sense: a finaliser
-must not be run before the equivalent destructor would have run. We therefore
-need to enforce on \lstinline{Gc<T>} the same scoping rules as for
-\lstinline{T}. For example, if we changed \cref{fig:premature_finalisation} to
-use a normal \lstinline{Box<T>} without wrapping it in a \lstinline{Gc<T>}, the
+In the context of Rust, we can trivially define premature finalisation: a
+finaliser for \lstinline{Gc<T>} must not be run before the equivalent
+destructor would have been run if the type was just \lstinline{T}. For example,
+if we changed \cref{fig:premature_finalisation} to use a normal
+\lstinline{Box<T>}, without wrapping it in a \lstinline{Gc<T>}, the
 destructor would be run at the end of \lstinline{main}.
 
-Even more fortunately for us, \rustc inserts calls to \lstinline{drop} at such
-points already, including for \lstinline{Gc<T>}.\jake{We need to mention that implementing \lstinline{Drop} for \lstinline{Gc} requires a hack to the type system, this is because \lstinline{Gc} is \lstinline{Copy} and Copy/Drop implementations on types are mutually exclusive. We special-case the \lstinline{Gc} type inside the compiler}\laurie{where do we special case this? are there any consequences or is it fairly simple?} \jake{\lstinline{https://github.com/softdevteam/alloy/commit/e9da091931162a55a14cb537c815ab4a5ce85385#diff-7d0a0274c5ae7a50dfd6d4081f4109e969f80d2f32f49d588b5b7c3e605919a4R66} It's a fairly trivial change without any implications. Obviously it means that now Gc's drop method could do nasty unsound things because the type is copyable, but we only use it to insert a barrier} All we need to do is insert a
-\emph{compiler barrier} (i.e.~a function which prevents a compiler from
-optimising a value) into \lstinline{Gc<T>}'s drop method. Compiler barriers are
-highly platform specific: we use \boehm's \lstinline{GC_keep_alive} compiler
-barrier which abstracts away these details for us. Thus \lstinline{Gc<T>}'s
-implementation of the \lstinline{Drop} trait looks as follows:
+The basis of our solution is the observation that our definition of premature
+finalisation is \emph{almost} equivalent to defining that the finalisation of a
+\lstinline{Gc<T>} value must not occur before the destruction of that
+\lstinline{Gc<T>} value. We say `almost' because \lstinline{Gc<T>} is copyable
+(see~\cref{gc_is_copyable}) and copyable types in Rust cannot have destructors
+\laurie{obvious question: why? is it just ``because''? are there other
+consequences we haven't thought of?}.
+
+We therefore modify both Rust's type system and \rustc so that
+\lstinline{Gc<T>} is allowed to have a destructor: fortunately, this is a
+relatively simple change, requiring changing only a handful of lines of code
+inside \rustc itself. \laurie{presumably we stop drop glue being generated for
+fields inside \lstinline{Gc<T>}?}
+
+Once \lstinline{Gc<T>} is allowed to have a destructor, we can then define a
+drop method for it. Because we have changed the type system, we have to be
+careful about what is put in the drop method: \laurie{i'm not totally certain
+what `rules' we have to follow here. we should give readers a hint}.
+Fortunately, all we want to do is use the drop method to inhibit finalisation:
+we achieve this with a memory \emph{fence} in the form of a \emph{keep-alive}
+function. Keep-alive functions serve both compile-time and run-time purposes:
+they prevent a compiler from changing the lifetime of a value (i.e.~it cannot
+be moved earlier or later); and prevent a CPU from reordering computation
+around that point. Keep-alive functions are highly platform (compiler, operating
+system, and CPU) specific: we use \boehm's \lstinline{GC_keep_alive} function
+which abstracts over these details. \lstinline{Gc<T>}'s
+implementation of the \lstinline{Drop} trait therefore looks as follows:
 
 \begin{lstlisting}[language=Rust]
 impl<T: ?Sized> Drop for Gc<T> {
@@ -735,18 +753,34 @@ impl<T: ?Sized> Drop for Gc<T> {
 \end{algorithmic}
 \end{algorithm}
 
-Our simple solution completely prevents premature finalisation --- but it comes
-at a cost. Compiler barriers, by definition, prevent many normal optimisations,
-and our insertion of a compiler barrier above is no different. In many
+Using a keep-alive function in \lstinline{Gc<T>}'s drop method completely prevents
+premature finalisation but imposes a performance overhead. Keep-alive functions
+frustrate many standard compile-time and run-time, and our use of a keep-alive
+function in \lstinline{Gc<T>}'s drop method is no different. In many
 programs, the cost is negligible, but as we shall later see it can be up to
-\somrsbarriers{bnaive}{all}{percent}. Our belief is that this is a case where the worst case is
+\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}. Our belief is that this is a case where the worst case is
 particularly important.
 
-Fortunately, we are able to largely optimise away the costs of compiler
-barriers thanks to finaliser elision: intuitively, if a finaliser can be
+We reduce the deleterious performance effects of the keep-alive function by
+piggy-backing on finaliser elision: if a finaliser can be
 elided, there is no finaliser to be called prematurely, and no need for a
-barrier. Practically speaking, \ourgc removes calls to \lstinline{drop} for
-those \lstinline{Gc<T>} types that do not need a formaliser.
+barrier. Intuitively, we want to avoid generating drop methods
+for \lstinline{Gc<T>} types that do not require finalisation. However, because
+of \rustc's pipeline, we have to generate drop methods for all
+\lstinline{Gc<T>} types and later remove those we do not want: the end effect
+is the same, though the implementation is different.
+
+\laurie{jake: we need a full explanation here, because at the moment our story
+is muddled. as a i current read it the story seems to be: (1) in an early-ish
+pass (which one?) we delete drop methods for elidable \lstinline{Gc<T>} but
+that leaves behind calls which no longer have a correct target (if so: doesn't
+this invalidate the mir?!) (2) in the \lstinline{remove_gc_drops} we patch
+those stubs.}
+The main data-structure in \rustc is \emph{MIR} (Mid-level Intermediate
+Representation): in essence the compiler is a series of passes which navigate
+over MIR, analysing and transforming it. We introduce a new MIR pass
+\lstinline{remove_gc_drops}, which we make the penultimate pass in \ourgc. This
+pass iterates over every basic block in the compiled program looking \laurie{and...}
 
 \laurie{do we remove the call to drop or the drop method itself? i think the
 former, but the text suggests both at different points? i also wondered why
