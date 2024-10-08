@@ -691,18 +691,26 @@ finalisation is \emph{almost} equivalent to defining that the finalisation of a
 \lstinline{Gc<T>} value. We say `almost' because \lstinline{Gc<T>} is copyable
 (see~\cref{gc_is_copyable}) and copyable types in Rust cannot have destructors
 \laurie{obvious question: why? is it just ``because''? are there other
-consequences we haven't thought of?}.
+consequences we haven't thought of?}. \jake{There seems to be some historical
+context here. In theory there's nothing wrong drop methods on copyable types --
+provided that the drop method is idempotent. In the early days of Rust, dynamic
+drop flags were stored in the object itself and the object was zeroed on drop.
+This zeroing caused codegen issues with Copy + Drop types, so they disallowed
+it on the basis that idempotent drops are a pretty niche usecase anyway. The
+zeroing behaviour was removed in 2016 and my guess is that we're now just stuck
+with the rule.}
+
 
 We therefore modify both Rust's type system and \rustc so that
 \lstinline{Gc<T>} is allowed to have a destructor: fortunately, this is a
 relatively simple change, requiring changing only a handful of lines of code
 inside \rustc itself. \laurie{presumably we stop drop glue being generated for
-fields inside \lstinline{Gc<T>}?}
+fields inside \lstinline{Gc<T>}?}\jake{The only field inside is a raw pointer to \lstinline{GcBox<T>}, so no drop glue would be generated for that anyway because raw pointers cannot have drop methods}
 
 Once \lstinline{Gc<T>} is allowed to have a destructor, we can then define a
 drop method for it. Because we have changed the type system, we have to be
 careful about what is put in the drop method: \laurie{i'm not totally certain
-what `rules' we have to follow here. we should give readers a hint}.
+what `rules' we have to follow here. we should give readers a hint}. \jake{It must be idempotent. So e.g. it could print its fields but it couldn't free some memory because that could cause a double free}
 Fortunately, all we want to do is use the drop method to inhibit finalisation:
 we achieve this with a memory \emph{fence} in the form of a \emph{keep-alive}
 function. Keep-alive functions serve both compile-time and run-time purposes:
@@ -758,7 +766,7 @@ premature finalisation but imposes a performance overhead. Keep-alive functions
 frustrate many standard compile-time and run-time, and our use of a keep-alive
 function in \lstinline{Gc<T>}'s drop method is no different. In many
 programs, the cost is negligible, but as we shall later see it can be up to
-\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}. Our belief is that this is a case where the worst case is
+\somrsbarriers{bnaive}{all}{percent} \laurie{looking at figure 12, graph search is 500\% slower, not 2\%!}\jake{I didn't commit the new graph. oops!}. Our belief is that this is a case where the worst case is
 particularly important.
 
 We reduce the deleterious performance effects of the keep-alive function by
