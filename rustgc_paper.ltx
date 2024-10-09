@@ -11,7 +11,7 @@ In this paper we explore a new design for, and implementation of GC in Rust, cal
 approaches to GC in Rust, \ourgc maps existing Rust destructors to
 finalisers: this makes GC in Rust natural to use but introduces surprising
 soundness, performance, and ergonomic problems. \ourgc provides solutions for
-each of these problems.
+  each of these problems.
 \end{abstract}
 
 \maketitle
@@ -358,7 +358,15 @@ reasons) it is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm. Fourth, we modified \boehm to run finalisers
 on a separate thread (see \laurie{Section XYZ}).
 
-\laurie{does each alloy program still need to set the global allocator?}
+\laurie{does each alloy program still need to set the global allocator?}\jake{Yes, and enable the GC feature, as below}
+
+\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
+#![feature(gc)]
+use std::gc::GcAllocator;
+
+#[global_allocator]
+static A: GcAllocator = GcAllocator
+\end{lstlisting}
 
 
 \section{Destructors and Finalisers}
@@ -495,6 +503,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 
 
 \section{Finaliser Elision}
+\label{sec:elision}
 
 Finalisers are much slower to run than destructors --- running every Rust destructor
 as a GC finaliser in \ourgc causes a \somrselision{felide}{all}{percent} slowdown
@@ -738,7 +747,7 @@ impl<T: ?Sized> Drop for Gc<T> {
 \begin{figure}[t]
 % \begin{algorithm}
 \begin{algorithmic}
-\Function{BarrierRemovalPass}{$func$}
+\Function{RemoveElidableDrops}{$func$}
       \ForEach {$basic\_block \in func$}
             \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
                 \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
@@ -760,7 +769,7 @@ impl<T: ?Sized> Drop for Gc<T> {
   \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
   for types with elided finalisers. This pass is registered inside \rustc,
   where it is invoked on all \textit{func}s in the program. The
-  \textit{BarrierRemovalPass} iteratess each basic block in a function in order
+  \textit{RemoveElidableDrops} iterates each basic block in a function in order
   to inspect whether the terminator is a call to a drop method as these are the
   only terminators of interest in this pass. If a ``drop terminator'' is found,
   then we check the type of the value being dropped. If the type of the value
@@ -801,8 +810,13 @@ function call to its successor. however, that still doesn't exactly explain
 `ReplaceTerminator': using the drop method's final terminator feels like a
 hack? is that because there's no sense of `when we remove a call we want to
 merge two basic blocks and/or use some sort of null terminator'?}
+\jake{\lstinline{https://doc.rust-lang.org/beta/nightly-rustc/src/rustc_middle/mir/syntax.rs.html#638-883}
+basic block terminators have a ``kind'' variant. We replace the kind of the
+terminator from a \lstinline{TerminatorKind::Drop} to a
+\lstinline{TerminatorKind::Goto} where the goto's target block is the return
+block fished out from the terminator of the last block of the drop method.}
 
-We therefore add a new pass \laurie{`remove\_elidable\_drops' perhaps?} to
+We therefore add a new pass \textit{RemoveElidableDrops} to
 \rustc's Mid-Level IR (MIR) processing. MIR is best thought of as the main IR
 inside \rustc: it contains the complete set of functions in the program; each
 function consists of a sequence of basic blocks; and function calls are
@@ -852,8 +866,7 @@ instead. This doesn't invalidate the MIR, but it does mean we end up with those 
 The main data-structure in \rustc is \emph{MIR} (Mid-level Intermediate
 Representation): in essence the compiler is a series of passes which navigate
 over MIR, analysing and transforming it. We introduce a new MIR pass
-\lstinline{remove_gc_drops}, which we make the penultimate pass in \ourgc. This
-pass iterates over every basic block in the compiled program looking \laurie{and...}
+\lstinline{RemoveElidableDrops}, which we make the penultimate pass in \ourgc.
 
 Adjusting \rustc to perform this optimisation requires iterating over all calls
 to \lstinline{drop} in a program and removing those that call a
@@ -891,10 +904,10 @@ cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 \subcaption{}
 \end{minipage}%
 \begin{minipage}{0.50\textwidth}
-\begin{lstlisting}[language=Rust, numbers=none]
-error: `Node{value: &*b, nbr: None}` cannot be safely
+\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
+error: `GcNode{value: &*b, nbr: None}` cannot be safely
        constructed.
- |  let gc1 = Gc::new(Node{value: &*b, nbr: None});
+ |  let gc1 = Gc::new(GcNode{value: &*b, nbr: None});
  |            --------^^^^^^^^^^^^^^^^^^^^^^^^^^^-
  |            |       |
  |            |       contains a reference (&) which
@@ -917,7 +930,7 @@ error: `Node{value: &*b, nbr: None}` cannot be safely
   use-after-free.\laurie{this example slightly contradicts the text: is the
   problem the existence of reference + finaliser OR the use of the reference in
   drop? I'm pretty sure it's the first of these two possibilities, but
-  I'd like to check!}}
+  I'd like to check!}\jake{The problem is the existence of a reference and finaliser, where the ref is then used inside a finaliser. In (b) we prevent a reference and a finaliser entirely, so that the use of the ref in a finaliser could never happen -- it is an overapproximation.  }}
 \end{figure}
 
 The \lstinline{Gc<T>} type can store, directly or indirectly, normal Rust
@@ -934,7 +947,7 @@ reference. For example,
 \lstinline{Gc<&GcNode<u8>>} is statically rejected by \ourgc because
 because \lstinline{GcNode}'s destructor
 requires a corresponding finaliser. \cref{fig:dangling_reference}
-shows the error that \ourgc raises in such a case \laurie{jake: can we update this with \lstinline{Gc<&GcNode<u8>>} please}.
+shows the error that \ourgc raises in such a case.
 
 \laurie{does finaliser elision happen `before' FSA such that FSA can take
 advantage of it? or does it use the compiler intrinsic and infer that elision
@@ -944,11 +957,11 @@ While we could somewhat relax this rule (e.g.~finalisers which provably do not,
 directly or indirectly, use a reference could be let through), there are few
 benefits to doing so: after all, \lstinline{Gc<T>} is explicitly designed to
 help users avoid ownership restrictions. That said, finaliser elision
-(see~\cref{XYZ}) does reduce the number of types which need finalisation, thus
+(see~\cref{sec:elision}) does reduce the number of types which need finalisation, thus
 enabling more types to be embedded as references, for those who really want to.
 
 \laurie{this paragraph again suggests that we look into the finaliser, but
-elsewhere we suggest we don't look into the finaliser.}
+elsewhere we suggest we don't look into the finaliser.}\jake{We always look into a finaliser. It's just that if the user tries to put a regular Rust reference inside a \lstinline{Gc::new} we will immediately bork with an error. What we're saying is that we do allow raw pointers inside GCable types, and we don't check for raw pointer dereferences inside a finaliser, because this requires unsafety from the user anyway.}
 As with references, this same unsoundness can be caused by storing raw pointers
 inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
 \lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
@@ -968,7 +981,7 @@ non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the
 manner we desire\footnote{Users can
 force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
 
-\laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?}
+\laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?} \jake{I think this is a dangling comment now?}
 
 
 \subsection{Cycles and Finalisation}
@@ -1014,7 +1027,7 @@ is to provide weak references, which allows users to detect when finalisation
 cycles have been broken and deal with them accordingly. Fundamentally, most
 languages and systems we know of assume that the user either doesn't run into
 this problem (finalisation cycles are considered rare in GC'd
-languages~\citep{jones16garbage} \laurie{needs page ref}), or knows how to deal
+languages~\citep[p.~229]{jones16garbage}, or knows how to deal
 with it when they do.
 
 \ourgc takes a different approach: if a destructor, directly or indirectly,
@@ -1036,39 +1049,6 @@ displayed when the example in \autoref{fig:unsound_finalisation_cycle} is
 compiled. It has identified that the user is trying to access field \lstinline{b},
 which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
 analysis} (described in \autoref{fsa}) to detect this.
-
-\begin{figure}[t!]
-\begin{lstlisting}
-error: `Mutex::new(Node {
-               name: String::from("a"),
-               next: None,
-           })` cannot be safely finalized.
-  --> src/main.rs:30:21
-   |
-15 |               Some(n) => {
-   |                    -
-   |                    |
-   |                    caused by the expression here in `fn drop(&mut)` because
-   |                    it uses another `Gc` type.
-...
-30 |       let b = Gc::new(Mutex::new(Node {
-   |  _____________________^
-31 | |         name: String::from("a"),
-32 | |         next: None,
-33 | |     }));
-   | |______^ has a drop method which cannot be safely finalized.
-   |
-   = help: `Gc` finalizers are unordered, so this field may have already been dropped.
-     It is not safe to dereference.
-
-\end{lstlisting}
-    \caption{\jake{todo, replace this example}The compile-time error message shown when attempting to compile the
-    example in \autoref{fig:unsound_finalisation_cycle}. FSA identifies that
-    another \lstinline{Gc} is being dereferenced inside a finaliser. This is
-    unsound when \ourgc does not use ordered finalisation as it may have already
-    been collected.}
-    \label{fig:unsound_finalisation_cycle_error}
-\end{figure}
 
 This is implemented by first adding a negative implementation of
 \lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
@@ -1265,23 +1245,20 @@ rare in practice.
 \begin{figure}[t]
 % \begin{algorithm}
 \begin{algorithmic}
-  \tiny
-\Function{FinaliserSafetyAnalysis}{$prog$}
-    \ForEach {$func \in prog$}
-        \ForEach {$basic\_block \in func$}
-              \If {\Call{IsCallToGcConstructor}{$basic_block.terminator$}}
-                  \State \Call{CheckCallsiteForDropImpl}{$basic_block.terminator$}
-              \EndIf
-        \EndFor
-    \EndFor
+\Function{FinaliserSafetyAnalysis}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \State $t \gets$ $basic\_block.terminator$
+            \If {\Call{IsGcConstructorCall}{$t$}}
+                \State \Call{CheckFinaliser}{$t.arg$}
+            \EndIf
+      \EndFor
 \EndFunction
 \State{}
-\Function{CheckCallsiteForDropImpl}{$callsite$}
-    \State $arg\_ty \gets$ \Call{GetTypeOfFirstArg}{$callsite$}
-    \If { \NOT \Call{Impls}{$arg\_ty$, $Drop$}}
+\Function{CheckFinaliser}{$arg$}
+    \If { \NOT \Call{Impls}{$arg$}, $Drop$}
         \State \Return
     \EndIf
-    \State $func \gets$ \Call{GetDropFuncIR}{$arg\_ty$}
+    \State $func \gets$ \Call{GetDropFuncIR}{$arg$}
     \ForEach {$basic\_block \in func$}
         \ForEach {$statement \in block$}
             \If {\Call{HasPlaceProjection}{$statement$}}
