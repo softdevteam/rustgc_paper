@@ -678,14 +678,12 @@ Java~\cite{shipilev20local}). Second, in most compilers, most optimisations are
 replacement can change the point in a program when GCed values appear
 finalisable.
 
-In our context, it is trivial to define premature finalisation as a finaliser
-for a \lstinline{Gc<T>} value running while an owning \lstinline{Gc<T>} is
-still alive (e.g.~while a variable of that type is still in scope). At a
-high-level, the solution (which is equivalent to the suggestion
-in~\cite[Solution~1]{boehm07optimization}) is also trivial: the pointer that a
-\lstinline{Gc<T>} wraps must not be overwritten at run-time before the
-\lstinline{Gc<T>} has gone out of scope\jake{this wording feels muddled. We
-mean scope at the source level here but we're talking about during runtime}. In this section, we first turn this
+In our context, it is trivial to define premature finalisation as a (dynamic) finaliser
+for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>}
+has gone out of scope. Our solution to this is equivalent
+to~\cite[Solution~1]{boehm07optimization}: we must ensure that the dynamic
+lifetime of a GC pointer matches, or exceeds, the static lifetime of the
+associated \lstinline{Gc<T>}. In this section, we first turn this
 solution into reality, before then showing how to optimise it.
 
 
@@ -789,14 +787,39 @@ Fortunately, premature finaliser prevention can piggy-back on finaliser
 elision: if a finaliser can be
 elided, there is no finaliser to be called prematurely, and no need for
 the resulting values to be kept alive. Intuitively, we therefore want to avoid generating drop methods
-for \lstinline{Gc<T>} types that do not require finalisation.
+for \lstinline{Gc<T>} types that do not require finalisation. However,
+inside \rustc, it is easier for us to remove drop method calls to elidable finalisers:
+this is functionally equivalent to removing the drop methods themselves, though
+it does put an extra burden on dead-code elimination in the compiler tool-chain.
 
-\laurie{the rest of the subsubsection past this point needs to have more thought put into it}
+\laurie{the way we use `terminators' feels misleading. the name (and the way we
+explain things) implies that each function call is a basic block terminator,
+and that we inline drop methods, so that we can replace a call to them with a
+reference to the drop method's final terminator. i \emph{think} the missing bit
+of information is that a basic block can have a successor that is not a
+function call to its successor. however, that still doesn't exactly explain
+`ReplaceTerminator': using the drop method's final terminator feels like a
+hack? is that because there's no sense of `when we remove a call we want to
+merge two basic blocks and/or use some sort of null terminator'?}
+
+We therefore add a new pass \laurie{`remove_elidable_drops' perhaps?} to
+\rustc's Mid-Level IR (MIR) processing. MIR is best thought of as the main IR
+inside \rustc: it contains the complete set of functions in the program; each
+function consists of a sequence of basic blocks; and function calls are
+represented as `terminators' on basic blocks.
+
+a control flow graph used for various control flow senitive
+optimisations and analyses phases (e.g. one such pass is borrow checking)
+
+at the point that drop methods are generated in \rustc, we do not have the information
+for finaliser elision: it is easier to remove drop method calls to elidable finalisers.
+
+We add a new optimisation pass to \rustc to remove such drop method calls.
 
 We implement this by modifying \rustc to include an optimisation pass which
 removes these unnecessary drop methods. As a program is compiled in \rustc, it
-is lowered through various intermediate representations. One such IR is Rust's
-Mid-Level IR (MIR): a control flow graph used for various control flow senitive
+is lowered through various intermediate representations, the most important
+of which is Mid-Level IR (MIR), a control flow graph used for various control flow senitive
 optimisations and analyses phases (e.g. one such pass is borrow checking).
 
 When a program is lowered to MIR, it is represented as a collection of function
@@ -807,7 +830,7 @@ terminators (i.e. the directional edges) which join basic blocks together.
 After a program is lowered to MIR, it undergoes various transformations via an
 ordered list of ``MIR passes''. The ordering is important because some of these
 passes depend on other passes having already been completed. We introduce a MIR
-pass (shown in \cref{alg:barrier_removal}) for removal of these unnecessary drops
+pass (shown in \cref{alg:barrier_removal}) for removal of these unnecessary drops \laurie{unnecessary drop methods or calls?}
 on \lstinline{Gc<T>}. This pass is introduced as one of the final optimisation
 passes performed on the MIR. This is because previous optimisations may
 introduce temporary copies of local values, which, for \lstinline{Gc<T>}s,
