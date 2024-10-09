@@ -1450,6 +1450,41 @@ naive implementation of the mark-sweep algorithm and does not use parallel
 collector threads.
 
 
+\section{Threats to validity}
+
+We cannot state with certainty that the solutions we presented for finalisers'
+problems are complete or correct. We have introduced a number of new tests
+\laurie{how many?} into \ourgc's test suite to target specific problems. We
+have ported a number of existing programs to use \ourgc, since some GC problems
+only manifest at scale. However, we could undoubtedly have performed much wider
+testing, investigated fuzzing, and so on: it is inevitable that there will be
+bugs in \ourgc that are entirely our fault (i.e.~are not simply inherited from
+\rustc or \boehm).
+
+Our definition of the problems, the design of our solutions, and the way we
+implemented them are presented in a fairly informal manner. Though we must
+admit that this partly reflects our backgrounds, a formal definition, let alone
+verification, would be challenging for two reasons. First, the problematic
+aspects of GC we tackle in this paper have resulted from careful analysis of
+running systems (e.g.~\cite{boehm03destructors}): to the best of our knowledge,
+no formalism of GC exists which truly covers these aspects. We suspect this is
+a mixture of a lack of research on this problem and also the challenging
+temporal aspects, which may not be an easy fit with many existing formalisms.
+Perhaps the closest analogue is the evolving research literature on memory
+models which, in a sense, modern GC is a superset of. Second, at the time of
+writing, Rust's semantics remain somewhat imprecise and incomplete, though this
+situation is gradually improving.
+
+Any performance judgements we make are necessarily contingent on our particular
+benchmark suite. We cannot say, for example, that finaliser elision will always
+improve performance by the \laurie{X\%} we see in our experiment: there
+undoubtedly exist reasonable, non-pathological, programs which will gain more
+or less from such factors. It would help if there was a more widely accepted
+set of programs to serve as a benchmark for GC in Rust. Since the benchmark
+suite in this paper is the largest for any GC in Rust \laurie{is that true of
+Bronze?}, it may serve as a partial basis for such a suite in the future.
+
+
 \section{Related work}
 \label{sec:related_work}
 
