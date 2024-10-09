@@ -683,8 +683,9 @@ for a \lstinline{Gc<T>} value running while an owning \lstinline{Gc<T>} is
 still alive (e.g.~while a variable of that type is still in scope). At a
 high-level, the solution (which is equivalent to the suggestion
 in~\cite[Solution~1]{boehm07optimization}) is also trivial: the pointer that a
-\lstinline{Gc<T>} wraps at run-time must not be overwritten before the
-\lstinline{Gc<T>} has gone out of scope. In this section, we first turn this
+\lstinline{Gc<T>} wraps must not be overwritten at run-time before the
+\lstinline{Gc<T>} has gone out of scope\jake{this wording feels muddled. We
+mean scope at the source level here but we're talking about during runtime}. In this section, we first turn this
 solution into reality, before then showing how to optimise it.
 
 
@@ -792,11 +793,6 @@ for \lstinline{Gc<T>} types that do not require finalisation.
 
 \laurie{the rest of the subsubsection past this point needs to have more thought put into it}
 
-However, because
-of \rustc's pipeline, we have to generate drop methods for all
-\lstinline{Gc<T>} types and later remove those we do not want: the end effect
-is the same, though the implementation is different.
-
 We implement this by modifying \rustc to include an optimisation pass which
 removes these unnecessary drop methods. As a program is compiled in \rustc, it
 is lowered through various intermediate representations. One such IR is Rust's
@@ -811,7 +807,7 @@ terminators (i.e. the directional edges) which join basic blocks together.
 After a program is lowered to MIR, it undergoes various transformations via an
 ordered list of ``MIR passes''. The ordering is important because some of these
 passes depend on other passes having already been completed. We introduce a MIR
-pass (shown in \cref{alg:barrier_removal}) for removal these unnecessary drops
+pass (shown in \cref{alg:barrier_removal}) for removal of these unnecessary drops
 on \lstinline{Gc<T>}. This pass is introduced as one of the final optimisation
 passes performed on the MIR. This is because previous optimisations may
 introduce temporary copies of local values, which, for \lstinline{Gc<T>}s,
@@ -823,16 +819,19 @@ is muddled. as a i current read it the story seems to be: (1) in an early-ish
 pass (which one?) we delete drop methods for elidable \lstinline{Gc<T>} but
 that leaves behind calls which no longer have a correct target (if so: doesn't
 this invalidate the mir?!) (2) in the \lstinline{remove_gc_drops} we patch
-those stubs.}
+those stubs.}\jake{We do a single pass, late on in the MIR transformation
+pipeline. Drop methods (and calls) have already been automatically inserted by
+\rustc when the program was lowered to MIR. We remove these calls (but not the
+methods) in our pass. The calls are represented as the terminators in basic
+blocks. When we see a drop call terminator we look at which basic block that
+drop method would have returned to and replace the Drop call with a call to that next function body
+instead. This doesn't invalidate the MIR, but it does mean we end up with those drop methods as dead code. They may then be removed later when the program is lowered into in LLVM-IR by LLVM's own dead code analysis.}
 The main data-structure in \rustc is \emph{MIR} (Mid-level Intermediate
 Representation): in essence the compiler is a series of passes which navigate
 over MIR, analysing and transforming it. We introduce a new MIR pass
 \lstinline{remove_gc_drops}, which we make the penultimate pass in \ourgc. This
 pass iterates over every basic block in the compiled program looking \laurie{and...}
 
-\laurie{do we remove the call to drop or the drop method itself? i think the
-former, but the text suggests both at different points? i also wondered why
-we don't just delete the drop method.}\jake{We remove the drop method entirely. This happens in a MIR pass before the calls to drop are generated (a later MIR pass)} \laurie{aha, ok. so the simplify mir pass is basically dead-heading all the calls to a method which no longer exists?} \jake{after some investigation i dont think this did what we expected. the goal of simplifycfg is to remove dead basic blocks which had all its incoming edges removed after some transformation. The idea for our pass was that after we have patched some block terminators to ``jump over'' the calls to drop, we would use simplifycfg to remove the drop method itself. However, the drop method is not a basic block, it is a function (i.e. MIR body) and i don't believe this gets removed by simplifycfg. In fact, I don't think dead drops get GC'd at all (see \lstinline{https://godbolt.org/z/dKhYbv9EY})}
 Adjusting \rustc to perform this optimisation requires iterating over all calls
 to \lstinline{drop} in a program and removing those that call a
 \lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
@@ -915,7 +914,7 @@ shows the error that \ourgc raises in such a case \laurie{jake: can we update th
 
 \laurie{does finaliser elision happen `before' FSA such that FSA can take
 advantage of it? or does it use the compiler intrinsic and infer that elision
-would therefore happen? or ...?}
+would therefore happen? or ...?} \jake{FSA uses the \lstinline{requires_finalizer} intrinsic. Finaliser elision is not an IR pass or transformation.}
 
 While we could somewhat relax this rule (e.g.~finalisers which provably do not,
 directly or indirectly, use a reference could be let through), there are few
@@ -942,7 +941,7 @@ type that is not \lstinline{ReferenceFree}. Primitive types such as integers
 are \lstinline{ReferenceFree} by default; crucially (and at the risk of stating
 the obvious) references themselves are not \lstinline{ReferenceFree}. Thus a
 non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the
-manner we desire\footnote{\laurie{``As with all auto traits?``}, users can
+manner we desire\footnote{Users can
 force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
 
 \laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?}
