@@ -664,69 +664,68 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-The folk view of finalisers is that they are called later than the
-equivalent destructors. As described in~\cite[section~3.4]{boehm03destructors},
-it is possible for finalisers to be called prematurely -- that is, before the
-equivalent destructor -- which undermines soundness. As described thus far,
-premature finalisation is also possible in \ourgc:
-see~\cref{fig:premature_finalisation} for an example. In this section we
-explain the problem in greater problem and explain how we are able to take
-a seemingly impractical solution and make it perform adequately thanks to
-a new design that takes advantage of Rust's ownership rules.
+Most of us imagine that finalisers are always run after the
+equivalent destructor would have run, but they can sometimes run
+prematurely~\cite[section~3.4]{boehm03destructors}. As described thus far,
+premature finalisation is also possible in \ourgc
+(see~\cref{fig:premature_finalisation}). In this section we
+show how we can turn a seemingly inefficient
+approach to premature finalisation prevention into a viable solution.
 
-There are two underlying causes of premature finalisation. First, language
-specifications often do define not precisely when the earliest point that a value can
-be finalised is; while this means that, formally, there is no `premature' finalisation,
-in practise it leads to surprising results (see e.g.~this example in
-Java~\cite{shipilev20local}). Second, compiler optimisations are `GC unaware', and one way
-this manifests is optimisations that make GCed values appear finalisable, even
-though they should not be.
+There are two aspects to premature finalisation. First, language
+specifications often do not define -- or not precisely define -- when the earliest point that a value can
+be finalised is. While this means that, formally, there is no `premature' finalisation,
+it seems unlikely that language designers anticipated some of the resulting
+surprises allowed by implementations (see e.g.~this example in
+Java~\cite{shipilev20local}). Second, in most compilers, most optimisations are
+`GC unaware'; one way this manifests is that optimisations such as scalar
+replacement can change the point in a program when GCed values appear
+finalisable.
 
-One suggested fix for this problem in GC for C++ is to ensure that all
-pointers, whether they refer to GCed objects or not, are kept alive for their
-full lexical scope~\cite[Solution~1]{boehm07optimization}. As we shall see
-later, this would almost certainly come with an unacceptable performance overhead,
-and be particularly frustrating for those parts of a program that a programmer
-knows, but a static analysis cannot prove, will not store GC pointers.
+In our context, it is trivial to define premature finalisation as a finaliser
+for a \lstinline{Gc<T>} value running while an owning \lstinline{Gc<T>} is
+still alive (e.g.~while a variable of that type is still in scope). At a
+high-level, the solution (which is equivalent to the suggestion
+in~\cite[Solution~1]{boehm07optimization}) is also trivial: the pointer that a
+\lstinline{Gc<T>} wraps at run-time must not be overwritten before the
+\lstinline{Gc<T>} has gone out of scope. In this section, we first turn this
+solution into reality, before then showing how to optimise it.
 
 
-\subsubsection{An outline of the solution}
-
-In the context of Rust, we can trivially define premature finalisation: a
-finaliser for \lstinline{Gc<T>} must not be run before the equivalent
-destructor would have been run if the type was just \lstinline{T}. For example,
-if we changed \cref{fig:premature_finalisation} to use a normal
-\lstinline{Box<T>}, without wrapping it in a \lstinline{Gc<T>}, the
-destructor would be run at the end of \lstinline{main}.
+\subsubsection{Realising early finaliser prevention}
 
 The basis of our solution is the observation that our definition of premature
-finalisation is \emph{almost} equivalent to defining that the finalisation of a
+finalisation is \emph{almost} equivalent to saying that the finalisation of a
 \lstinline{Gc<T>} value must not occur before the destruction of that
 \lstinline{Gc<T>} value. We say `almost' because \lstinline{Gc<T>} is copyable
 (see~\cref{gc_is_copyable}) and copyable types in Rust cannot have
 destructors\footnote{This restriction was needed in Rust's past when `dynamic
-drops' (roughly speaking, the dropping of partially initialised values) caused
-a value's backing memory to be zeroed when dropped. That has not been the case
-since 2016~\cite{klock14nonzeroing} \laurie{the reference is from 2014?} and, to the best of our knowledge,
+drops' (roughly speaking, the dropping of partially initialised values) led to
+a value's backing memory being `nulled out' (or `zeroed') when dropped. That has not been the case
+since 2016~\cite{klock14nonzeroing} \laurie{the reference is from 2014?} and
 the `copyable types cannot have destructors' restriction has been unnecessary
-since.}.
+since.}. By removing this restriction, we can then use the existence of a destructor
+for \lstinline{Gc<T>} to prevent premature finalisation.
 
-We therefore modify both Rust's type system and \rustc so that
-\lstinline{Gc<T>} is allowed to have a destructor: fortunately, this is a
-relatively simple change to both the type system and the implementation,
-requiring changing only a handful of lines of code. There is an implicit
-restriction on the resulting destructor: since it may be called multiple times
-for the `same' value, it must be idempotent. We are helped by the fact that
-\lstinline{Gc<T>} has no drop glue, since it wraps a single pointer type:
-therefore we only need to make sure we adhere to this restriction in
-\lstinline{Gc<T>}'s drop method.
+We thus modify both Rust's type system and \rustc so that
+\lstinline{Gc<T>} is allowed to have a destructor. This is a
+relatively simple change to both type system and implementation,
+requiring changing only a handful of lines of code. However, we must be
+very careful with the resulting destructor: each copy of
+\lstinline{Gc<T>} ends up with a call to the destructor, so the destructor
+itself must be idempotent (for this reason, we do not allow other copyable types
+to have a destructor). Our task is made easier because \lstinline{Gc<T>} has no
+drop glue: Rust does not add a destructor for pointer types, and from the
+perspective of the type system \lstinline{Gc<T>} is simply a wrapper around a
+pointer type.
 
-Fortunately, an idempotent drop method is exactly what we need: we do not
+We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
+is idempotent. Fortunately, this is exactly what we need: we do not
 want the drop method to have behaviour per se, but simply to inhibit finalisation.
 We achieve this with a memory fence in the form of a \emph{keep-alive}
 function. Keep-alive functions serve both compile-time and run-time purposes:
 they prevent a compiler from changing the lifetime of a value (i.e.~it cannot
-be moved earlier or later); and prevent a CPU from reordering computation
+be moved earlier or later); and they prevent a CPU from reordering computation
 around that point. Keep-alive functions are highly platform (compiler, operating
 system, and CPU) specific: we use \boehm's \lstinline{GC_keep_alive} function
 which abstracts over these details. \lstinline{Gc<T>}'s
@@ -780,23 +779,28 @@ impl<T: ?Sized> Drop for Gc<T> {
   \label{alg:barrier_removal}
 \end{figure}
 
-Using a keep-alive function in \lstinline{Gc<T>}'s drop method prevents
-premature finalisation but imposes a performance overhead because keep-alive functions
-necessarily inhibit many standard compile-time and run-time optimisations.
+Adding a drop method to \lstinline{Gc<T>} fully prevents premature
+finalisation. It also solves a performance problem with the suggested solution
+for C++ in~\cite[Solution~1]{boehm07optimization}, which requires keeping alive
+all pointers, no matter their type, for their full scope. By definition, our
+solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
+optimise values of other types as it so wishes.
 
-Our design naturally bypasses one of the problems that would be associated with
-an equivalent solution in, say, C++: we only have to keep-alive
-\lstinline{Gc<T>} values, so other parts of the code suffer no performance
-impact at all. However, this alone is not enough: in the worst case in our
-benchmark suite, our keep-alive solution a slowdown of
-\jake{fixme: have this show the slowdown as a percentage}\somrsbarriers{bnaive}{fibonacci}{speedup}. Our belief is that this is a case where the worst case is
-particularly important, and so further optimisations are necessary.
+However, our approach still imposes a performance overhead on code that uses
+\lstinline{Gc<T>}. In the worst case in our benchmark suite, the overhead is
+\somrsbarriers{bnaive}{fibonacci}{speedup}. Our belief is that this is a case
+where the worst case is particularly important, and so further optimisations
+are necessary if premature finaliser prevention is to be practical.
 
-We reduce the deleterious performance effects of the keep-alive function by
-piggy-backing on finaliser elision: if a finaliser can be
-elided, there is no finaliser to be called prematurely, and no need for a
-barrier. Intuitively, we want to avoid generating drop methods
-for \lstinline{Gc<T>} types that do not require finalisation. However, because
+Fortunately, premature finaliser prevention can piggy-back on finaliser
+elision: if a finaliser can be
+elided, there is no finaliser to be called prematurely, and no need for
+the resulting values to be kept alive. Intuitively, we therefore want to avoid generating drop methods
+for \lstinline{Gc<T>} types that do not require finalisation.
+
+\laurie{the rest of the subsubsection past this point needs to have more thought put into it}
+
+However, because
 of \rustc's pipeline, we have to generate drop methods for all
 \lstinline{Gc<T>} types and later remove those we do not want: the end effect
 is the same, though the implementation is different.
