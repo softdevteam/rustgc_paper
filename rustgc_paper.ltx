@@ -1655,6 +1655,14 @@ Because \gcarena is so different in nature to the other GCs described in this
 chapter, it is difficult to compare it ergonomically to other approaches.
 
 
+\section{Conclusions}
+
+In this paper we have introduced a novel design for GC in Rust, and shown how
+it solves some classical GC finaliser problems. We implemented our design in a
+fork of \rustc, and showed that it has a fairly small performance overhead. We
+do not claim that \ourgc is the best, final, design for GC in Rust, but it does
+show how much can be achieved if one is willing to adjust and extend the
+language design and, in particular, \rustc.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
