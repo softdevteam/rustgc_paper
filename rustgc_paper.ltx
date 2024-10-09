@@ -70,7 +70,8 @@ We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
 API; and how to make \emph{finalisation} (i.e.~the code that is run just before a
 values collected by the GC) safe, performant, and ergonomic. We show that
-using conservative\jake{We don't actually define what conservative means until section3.1. Are we assuming the readers will be familiar with this term? Or should we have a brief distinction between conservative / precise in the GC terminology section and then add a forward reference?} GC is necessary and sufficient to solve the API challenge,
+using \emph{conservative} GC (i.e.~treating each reachable machine word as
+a potential pointer) is necessary and sufficient to solve the API challenge,
 but the finalisation challenge is more difficult.
 
 In existing GCs for Rust, if a user needs values of type \lstinline{T} to cause a
@@ -296,9 +297,8 @@ keyword still allows arbitrary conversions.}.
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
-inevitable that \ourgc must be a \emph{conservative} GC, which treats each
-reachable machine word as a possible pointer: if,
-when considered as a pointer, a word's address falls within a GCed block of memory,
+inevitable that \ourgc must be a conservative GC: if, when considered as a
+pointer, a reachable word's address falls within a GCed block of memory,
 then that block itself is considered reachable (and thus transitively scanned).
 Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
 bits that also happens to make it a valid pointer, this over-approximates the
