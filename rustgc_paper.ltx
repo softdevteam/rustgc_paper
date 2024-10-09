@@ -69,8 +69,8 @@ Rust, as perhaps suggested by the number of different attempts to do so.
 We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
 API; and how to make \emph{finalisation} (i.e.~the code that is run just before a
-values collected by the GC) safe, performant, and ergonomic. We show that
-using \emph{conservative} GC (i.e.~treating each reachable machine word as
+value is collected by the GC) safe, performant, and ergonomic. We show that
+\emph{conservative} GC (i.e.~treating each reachable machine word as
 a potential pointer) is necessary and sufficient to solve the API challenge,
 but the finalisation challenge is more difficult.
 
@@ -81,11 +81,10 @@ existing \emph{destructors} (i.e.~code which is run just before a value is
 reclaimed by Rust's implicit memory management) but this makes it impossible to
 provide finalisers for types in external libraries.
 
-The `obvious' solution to this problem is to allow existing Rust destructors to
-be automatically used as finalisers. However, this introduces a number of
-problems. In the nearest context to our work, a GC proposal for C++, this solution was
-explicitly ruled out as the problems were thought
-insoluble~\cite[p.~32]{boehm09garbage}. We break these problems down into three
+The obvious solution to this problem is to allow existing Rust destructors to
+be automatically used as finalisers. However, in the nearest context to our
+work, a GC proposal for C++, this solution was explicitly ruled out as it
+introduces seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We break these problems down into three
 categories:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run prematurely;
