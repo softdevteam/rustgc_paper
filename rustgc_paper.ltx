@@ -802,7 +802,7 @@ function call to its successor. however, that still doesn't exactly explain
 hack? is that because there's no sense of `when we remove a call we want to
 merge two basic blocks and/or use some sort of null terminator'?}
 
-We therefore add a new pass \laurie{`remove_elidable_drops' perhaps?} to
+We therefore add a new pass \laurie{`remove\_elidable\_drops' perhaps?} to
 \rustc's Mid-Level IR (MIR) processing. MIR is best thought of as the main IR
 inside \rustc: it contains the complete set of functions in the program; each
 function consists of a sequence of basic blocks; and function calls are
