@@ -819,42 +819,6 @@ cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 
 \subsection{Rust references}
 
-\begin{figure}[t]
-\centering
-\begin{minipage}{0.50\textwidth}
-\lstinputlisting[language=Rust,firstline=9,lastline=18, basicstyle=\footnotesize\ttfamily]{listings/dangling_reference.rs}
-\subcaption{}
-\end{minipage}%
-\begin{minipage}{0.50\textwidth}
-\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
-error: `GcNode{value: &*b, nbr: None}` cannot be safely
-       constructed.
- |  let gc1 = Gc::new(GcNode{value: &*b, nbr: None});
- |            --------^^^^^^^^^^^^^^^^^^^^^^^^^^^-
- |            |       |
- |            |       contains a reference (&) which
- |            |       may no longer be valid when it
- |            |       is finalized.
- |            `Gc::new` requires that a type is
- |            reference free.
-\end{lstlisting}
-\subcaption{}
-\end{minipage}
-\label{fig:dangling_reference}
-\captionof{lstlisting}{A \lstinline{u64} is
-  placed on the heap using a \lstinline{Box}, and an immutable reference to it
-  is stored inside the \lstinline{Gc<Node>}. Without finalisation, this is
-  valid as long as \lstinline{gc1} does not outlive \lstinline{b}. However, the
-  use of the references from the \lstinline{drop} method is unsound. This is
-  because the collector is likely to schedule the finaliser to run after the
-  \lstinline{Box<u64>} is freed when \lstinline{b} goes out of scope. The
-  dereference on line 3 would thus access a dangling reference causing a
-  use-after-free.\laurie{this example slightly contradicts the text: is the
-  problem the existence of reference + finaliser OR the use of the reference in
-  drop? I'm pretty sure it's the first of these two possibilities, but
-  I'd like to check!}\jake{The problem is the existence of a reference and finaliser, where the ref is then used inside a finaliser. In (b) we prevent a reference and a finaliser entirely, so that the use of the ref in a finaliser could never happen -- it is an overapproximation.  }}
-\end{figure}
-
 The \lstinline{Gc<T>} type can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
@@ -863,38 +827,20 @@ However, finalisers can be thought of as extending the lifetime of a
 reference stored in a \lstinline{Gc<T>} it would implicitly undermine Rust's
 borrow checking rules.
 
-\ourgc's solution to this is simple: \lstinline{Gc<T>} can only include a
-reference if that type's finaliser, should it exist, does not access that
-reference. For example,
-\lstinline{Gc<&GcNode<u8>>} is statically rejected by \ourgc because
-because \lstinline{GcNode}'s destructor
-requires a corresponding finaliser. \cref{fig:dangling_reference}
-shows the error that \ourgc raises in such a case.
+The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
+from storing, directly or indirectly, references. While references seem
+pointless inside a \lstinline{Gc<T>}, it is occasionally useful, including when
+one is refactoring or experimenting with existing code.
 
-\laurie{does finaliser elision happen `before' FSA such that FSA can take
-advantage of it? or does it use the compiler intrinsic and infer that elision
-would therefore happen? or ...?} \jake{FSA uses the \lstinline{requires_finalizer} intrinsic. Finaliser elision is not an IR pass or transformation.}
-
-While we could somewhat relax this rule (e.g.~finalisers which provably do not,
-directly or indirectly, use a reference could be let through), there are few
-benefits to doing so: after all, \lstinline{Gc<T>} is explicitly designed to
-help users avoid ownership restrictions. That said, finaliser elision
-(see~\cref{sec:elision}) does reduce the number of types which need finalisation, thus
-enabling more types to be embedded as references, for those who really want to.
-
-\laurie{this paragraph again suggests that we look into the finaliser, but
-elsewhere we suggest we don't look into the finaliser.}\jake{We always look into a finaliser. It's just that if the user tries to put a regular Rust reference inside a \lstinline{Gc::new} we will immediately bork with an error. What we're saying is that we do allow raw pointers inside GCable types, and we don't check for raw pointer dereferences inside a finaliser, because this requires unsafety from the user anyway.}\laurie{i still find this confusing: other examples don't show us borking when we put \lstinline{&} in a \lstinline{Gc::new}?}
-\jake{I think I'm confused why you're confused now. Which other examples do we put a \lstinline{&} inside a \lstinline{Gc::new}? If we did that \rustc should bork and not even bother looking inside the drop method}
-As with references, this same unsoundness can be caused by storing raw pointers
-inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
-\lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
-is sound even without enforcing this rule for raw pointers because dereferencing raw pointers
-is already not possible in safe Rust code, and programmers must ensure the
-reference is valid for each dereference anyway.
+\ourgc therefore defines a more relaxed rule: a \lstinline{Gc<T>} can only store,
+directly or indirectly, references if it has no finaliser (i.e.~\lstinline{T}
+has no destructor, or finaliser elision has removed the \lstinline{Gc<T>}'s
+finaliser)\footnote{We could relax this even further by allowing the presence of a
+finaliser if it does not access a stored reference, but that is more tricky to
+implement, and we did not find a particular need for it.}.
 
 To check whether a type passed to \lstinline{Gc} contains a reference, \ourgc
-defines a \emph{marker} (i.e.~without methods) \emph{auto trait}
-(i.e.~automatically implemented for types which adhere to its restrictions)
+defines another marker auto trait
 \lstinline{ReferenceFree}. \ourgc automatically implements
 \lstinline{ReferenceFree} for each type that does not itself contain a
 type that is not \lstinline{ReferenceFree}. Primitive types such as integers
