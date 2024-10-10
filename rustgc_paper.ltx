@@ -696,26 +696,23 @@ associated \lstinline{Gc<T>}. In this section, we first turn this
 solution into reality, before then showing how to optimise it.
 
 
-\subsubsection{Realising early finaliser prevention}
+\subsubsection{Realising premature finaliser prevention}
 
-The basis of our solution is the observation that our definition of premature
-finalisation is \emph{almost} equivalent to saying that the finalisation of a
-\lstinline{Gc<T>} value must not occur before the destruction of that
-\lstinline{Gc<T>} value. We say `almost' because \lstinline{Gc<T>} is copyable
+We want to delay the finalisation of a \lstinline{Gc<T>} value until after the
+point that the \lstinline{Gc<T>} owner would be destructed. However,
+\lstinline{Gc<T>} is copyable
 (see~\cref{gc_is_copyable}) and copyable types in Rust cannot have
 destructors\footnote{This restriction was needed in Rust's past when `dynamic
 drops' (roughly speaking, the dropping of partially initialised values) led to
-a value's backing memory being `nulled out' (or `zeroed') when dropped. That has not been the case
-since the suggestions in~\cite{klock14nonzeroing} were merged in 2016. The
-`copyable types cannot have destructors' restriction has been unnecessary
-since.}. By removing this restriction, we can then use the existence of a destructor
-for \lstinline{Gc<T>} to prevent premature finalisation.
-
-We thus modify both Rust's type system and \rustc so that
+a value's backing memory being zeroed when dropped. That has not been the case
+since 2016~\cite{klock14nonzeroing}, at which point the
+`copyable types cannot have destructors' restriction has been unnecessary.}.
+We first modify both Rust's type system and \rustc so that
 \lstinline{Gc<T>} is allowed to have a destructor. This is a
 relatively simple change to both type system and implementation,
-requiring changing only a handful of lines of code. However, we must be
-very careful with the resulting destructor: each copy of
+changing only a handful of lines of code.
+
+However, we must be very careful with the resulting destructor: each copy of
 \lstinline{Gc<T>} ends up with a call to the destructor, so the destructor
 itself must be idempotent (for this reason, we do not allow other copyable types
 to have a destructor). Our task is made easier because \lstinline{Gc<T>} has no
@@ -724,8 +721,8 @@ perspective of the type system \lstinline{Gc<T>} is simply a wrapper around a
 pointer type.
 
 We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
-is idempotent. Fortunately, this is exactly what we need: we do not
-want the drop method to have behaviour per se, but simply to inhibit finalisation.
+is idempotent. Fortunately, this is sufficient: we want the drop
+method to inhibit finalisation but that does not require run-time behaviour.
 We achieve this with a memory fence in the form of a \emph{keep-alive}
 function. Keep-alive functions serve both compile-time and run-time purposes:
 they prevent a compiler from changing the lifetime of a value (i.e.~it cannot
@@ -742,141 +739,81 @@ impl<T: ?Sized> Drop for Gc<T> {
 \end{lstlisting}
 
 
-\subsection{Optimising premature finaliser prevention}
+\subsubsection{Optimising premature finaliser prevention}
 
-\begin{figure}[t]
-% \begin{algorithm}
-\begin{algorithmic}
-\Function{RemoveElidableDrops}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-                \If {\Call{IsGcType}{$ty$}}
-                    \If {\NOT \Call{RequiresFinaliser}{$ty$}}
-                        \State \Call{ReplaceTerminator}{$basic\_block$}
-                    \EndIf
-                \EndIf
-            \EndIf
-      \EndFor
-\EndFunction
-\Function{ReplaceTerminator}{$basic\_block$}
-    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-    \State $block.terminator \gets last\_block.terminator$
-\EndFunction
-\end{algorithmic}
-% \end{algorithm}
-  \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
-  for types with elided finalisers. This pass is registered inside \rustc,
-  where it is invoked on all \textit{func}s in the program. The
-  \textit{RemoveElidableDrops} iterates each basic block in a function in order
-  to inspect whether the terminator is a call to a drop method as these are the
-  only terminators of interest in this pass. If a ``drop terminator'' is found,
-  then we check the type of the value being dropped. If the type of the value
-  being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
-  the drop terminator can be replaced. We can then replace these terminators by
-  ``leaping over'' the drop method and patching it to the next basic block in
-  the control flow.}
-  \label{alg:barrier_removal}
-\end{figure}
+% \begin{figure}[t]
+% % \begin{algorithm}
+% \begin{algorithmic}
+% \Function{RemoveElidableDrops}{$func$}
+%       \ForEach {$basic\_block \in func$}
+%             \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+%                 \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+%                 \If {\Call{IsGcType}{$ty$}}
+%                     \If {\NOT \Call{RequiresFinaliser}{$ty$}}
+%                         \State \Call{ReplaceTerminator}{$basic\_block$}
+%                     \EndIf
+%                 \EndIf
+%             \EndIf
+%       \EndFor
+% \EndFunction
+% \Function{ReplaceTerminator}{$basic\_block$}
+%     \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+%     \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+%     \State $block.terminator \gets last\_block.terminator$
+% \EndFunction
+% \end{algorithmic}
+% % \end{algorithm}
+%   \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
+%   for types with elided finalisers. This pass is registered inside \rustc,
+%   where it is invoked on all \textit{func}s in the program. The
+%   \textit{RemoveElidableDrops} iterates each basic block in a function in order
+%   to inspect whether the terminator is a call to a drop method as these are the
+%   only terminators of interest in this pass. If a ``drop terminator'' is found,
+%   then we check the type of the value being dropped. If the type of the value
+%   being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
+%   the drop terminator can be replaced. We can then replace these terminators by
+%   ``leaping over'' the drop method and patching it to the next basic block in
+%   the control flow.}
+%   \label{alg:barrier_removal}
+% \end{figure}
 
-Adding a drop method to \lstinline{Gc<T>} fully prevents premature
+The drop method we add to \lstinline{Gc<T>} fully prevents premature
 finalisation. It also solves a performance problem with the suggested solution
 for C++ in~\cite[Solution~1]{boehm07optimization}, which requires keeping alive
 all pointers, no matter their type, for their full scope. By definition, our
 solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
-optimise values of other types as it so wishes.
+optimise values of other types as it so wishes. However, our approach still
+imposes a performance overhead on code that uses
+\lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
+\somrsbarriers{bnaive}{fibonacci}{speedup} \laurie{this figure seems wrong}.
 
-However, our approach still imposes a performance overhead on code that uses
-\lstinline{Gc<T>}. In the worst case in our benchmark suite, the overhead is
-\somrsbarriers{bnaive}{fibonacci}{speedup}, and so further optimisations
-are necessary if premature finaliser prevention is to be practical.
-
-Fortunately, premature finaliser prevention can piggy-back on finaliser
-elision: if a finaliser can be
+Fortunately, we can optimise premature finaliser prevention further by
+piggy-backing on finaliser elision: if a finaliser can be
 elided, there is no finaliser to be called prematurely, and no need for
-the resulting values to be kept alive. Intuitively, we therefore want to avoid generating drop methods
+resulting values to be kept alive. Intuitively, we want to avoid generating drop methods
 for \lstinline{Gc<T>} types that do not require finalisation. However,
 inside \rustc, it is easier for us to remove drop method calls to elidable finalisers:
-this is functionally equivalent to removing the drop methods themselves, though
-it does put an extra burden on dead-code elimination in the compiler tool-chain.
+this is functionally equivalent to not generating the drop methods in the first place, though
+our approach does put an extra burden on dead-code elimination in the compiler tool-chain.
 
-\laurie{the way we use `terminators' feels misleading. the name (and the way we
-explain things) implies that each function call is a basic block terminator,
-and that we inline drop methods, so that we can replace a call to them with a
-reference to the drop method's final terminator. i \emph{think} the missing bit
-of information is that a basic block can have a successor that is not a
-function call to its successor. however, that still doesn't exactly explain
-`ReplaceTerminator': using the drop method's final terminator feels like a
-hack? is that because there's no sense of `when we remove a call we want to
-merge two basic blocks and/or use some sort of null terminator'?}
-\jake{\lstinline{https://doc.rust-lang.org/beta/nightly-rustc/src/rustc_middle/mir/syntax.rs.html#638-883}
-basic block terminators have a ``kind'' variant. We replace the kind of the
-terminator from a \lstinline{TerminatorKind::Drop} to a
-\lstinline{TerminatorKind::Goto} where the goto's target block is the return
-block fished out from the terminator of the last block of the drop method.}
+We therefore add a new pass
+\lstinline{remove_elidable_drops}\footnote{Internally, \rustc sometimes
+conflates `drop' and `destructor'; we avoid doing so except where it would make
+it difficult to reconcile our explanation with \rustc's implementation.} to
+\rustc's Mid-Level Intermediate Representation (MIR) processing. MIR is best
+thought of as the main IR inside \rustc: it contains the complete set of
+functions in the program, where each function consists of a sequence of basic
+blocks. Simplifying somewhat, function and destructor calls are represented as
+different kinds of \emph{terminators} on basic blocks, where such terminators
+reference both the callee and a successor block.
 
-We therefore add a new pass \textit{RemoveElidableDrops} to
-\rustc's Mid-Level IR (MIR) processing. MIR is best thought of as the main IR
-inside \rustc: it contains the complete set of functions in the program; each
-function consists of a sequence of basic blocks; and function calls are
-represented as `terminators' on basic blocks.
-
-a control flow graph used for various control flow senitive
-optimisations and analyses phases (e.g. one such pass is borrow checking)
-
-at the point that drop methods are generated in \rustc, we do not have the information
-for finaliser elision: it is easier to remove drop method calls to elidable finalisers.
-
-We add a new optimisation pass to \rustc to remove such drop method calls.
-
-We implement this by modifying \rustc to include an optimisation pass which
-removes these unnecessary drop methods. As a program is compiled in \rustc, it
-is lowered through various intermediate representations, the most important
-of which is Mid-Level IR (MIR), a control flow graph used for various control flow senitive
-optimisations and analyses phases (e.g. one such pass is borrow checking).
-
-When a program is lowered to MIR, it is represented as a collection of function
-bodies, which are made up of basic blocks connected by edges. During this
-lowering, the compiler-inserted calls to drop methods are represented as
-terminators (i.e. the directional edges) which join basic blocks together.
-
-After a program is lowered to MIR, it undergoes various transformations via an
-ordered list of ``MIR passes''. The ordering is important because some of these
-passes depend on other passes having already been completed. We introduce a MIR
-pass (shown in \cref{alg:barrier_removal}) for removal of these unnecessary drops \laurie{unnecessary drop methods or calls?}
-on \lstinline{Gc<T>}. This pass is introduced as one of the final optimisation
-passes performed on the MIR. This is because previous optimisations may
-introduce temporary copies of local values, which, for \lstinline{Gc<T>}s,
-could end up inserting new drop calls at the end of those temporaries'
-lifetimes. This would mean we would need to run our pass again to clean up after them.
-
-\laurie{jake: we need a full explanation here, because at the moment our story
-is muddled. as a i current read it the story seems to be: (1) in an early-ish
-pass (which one?) we delete drop methods for elidable \lstinline{Gc<T>} but
-that leaves behind calls which no longer have a correct target (if so: doesn't
-this invalidate the mir?!) (2) in the \lstinline{remove_gc_drops} we patch
-those stubs.}\jake{We do a single pass, late on in the MIR transformation
-pipeline. Drop methods (and calls) have already been automatically inserted by
-\rustc when the program was lowered to MIR. We remove these calls (but not the
-methods) in our pass. The calls are represented as the terminators in basic
-blocks. When we see a drop call terminator we look at which basic block that
-drop method would have returned to and replace the Drop call with a call to that next function body
-instead. This doesn't invalidate the MIR, but it does mean we end up with those drop methods as dead code. They may then be removed later when the program is lowered into in LLVM-IR by LLVM's own dead code analysis.}
-The main data-structure in \rustc is \emph{MIR} (Mid-level Intermediate
-Representation): in essence the compiler is a series of passes which navigate
-over MIR, analysing and transforming it. We introduce a new MIR pass
-\lstinline{RemoveElidableDrops}, which we make the penultimate pass in \ourgc.
-
-Adjusting \rustc to perform this optimisation requires iterating over all calls
-to \lstinline{drop} in a program and removing those that call a
-\lstinline{Gc<T>} type whose finaliser is elidable. \cref{alg:barrier_removal}
-outlines the basic approach. Note that the drop method is removed by patching
-the terminator of the block which calls drop with the terminator at the end of
-the drop body. After this pass, we call the Rust compiler's existing
-\emph{simplify mir} pass,
-which tidies up the control flow graph by removing the empty blocks which were
-created as a result of drop removal.
+The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
+identifies destructor terminators which reference elidable finalisers (using
+the \lstinline{requires_finalizer} intrinsic from
+\cref{requires_finalizer_intrinsic}), and turns them into `goto' terminators
+that inhibit generation of the destructor. Although it might seem natural for
+us to goto the terminator's successor block, we \laurie{i don't understand why
+we do things in this way} we use the return basic block of the drop method.
 
 
 \section{Finaliser Safety Analysis}
