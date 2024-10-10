@@ -412,7 +412,7 @@ recursively scanned for finaliser glue.
 
 Problem (4) is impossible to solve in Rust as-is. One cannot define a function
 that can never be called --- what use would such a function have? It might seem
-tempting to have the \lstinline{finalize} method take ownership of the value,
+tempting to have the \lstinline{finalise} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
 glue to be run afterwards.
 
@@ -474,9 +474,9 @@ Over time, finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}. It
-is important to differentiate such mechanisms from the \lstinline{Finalize} trait that many existing GCs for
+is important to differentiate such mechanisms from the \lstinline{Finalise} trait that many existing GCs for
 Rust force users to manually implement: cleaners impose restrictions
-to make finalisers less problematic; existing \lstinline{Finalize} traits
+to make finalisers less problematic; existing \lstinline{Finalise} traits
 do not impose any such restrictions.
 
 Our desire that \ourgc should use existing Rust destructors as finalisers whenever
@@ -547,8 +547,8 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \caption{Finaliser Elision}
 \label{alg:elision}
 \begin{algorithmic}
-\Function{RequiresFinalizer}{$T$}
-    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, $DropMethodFinalizerElidable$}}
+\Function{RequiresFinaliser}{$T$}
+    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, $DropMethodFinaliserElidable$}}
         \State \Return{true}
     \EndIf
 \ForEach {$field \in type$}
@@ -561,40 +561,40 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \end{algorithmic}
 \end{algorithm}
 
-\label{requires_finalizer_intrinsic}
+\label{requires_finaliser_intrinsic}
 The aim of finaliser elision is to statically determine which type's destructors do
 not require corresponding finalisers and elide them. Our approach is conservative,
 and deals correctly with drop glue and nested data types. We implement approach
-shown in \cref{alg:elision} a \rustc compiler intrinsic \lstinline{requires_finalizer}.
+shown in \cref{alg:elision} a \rustc compiler intrinsic \lstinline{requires_finaliser}.
 
 In essence, \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalisation unless it also implements the
-\lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
+\lstinline{DropMethodFinaliserElidable} \emph{marker trait} (i.e.~a
 trait without methods). The latter trait is defined by \ourgc, and must be
 manually implemented by users: it signifies that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. However,
-\lstinline{DropMethodFinalizerElidable} only refers to the `top-level' type: if
+\lstinline{DropMethodFinaliserElidable} only refers to the `top-level' type: if
 a transitively reachable field has a type which implements the \lstinline{Drop}
-trait but not the \lstinline{DropMethodFinalizerElidable} trait, then the
+trait but not the \lstinline{DropMethodFinaliserElidable} trait, then the
 top-level type still requires finalisation. This latter qualification is
 necessary to deal with drop glue.
 
 Even though neither normal Rust destructors or \ourgc finalisers are guaranteed
 to run, a program whose destructors or finalisers never run would probably not
 be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We have
-therefore chosen to make \lstinline{DropMethodFinalizerElidable} an unsafe
+therefore chosen to make \lstinline{DropMethodFinaliserElidable} an unsafe
 trait, because implementing it inappropriately is likely to lead undesired
 (though not incorrect!) behaviour at run-time. To implement it one therefore
 needs to opt in to unsafe Rust:
 
 \begin{lstrustsmall}
-unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
+unsafe impl<T> DropMethodFinaliserElidable for Box<T> {}
 \end{lstrustsmall}
 
 \ourgc modifies the standard Rust library to implement
-\lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
+\lstinline{DropMethodFinaliserElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
-not only are these types' drop methods compatible as-is with \lstinline{DropMethodFinalizerElidable},
+not only are these types' drop methods compatible as-is with \lstinline{DropMethodFinaliserElidable},
 but these types are widely used in real Rust code: as we shall see in \cref{sec:evaluation},
 they are an important part of allowing us to elide significant numbers of finalisers in real code.
 
@@ -602,17 +602,17 @@ they are an important part of allowing us to elide significant numbers of finali
   \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily,
     label={listing:elision_in_rustc}, caption={
       A simplified view of how finalisers are elided inside \ourgc. The new compiler intrinsic
-      \lstinline{requires_finalizer} returns true if a finaliser is required for a
+      \lstinline{requires_finaliser} returns true if a finaliser is required for a
       type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
-      value is registered as requiring a finaliser. Because \lstinline{requires_finalizer}
+      value is registered as requiring a finaliser. Because \lstinline{requires_finaliser}
       is a \lstinline{const} function, with optimisations turned on, it is inlined
       and the branch optimised away. In other words, the seemingly dynamic, branching code
       in \lstinline{Gc::new} turns into static, branchless code.
     }]
 impl<T> Gc<T> {
   pub fn new(value: T) -> Self {
-    if requires_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
-    else { Gc<T>::new_without_finalizer(value) }
+    if requires_finaliser::<T>() { Gc<T>::new_with_finaliser(value) }
+    else { Gc<T>::new_without_finaliser(value) }
     ...
   }
 }
@@ -620,10 +620,10 @@ impl<T> Gc<T> {
 \end{figure}
 
 \cref{listing:elision_in_rustc} shows how we use the \lstinline{const} compiler intrinsinc
-\lstinline{requires_finalizer}. \lstinline{Gc::new} uses this intrinsic to decide
+\lstinline{requires_finaliser}. \lstinline{Gc::new} uses this intrinsic to decide
 whether a finaliser must be registered or not. Although this looks like
 a dynamic check, in fully optimised builds it turns into a static
-check: \lstinline{requires_finalizer} is
+check: \lstinline{requires_finaliser} is
 evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
@@ -797,8 +797,8 @@ reference both the callee and a successor block.
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies destructor terminators which reference elidable finalisers (using
-the \lstinline{requires_finalizer} intrinsic from
-\cref{requires_finalizer_intrinsic}), and turns them into `goto' terminators
+the \lstinline{requires_finaliser} intrinsic from
+\cref{requires_finaliser_intrinsic}), and turns them into `goto' terminators
 to the basic block's successor.
 
 
@@ -970,10 +970,10 @@ which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
 analysis} (described in \autoref{fsa}) to detect this.
 
 This is implemented by first adding a negative implementation of
-\lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
+\lstinline{FinaliserSafe} to the \lstinline{Gc<T>} type:
 
 \begin{lstrustsmall}
-impl<T> !FinalizerSafe for Gc<T> {}
+impl<T> !FinaliserSafe for Gc<T> {}
 \end{lstrustsmall}
 
 FSA then uses this to identify the specific field which was unsafely
@@ -1264,7 +1264,7 @@ Unlike \ourgc, destruction in \citep{rustbacon} is deterministic: it occurs as
 soon as an object's last owner is gone; in the case of cyclic garbage, this
 means after the user calls \lstinline{collect_cycles}. However, like \ourgc it
 relies on the \lstinline{Drop} trait for destruction and does not implement
-it's own \lstinline{Finalize} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
+it's own \lstinline{Finalise} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
 This prevents the trapdoor reference in finalisers problem explained in
 \jake{section FSA}.
 
@@ -1318,7 +1318,7 @@ with \rustgc. The \lstinline{GcCell} provides additional support for rooting and
 unrooting objects across a borrow as they are mutated inside the \lstinline{Gc}.
 It provides a similar API to the user as \lstinline{RefCell}.
 
-Unlike \ourgc, objects are finalised by implementing a \lstinline{Finalize}
+Unlike \ourgc, objects are finalised by implementing a \lstinline{Finalise}
 trait. Though this reduces much of the complexity that \ourgc needs in order to
 support calling \lstinline{T::drop} from a finaliser or destructor context,
 \rustgc requires the programmer to ensure that a finaliser implementation is
