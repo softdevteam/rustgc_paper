@@ -819,6 +819,9 @@ cases. We then explain how we changed \rustc to implement these rules in \ourgc.
 
 \subsection{Rust references}
 
+\jake{We no longer have an example of an unsound Rust program for this. I'm
+guessing you thought the prose was self explanatory enough?}
+
 The \lstinline{Gc<T>} type can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
@@ -863,7 +866,7 @@ force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
     whether \lstinline{gc1} or \lstinline{gc2} is finalised first. Note that
     neither possibility includes the `seemingly expected' values of \lstinline{1
     2} or \lstinline{2 1}: whichever GCed value is finalised first changes
-    what the other GCed value sees in its finaliser.
+    what the other GCed value sees in its finaliser. \jake{I think it's important to point out that the problem here is that one of prints does an invalid read, so it is unsound. Furthermore, if this were combined with a Boxed value, it could even segfault because that Box may have been freed first (as part of one of the finalisers}
   }]
 struct GcNode { value: u8, nbr: Option<Gc<RefCell<GcNode>>> }
 impl Drop for GcNode {
