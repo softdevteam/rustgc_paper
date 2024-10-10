@@ -1024,55 +1024,7 @@ side of caution, favouring soundness by refusing to compile the program.
 \subsection{The Analysis}
 \label{sec:fsa}
 
-Extends Rust's type system to reject programs whose destructors are not
-provably safe to be used as finalisers. At compile-time, a static analysis is
-performed over the drop methods of each value used in a \lstinline{Gc}.
-
-
-\subsubsection{Ensuring thread-safety}
-
-The basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
-drop method needs to be checked to ensure it only accesses fields which are
-safe to be used inside a finaliser. Performing this check only when such types
-are used in \lstinline{Gc} is important as it prevents FSA from breaking
-existing Rust programs: drop methods with unsound finalisation behaviour are
-not a problem if they are never used in a \lstinline{Gc}.
-
-The \lstinline{Wrapper} uses a \lstinline{RefCell} to swap the value of
-underlying string (line 11). A \lstinline{RefCell} provides a form of interior
-mutability which is not thread-safe (because its \lstinline{borrow()} /
-\lstinline{borrow_mut()} methods are non-atomic). In this example, a
-\lstinline{Wrapper} can safely be placed inside a \lstinline{Gc}, because the
-\lstinline{RefCell} is not used in \lstinline{Wrapper}'s finaliser (line 4).
-This is checked by FSA at compile-time.
-
-As with any static analysis, FSA is inherently conservative: some drop methods
-are impossible to analyse at compile-time so in these cases \ourgc will err on
-the side of caution and reject potentially safe programs. This is most likely
-to happen in two situations.
-
-First, a drop method may contain a call to an opaque (i.e. externally linked)
-function for which the compiler does not have the MIR. If a reference to a field
-which would be unsafe to use in a finaliser is passed to this function, then FSA
-would reject the program. This function call \emph{could} be safe, but FSA has
-no way of knowing, and will reject it.
-
-Second, if a finaliser is used on a trait object which is called using dynamic
-dispatch in Rust. At compile-time, it is not possible to know the concrete type
-of a trait object, so FSA does not know which drop method to check.
-
-In both cases, the user has the option of explicitly informing the compiler a
-particular drop method is safe to use as a finaliser. We observe that this is
-rare in practice.
-
-\subsubsection{Making unordered finalisation sound}
-\label{sound_unordered_finalisation}
-
-
-\subsubsection{How it works}
-
-
-\begin{figure}[t]
+\begin{figure}[t!]
 % \begin{algorithm}
 \begin{algorithmic}
 \Function{FinaliserSafetyAnalysis}{$func$}
@@ -1119,6 +1071,42 @@ rare in practice.
 % \end{algorithm}
   \captionof{algorithm}{}
 \end{figure}
+
+Extends Rust's type system to reject programs whose destructors are not
+provably safe to be used as finalisers. At compile-time, a static analysis is
+performed over the drop methods of each value used in a \lstinline{Gc}.
+
+
+\subsubsection{Ensuring thread-safety}
+
+The basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
+drop method needs to be checked to ensure it only accesses fields which are
+safe to be used inside a finaliser. Performing this check only when such types
+are used in \lstinline{Gc} is important as it prevents FSA from breaking
+existing Rust programs: drop methods with unsound finalisation behaviour are
+not a problem if they are never used in a \lstinline{Gc}.
+
+\subsubsection{Limitations}
+
+As with any static analysis, FSA is inherently conservative: some drop methods
+are impossible to analyse at compile-time so in these cases \ourgc will err on
+the side of caution and reject potentially safe programs. This is most likely
+to happen in two situations.
+
+First, a drop method may contain a call to an opaque (i.e. externally linked)
+function for which the compiler does not have the MIR. If a reference to a field
+which would be unsafe to use in a finaliser is passed to this function, then FSA
+would reject the program. This function call \emph{could} be safe, but FSA has
+no way of knowing, and will reject it.
+
+Second, if a finaliser is used on a trait object which is called using dynamic
+dispatch in Rust. At compile-time, it is not possible to know the concrete type
+of a trait object, so FSA does not know which drop method to check.
+
+In both cases, the user has the option of explicitly informing the compiler a
+particular drop method is safe to use as a finaliser. We observe that this is
+rare in practice.
+
 
 
 \section{Performance Evaluation}
