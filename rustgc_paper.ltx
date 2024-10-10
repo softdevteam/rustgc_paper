@@ -917,31 +917,20 @@ algorithm (\cref{alg:fsa}) here? or add a forward ref to The Analysis section?}
 \subsection{Cycles and Finalisation}
 
 \begin{figure}[tb]
-\begin{lstlisting}[
-  language=Rust, basicstyle=\footnotesize\ttfamily,
-  label={fig:cycles_and_finalisation},
-  caption={An example of the problems that cycles cause finalisation. This
-    seemingly innocuous variation of~\cref{fig:first_example} would
-    non-deterministically print \lstinline{2 0} or \lstinline{1 0} depending on
-    whether \lstinline{gc1} or \lstinline{gc2} is finalised first. Note that
-    neither possibility includes the `seemingly expected' values of \lstinline{1
-    2} or \lstinline{2 1}: whichever GCed value is finalised first changes
-    what the other GCed value sees in its finaliser. \jake{I think it's important to point out that the problem here is that one of prints does an invalid read, so it is unsound. Furthermore, if this were combined with a Boxed value, it could even segfault because that Box may have been freed first (as part of one of the finalisers}
-  }]
-struct GcNode { value: u8, nbr: Option<Gc<RefCell<GcNode>>> }
-impl Drop for GcNode {
-  fn drop(&mut self) { self.value = 0; println!("{}", self.nbr.unwrap().value); }
-}
-fn main()  {
-  let mut gc1 = Gc::new(RefCell::new(GcNode{value: 1, nbr: None}));
-  let gc2 = Gc::new(RefCell::new(GcNode{value: 2, nbr: None}));
-  gc1.borrow_mut().nbr = Some(gc2);
-  gc2.borrow_mut().nbr = Some(gc1);
-  gc1 = gc2;
-  force_gc();
-  // Assume both finalisers run at this point
-}
-\end{lstlisting}
+\lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
+  firstline=5]{listings/finalisation_cycle.rs}
+\captionof{lstlisting}{An example of the problems that cycles cause
+  finalisation. This seemingly innocuous variation of~\cref{fig:first_example}
+  would non-deterministically print \lstinline{2 0} or \lstinline{1 0}
+  depending on whether \lstinline{gc1} or \lstinline{gc2} is finalised first.
+  Note that neither possibility includes the `seemingly expected' values of
+  \lstinline{1 2} or \lstinline{2 1}: whichever GCed value is finalised first
+  changes what the other GCed value sees in its finaliser. \jake{I think it's
+  important to point out that the problem here is that one of prints does an
+  invalid read, so it is unsound. Furthermore, if this were combined with a
+  Boxed value, it could even segfault because that Box may have been freed
+  first (as part of one of the finalisers}}
+\label{fig:finaliser_cycle}
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic

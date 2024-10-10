@@ -2,15 +2,16 @@
 use std::gc::Gc;
 use std::sync::Mutex;
 
-struct Node {value: u8, nbr: Option<Gc<Mutex<Node>>>}
-impl Drop for Node {
- fn drop(&mut self) {
-    let nbr = self.nbr.unwrap();
-    println!("nbr {}", nbr.lock().unwrap().value);
- }
+struct GcNode { value: u8, nbr: Option<Gc<RefCell<GcNode>>> }
+impl Drop for GcNode {
+  fn drop(&mut self) { self.value = 0; println!("{}", self.nbr.unwrap().value); }
 }
-
-fn main() {
-  let n1 = Mutex::new(Node{value: 1, nbr: None});
-  let gc1 = Gc::new(n1);
+fn main()  {
+  let mut gc1 = Gc::new(RefCell::new(GcNode{value: 1, nbr: None}));
+  let gc2 = Gc::new(RefCell::new(GcNode{value: 2, nbr: None}));
+  gc1.borrow_mut().nbr = Some(gc2);
+  gc2.borrow_mut().nbr = Some(gc1);
+  gc1 = gc2;
+  force_gc();
+  // Assume both finalisers run at this point
 }
