@@ -340,9 +340,8 @@ than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion and have
 added or changed approximately 3,150 Lines Of Code (LOC). Users must opt-in
-to GC by enabling the allocator explicitly:
+to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
 
-\laurie{dumb question: why `A'?}\jake{It's just the name of the static variable, it could be anything really}
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
 #![feature(gc)] use std::gc::GcAllocator;
 #[global_allocator] static A: GcAllocator = GcAllocator
@@ -381,10 +380,10 @@ we therefore use `destructor' as the umbrella term for both drop methods and dro
 
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
-value is dropped, the underlying resources (e.g.~file handles or mutexes) it
-acquired when created are released. Whether one considers all such uses
-to be RAII or not, a brief perusal of Rust code will quickly show both that
-types that have drop methods are used frequently, and that users fairly often
+value is dropped, the underlying resources it possesses (e.g.~file handles or heap memory)
+are released. Whether one considers all such uses
+to be RAII or not, a brief perusal of Rust code will quickly show that
+types that have drop methods are used frequently and that users fairly often
 implement their own drop methods.
 
 Existing GCs for Rust have very separate notions of destructors and finalisers.
@@ -403,7 +402,7 @@ cannot replicate \rustc's refusal to allow calls to the equivalent of
 Programmers can workaround problems (1) and (2) in various ways. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalisers on those instead~\cite[Section~19.3]{klabnik18rust}.
-Doing so involves drudgery, but little conceptually difficulty.
+Doing so is tedious but not conceptually difficult.
 
 Problem (3) has partial solutions: for example, ~\cite{manish15rustgc} uses the
 \lstinline{Trace} macro to generate `finaliser glue' (our term) for
@@ -437,14 +436,10 @@ An obvious difference between destructors and finalisers is when both
 are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
-unspecified.}, finalisers run at an unspecified point in time
-after the last reference to a GCed value is lost. However, it is possible
-for a finaliser to run \emph{prematurely}, that is before the equivalent
-destructor~\cite[section~3.4]{boehm03destructors}. This can happen as
-a result of compiler optimisations such as `scalar replacement', which extracts
-some or all parts of a combined structure in registers and not on the heap: this
-can cause the last pointer to the struct to be lost, at which point the GC
-can run its finaliser, even though some components are still in use.
+unspecified.}, finalisers run at an unspecified point in time. Although
+we often assume is happens after the last reference to a GCed value is lost,
+finalisers can run \emph{prematurely}, that is before the equivalent
+destructor~\cite[section~3.4]{boehm03destructors}.
 
 A less obvious difference relates to where destructors and finalisers are run.
 Destructors run in the same thread as the last owner of a value.
@@ -484,7 +479,7 @@ to make finalisers less problematic; existing \lstinline{Finalize} traits
 do not impose any such restrictions.
 
 Our desire that \ourgc should use existing Rust destructors as finalisers whenever
-possible may thus seem out of reach. Indeed, in the nearest
+possible may seem out of reach. Indeed, in the nearest
 context to our work GC for C++ this solution was explicitly ruled out for GC for C++ as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
@@ -512,15 +507,12 @@ must be maintained, whereas destructors can be run immediately; since finalisers
 some time after the last access of a value, running them is more likely to involve
 cache misses; and so on. Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
-not suggest that major missing optimisations that would allow this
-performance penalty to be overcome.
+not suggest that optimisations of the necessary magnitude could be made to it.
 
 Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not need to be run at all.
-We are able to do this for two reasons. First, all allocations in \ourgc use
-\boehm, whether or not those allocations are directly used for GC purposes or not.
-Second, many Rust destructors
+We are able to do this because many Rust destructors
 exclusively do work that a GC will do anyway --- when used as finalisers,
-such destructors are unnecessary and can be elided.
+such destructors are unnecessary.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
@@ -571,9 +563,8 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \label{requires_finalizer_intrinsic}
 The aim of finaliser elision is to statically determine which type's destructors do
 not require corresponding finalisers and elide them. Our approach is conservative,
-and deals correctly with drop glue and nested data types. The high-level \cref{alg:elision}
-is then implemented as a compiler intrinsic \lstinline{requires_finalizer} inside
-our fork of \rustc.
+and deals correctly with drop glue and nested data types. We implement approach
+shown in \cref{alg:elision} a \rustc compiler intrinsic \lstinline{requires_finalizer}.
 
 In essence, \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalisation unless it also implements the
@@ -602,9 +593,9 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
-not only are these types drop methods compatible as-is with \lstinline{DropMethodFinalizerElidable},
+not only are these types' drop methods compatible as-is with \lstinline{DropMethodFinalizerElidable},
 but these types are widely used in real Rust code: as we shall see in \cref{sec:evaluation},
-they are part of allowing us to elide significant numbers of finalisers in real code.
+they are an important part of allowing us to elide significant numbers of finalisers in real code.
 
 \begin{figure}[t]
   \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily,
@@ -627,11 +618,10 @@ impl<T> Gc<T> {
 \end{lstlisting}
 \end{figure}
 
-\cref{listing:elision_in_rustc} shows how finaliser elision is implemented. We
-translate \cref{alg:elision} to a new \lstinline{const} compiler intrinsinc
-\lstinline{requires_finalizer}. \lstinline{Gc<T>}'s constructor then uses this intrinsic to decide
+\cref{listing:elision_in_rustc} shows how we use the \lstinline{const} compiler intrinsinc
+\lstinline{requires_finalizer}. \lstinline{Gc::new} uses this intrinsic to decide
 whether a finaliser must be registered or not. Although this looks like
-a purely dynamic check, in fully optimised builds it turns into a static
+a dynamic check, in fully optimised builds it turns into a static
 check: \lstinline{requires_finalizer} is
 evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
@@ -667,10 +657,10 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-Most of us imagine that finalisers are always run after the
+Most of us assume that finalisers are always run after the
 equivalent destructor would have run, but they can sometimes run
-prematurely~\cite[section~3.4]{boehm03destructors}. As described thus far,
-premature finalisation is also possible in \ourgc
+prematurely~\cite[section~3.4]{boehm03destructors}.
+As described thus far, premature finalisation is also possible in \ourgc
 (see~\cref{fig:premature_finalisation}). In this section we
 show how we can turn a seemingly inefficient
 approach to premature finalisation prevention into a viable solution.
@@ -694,9 +684,9 @@ lifetime of a GC pointer matches, or exceeds, the static lifetime of the
 solution into reality, and then show how to optimise it.
 
 
-\subsubsection{Realising premature finaliser prevention}
+\subsection{Realising premature finaliser prevention}
 
-We want to delay the finalisation of a \lstinline{Gc<T>} value until after the
+We want to delay the finalisation of a \lstinline{Gc<T>} value until at least the
 point that the \lstinline{Gc<T>} owner would be destructed. However,
 \lstinline{Gc<T>} is copyable
 (see~\cref{gc_is_copyable}) and copyable types in Rust cannot have
@@ -719,13 +709,12 @@ perspective of the type system \lstinline{Gc<T>} is simply a wrapper around a
 pointer type.
 
 We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
-is idempotent. Fortunately, this is sufficient: we want the drop
-method to inhibit finalisation but that does not require run-time behaviour.
-We achieve this with a memory fence in the form of a \emph{keep-alive}
-function. Keep-alive functions serve both compile-time and run-time purposes:
-they prevent a compiler from changing the lifetime of a value (i.e.~it cannot
-be moved earlier or later); and they prevent a CPU from reordering computation
-around that point. Keep-alive functions are highly platform (compiler, operating
+is idempotent. Fortunately, this is sufficient for our purposes: we want the drop
+method to inhibit finalisation but that does not require run-time side effects.
+We therefore use a memory fence in the form of a \emph{keep-alive}
+function. Keep-alive functions have both compile-time and run-time effects:
+they prevent both compilers and CPUs from reordering computations around a given value.
+Keep-alive functions are highly platform (compiler, operating
 system, and CPU) specific: we use \boehm's \lstinline{GC_keep_alive} function
 which abstracts over these details. \lstinline{Gc<T>}'s
 implementation of the \lstinline{Drop} trait therefore looks as follows:
@@ -737,7 +726,7 @@ impl<T: ?Sized> Drop for Gc<T> {
 \end{lstlisting}
 
 
-\subsubsection{Optimising premature finaliser prevention}
+\subsection{Optimising premature finaliser prevention}
 
 % \begin{figure}[t]
 % % \begin{algorithm}
@@ -809,9 +798,7 @@ The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies destructor terminators which reference elidable finalisers (using
 the \lstinline{requires_finalizer} intrinsic from
 \cref{requires_finalizer_intrinsic}), and turns them into `goto' terminators
-that inhibit generation of the destructor. Although it might seem natural for
-us to goto the terminator's successor block, we \laurie{i don't understand why
-we do things in this way} we use the return basic block of the drop method.
+to the basic block's successor.
 
 
 \section{Finaliser Safety Analysis}
