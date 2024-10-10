@@ -1115,51 +1115,51 @@ rare in practice.
 \Function{FinaliserSafetyAnalysis}{$func$}
       \ForEach {$basic\_block \in func$}
             \State $t \gets$ $basic\_block.terminator$
-            \If {\Call{IsGcConstructorCall}{$t$}}
-                \State \Call{CheckFinaliser}{$t.arg$}
+            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
+                \State \textbf{continue}
+            \EndIf
+            \State $ty \gets$ \Call{GetTyOfGcValue}{$t$}
+            \If {\Call{isFinaliserUnchecked}{$ty$} \OR \NOT \Call{RequiresFinaliser}{$ty$}}
+              \State \textbf{continue}
+            \EndIf
+            \If { \NOT \Call{ImplementsTrait}{$ty$, $ReferenceFree$}}
+            \State \Call{EmitReferenceError}{}
+            \Else
+            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{$ty$}}
+              \State \Call{CheckDropMethodSafety}{$drop\_method$}
+            \EndFor
             \EndIf
       \EndFor
 \EndFunction
 \State{}
-\Function{CheckFinaliser}{$arg$}
-    \If { \NOT \Call{Impls}{$arg$}, $Drop$}
-        \State \Return
+\Function{CheckDropMethodSafety}{$drop$}
+    \State $ty \gets$ \Call{GetTyOfDropValue}{$drop$}
+    \If {\Call{IsFinaliserSafe}{$ty$}}
+      \State \Return
     \EndIf
-    \State $func \gets$ \Call{GetDropFuncIR}{$arg$}
-    \ForEach {$basic\_block \in func$}
-        \ForEach {$statement \in block$}
-            \If {\Call{HasPlaceProjection}{$statement$}}
-                \ForEach {$projection \in statement$}
-                    \State \Call{CheckProjection}{$projection$}
-                \EndFor
-            \EndIf
+      \ForEach {$basic\_block \in drop$}
+        \ForEach {$statement \in basic\_block$}
+            \ForEach {$projection \in statement$}
+              \If{\NOT \Call{IsFinaliserSafe}{$projection.element$}}
+                  \State \Call{EmitFinaliserUnsafeErr}{}
+              \EndIf
+            \EndFor
         \EndFor
-    \EndFor
+      \EndFor
+
 \EndFunction
 \State{}
-\Function{CheckProjection}{$projection$}
-    \State $projection\_ty \gets$ \Call{GetType}{$projection.elem$}
-    \If{ \NOT \Call{Impls}{$arg\_ty$, $FinalizerSafe$}}
-        \State \Return{\Call{Error}{}}
-    \EndIf
+\Function{IsFinaliserSafe}{$ty$}
+    \State \Return{\Call{Impls}{$ty$, $Send$} \AND {\Call{Impls}{$ty$, $Sync$}} \AND {\Call{Impls}{$ty$, $FinaliserSafe$}}}
 \EndFunction
+%     \State $projection\_ty \gets$ \Call{GetType}{$projection.elem$}
+%     \If{ \NOT \Call{Impls}{$arg\_ty$, $FinalizerSafe$}}
+%         \State \Return{\Call{Error}{}}
+%     \EndIf
+% \EndFunction
 \end{algorithmic}
 % \end{algorithm}
-\caption{The finaliser safety analysis algorithm. The first stage of FSA is to
-  identify calls to \lstinline{Gc::new}. This checks every statement in the MIR
-  for a call to \lstinline{Gc<T>::new} constructor. If found, we check if
-  \lstinline{T} implements \lstinline{Drop}. If it does, then \lstinline{Gc<T>}
-  needs finalising, so the MIR body for \lstinline{T}'s drop method is checked
-  for soundness violations. FSA only considers a drop method sound if fields
-  which are dereferenced implement the \lstinline{FinalizerSafe} trait. In
-  Rust's MIR terminology, such a field access would constitute a \emph{place
-  projection}, where a place is a memory location (or lvalue), and a projection
-  is a field access. A single MIR statement can contain more than one field
-  projection (e.g.~\lstinline{self.foo.bar.baz}). If
-  \lstinline{CheckProjection} discovers a field access of a field which does
-  not implement \lstinline{FinalizerSafe}, it will throw a compiler error. This
-  does not halt the analysis, so multiple lines in drop methods which perform
-  unsound field accesses will be caught in a single FSA pass.}
+  \caption{}
 \end{figure}
 
 
