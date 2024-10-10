@@ -422,6 +422,7 @@ cannot be replicated in normal user code.
 
 
 \subsection{General Challenges When Using Destructors as Finalisers}
+\label{sec:general_challenges}
 
 Even if there were no Rust-specific challenges to using destructors as
 finalisers, we would still face the problem that finalisers and destructors
@@ -875,23 +876,43 @@ force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
 
 \jake{I think this bit should come before cycles because a) it explains why we end up moving stuff off thread and b) The FSA for cycles (which introduces and checks for the \lstinline{FinaliserSafe} trait) is an extension of the FSA for off-thread finalisation (which checks for the \lstinline{Send + Sync} traits)}
 
-One possible solution might seem to be to prohibit finalisers from acquiring
-locks, however this can still cause race-like bugs because of how finalisers can
-interleave asynchronously with the mutator~\citep{niko13destructors}.
+For a finaliser to be at all useful, it must be able to access fields from
+other objects or even global state. However, as mentioned in
+\cref{sec:general_challenges}, finalisers which access shared state can
+deadlock and introduce race conditions when run on the same thread as the
+mutator, even at no fault of the user.
 
-It is common in many languages for finalisers to access fields from other
-objects or even global state. Since an object's finaliser is run at some unknown
-point in time once it is considered unreachable by the collector, it must be
-able to safely access such state without racing with the mutator.
+Though at first it may seem like one solution to prevent deadlocks would be to
+prevent finalisers from acquiring locks at all, this can still cause race-like
+bugs because of how finalisers can interleave asynchronously with the
+mutator~\citep{niko13destructors}.
 
-However, if \ourgc were to perform on-thread finalisation, it would open
-the possibility of previously non-deadlocking code deadlocking.
-
-Unfortunately, finalising objects off-thread now means that shared data, or other
+We see the only solution to this problem is ensuring that finalisers are run on
+a separate thread. Unfortunately, this now means that shared data, or other
 objects accessed from a finaliser must be done in a thread-safe way. The problem
-with this is that in \ourgc, a finaliser calls a type's existing drop methods.
-Since \lstinline{Drop} was not originally defined in expectation of being
-called on a separate thread, it does not guarantee thread safety.
+with this is that because we run a type's drop glue as a finaliser, this may
+not be thread-safe, because those drop methods were not originally written with
+any awareness that they may be used in this context. An example of how this can be unsound\jake{is unsoundness the correct term here? are deadlocks technically unsound?} is in \cref{fig:finaliser_deadlock}.
+
+\jake{We're going to have to explain how Rust does thread-safety now,
+introducing the Send and Sync auto traits, I've had a brief go below}.
+
+Rust is already able to statically determine whether types are thread-safe. It
+does this with the use of two special auto-traits : \lstinline{Send} and
+\lstinline{Sync}. A value whose type implements \lstinline{Send} can be moved
+to other threads. Almost all types in Rust implement the \lstinline{Send} trait
+save for a few exceptions (e.g. \lstinline{Rc<T>}, because it does not perform
+reference counts atomically). The corollary trait, \lstinline{Sync}, is
+implemented on types whose values perform mutation in a thread-safe manner. For
+example, a \lstinline{Mutex<T>} is \lstinline{Sync}, whereas a
+\lstinline{RefCell} (which performs dynamic borrow-checking non-atomically) is
+not \lstinline{Sync}. Just like our \lstinline{ReferenceFree} auto trait, both
+of these traits also pollute their container types.
+
+Now that we have established that finalisers must be thread-safe, what this
+means in practice is that any type used in a drop method must implement
+\lstinline{Send} and \lstinline{Sync}. \jake{Do we explain the analysis
+algorithm (\cref{alg:fsa}) here? or add a forward ref to The Analysis section?}
 
 \subsection{Cycles and Finalisation}
 
@@ -976,51 +997,6 @@ not detect e.g.~by doing so behind an opaque function call. In such cases
 where the MIR for the entire drop method cannot be checked, FSA will err on the
 side of caution, favouring soundness by refusing to compile the program.
 
-
-% \subsubsection{Need to introduce concurrency}
-% \label{sendsync}
-%
-% The Rust type system is able to guarantee statically that values are being used
-% in a thread-safe way. It does this with the use of two special "marker" traits:
-% \lstinline{Send} and \lstinline{Sync}.
-%
-% A value whose type implements the \lstinline{Send} trait can be transferred to
-% other threads. Almost all types in Rust implement the \lstinline{Send} trait
-% save for a few exceptions. One such exception is the \lstinline{Rc<T>}
-% (reference counting) type. This does \emph{not} implement \lstinline{Send}
-% because it does not perform count operations on its underlying contents
-% atomically. If it were sent to another thread, it could race if both threads
-% tried to update the count simultaneously. In contrast, the \lstinline{Arc<T>}
-% type (an atomic implementation of \lstinline{Rc<T>}) does implement
-% \lstinline{Send} provided its inner type \lstinline{T} is also \lstinline{Send}.
-%
-% The corollary to \lstinline{Send} is the \lstinline{Sync} trait, which can be
-% implemented on types whose values perform mutation in a thread-safe manner. For
-% example, a \lstinline{Mutex<T>} implements \lstinline{Sync} because it provides
-% exclusive access to its underlying data atomically. On the other hand, a
-% \lstinline{RefCell} (discussed in \autoref{intmut}) does not implement
-% \lstinline{Sync} because it only provides single-threaded interior
-% mutability. This is because its underlying mechanism to increment and decrement
-% borrow counts are not performed atomically.
-%
-% The \lstinline{Send} and \lstinline{Sync} marker traits are a special kind of
-% trait known as \emph{auto traits}. This means that they are automatically
-% implemented for every type, unless the type, or a type it contains, has
-% explicitly opted out. Types can be opted out via a \emph{negative impl}:
-
-% \begin{lstrustsmall}
-%     impl !Send for T {}
-% \end{lstrustsmall}
-
-% If, for example, a struct \lstinline{S} contains a field of type \lstinline{T}
-% from the example above, then the entire struct \lstinline{S} will also not
-% implement \lstinline{Send}.
-%
-% \lstinline{Send} and \lstinline{Sync} can be manually implemented on types, but
-% doing so requires \lstinline{unsafe} Rust code since the user must guarantee it
-% is safe to use in a multi-threaded context.
-
-
 \subsection{The Analysis}
 \label{sec:fsa}
 
@@ -1070,6 +1046,7 @@ side of caution, favouring soundness by refusing to compile the program.
 \end{algorithmic}
 % \end{algorithm}
   \captionof{algorithm}{}
+  \label{alg:fsa}
 \end{figure}
 
 Extends Rust's type system to reject programs whose destructors are not
