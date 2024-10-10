@@ -339,7 +339,14 @@ than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion and have
-added or changed approximately 3,150 Lines Of Code (LOC).
+added or changed approximately 3,150 Lines Of Code (LOC). Users must opt-in
+to GC by enabling the allocator explicitly:
+
+\laurie{dumb question: why `A'?}
+\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
+#![feature(gc)] use std::gc::GcAllocator;
+#[global_allocator] static A: GcAllocator = GcAllocator
+\end{lstlisting}
 
 \ourgc uses the conservative Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage} as its collector.
 Although we use some uncommon, and extend other, parts of \boehm, there is
@@ -357,16 +364,6 @@ then can scan their stacks, but (for bootstrapping
 reasons) it is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm. Fourth, we modified \boehm to run finalisers
 on a separate thread (see \laurie{Section XYZ}).
-
-\laurie{does each alloy program still need to set the global allocator?}\jake{Yes, and enable the GC feature, as below}
-
-\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
-#![feature(gc)]
-use std::gc::GcAllocator;
-
-#[global_allocator]
-static A: GcAllocator = GcAllocator
-\end{lstlisting}
 
 
 \section{Destructors and Finalisers}
@@ -571,6 +568,7 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \end{algorithmic}
 \end{algorithm}
 
+\label{requires_finalizer_intrinsic}
 The aim of finaliser elision is to statically determine which type's destructors do
 not require corresponding finalisers and elide them. Our approach is conservative,
 and deals correctly with drop glue and nested data types. The high-level \cref{alg:elision}
@@ -635,7 +633,7 @@ translate \cref{alg:elision} to a new \lstinline{const} compiler intrinsinc
 whether a finaliser must be registered or not. Although this looks like
 a purely dynamic check, in fully optimised builds it turns into a static
 check: \lstinline{requires_finalizer} is
-evaluated at compile-time and can be inlined into \lstinline{Gc::new};
+evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
 finaliser' checks have no run-time cost at all.
@@ -678,22 +676,22 @@ show how we can turn a seemingly inefficient
 approach to premature finalisation prevention into a viable solution.
 
 There are two aspects to premature finalisation. First, language
-specifications often do not define -- or not precisely define -- when the earliest point that a value can
+specifications often do not define, or not precisely define, when the earliest point that a value can
 be finalised is. While this means that, formally, there is no `premature' finalisation,
 it seems unlikely that language designers anticipated some of the resulting
-surprises allowed by implementations (see e.g.~this example in
-Java~\cite{shipilev20local}). Second, in most compilers, most optimisations are
-`GC unaware'; one way this manifests is that optimisations such as scalar
-replacement can change the point in a program when GCed values appear
+implementation surprises (see e.g.~this example in
+Java~\cite{shipilev20local}). Second most compiler optimisations are
+`GC unaware', so optimisations such as scalar
+replacement can change the point in a program when GCed values appear to be
 finalisable.
 
 In our context, it is trivial to define premature finalisation as a (dynamic) finaliser
-for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>}
+for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
 has gone out of scope. Our solution to this is equivalent
 to~\cite[Solution~1]{boehm07optimization}: we must ensure that the dynamic
 lifetime of a GC pointer matches, or exceeds, the static lifetime of the
-associated \lstinline{Gc<T>}. In this section, we first turn this
-solution into reality, before then showing how to optimise it.
+\lstinline{Gc<T>} owner. In this section, we first turn this
+solution into reality, and then show how to optimise it.
 
 
 \subsubsection{Realising premature finaliser prevention}
@@ -898,7 +896,7 @@ help users avoid ownership restrictions. That said, finaliser elision
 enabling more types to be embedded as references, for those who really want to.
 
 \laurie{this paragraph again suggests that we look into the finaliser, but
-elsewhere we suggest we don't look into the finaliser.}\jake{We always look into a finaliser. It's just that if the user tries to put a regular Rust reference inside a \lstinline{Gc::new} we will immediately bork with an error. What we're saying is that we do allow raw pointers inside GCable types, and we don't check for raw pointer dereferences inside a finaliser, because this requires unsafety from the user anyway.}
+elsewhere we suggest we don't look into the finaliser.}\jake{We always look into a finaliser. It's just that if the user tries to put a regular Rust reference inside a \lstinline{Gc::new} we will immediately bork with an error. What we're saying is that we do allow raw pointers inside GCable types, and we don't check for raw pointer dereferences inside a finaliser, because this requires unsafety from the user anyway.}\laurie{i still find this confusing: other examples don't show us borking when we put \lstinline{&} in a \lstinline{Gc::new}?}
 As with references, this same unsoundness can be caused by storing raw pointers
 inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
 \lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
@@ -917,8 +915,6 @@ the obvious) references themselves are not \lstinline{ReferenceFree}. Thus a
 non-\lstinline{ReferenceFree} type `pollutes' its container type(s) in the
 manner we desire\footnote{Users can
 force a type to implement \lstinline{ReferenceFree}, but only in unsafe Rust.}.
-
-\laurie{``this is then checked in the \lstinline{CheckCallSite} phase`` is that part of FSA or normal \rustc?} \jake{I think this is a dangling comment now?}
 
 
 \subsection{Cycles and Finalisation}
