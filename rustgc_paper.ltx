@@ -805,7 +805,7 @@ to the basic block's successor.
 \section{Finaliser Safety Analysis}
 
 In this section we address two problems: running finalisers on the same thread
-as a paused collector can cause deadlocks\jake{and race conditions}; and some safe destructors are not
+as a paused collector can cause race conditions and deadlocks; and some safe destructors are not
 safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the second problem.
@@ -947,7 +947,8 @@ cycles have been broken and deal with them accordingly. Fundamentally, most
 languages and systems we know of assume that the user either doesn't run into
 this problem (finalisation cycles are considered rare in GC'd
 languages~\citep[p.~229]{jones16garbage}), or knows how to deal
-with it when they do\jake{i.e. by refactoring their code, splitting finalisable objects out of the cycle.\cite[p.~11]{boehm03destructors}}
+with it when they do (by e.g.~splitting finalisable objects out of the
+cycle~\cite[p.~11]{boehm03destructors}).
 
 \ourgc takes a different approach: if a destructor, directly or indirectly,
 dereferences a \lstinline{Gc<T>} type, then that destructor is an invalid
