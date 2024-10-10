@@ -342,7 +342,7 @@ Rust compiler \rustc. We forked \rustc~\rustcversion and have
 added or changed approximately 3,150 Lines Of Code (LOC). Users must opt-in
 to GC by enabling the allocator explicitly:
 
-\laurie{dumb question: why `A'?}
+\laurie{dumb question: why `A'?}\jake{It's just the name of the static variable, it could be anything really}
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
 #![feature(gc)] use std::gc::GcAllocator;
 #[global_allocator] static A: GcAllocator = GcAllocator
@@ -897,6 +897,7 @@ enabling more types to be embedded as references, for those who really want to.
 
 \laurie{this paragraph again suggests that we look into the finaliser, but
 elsewhere we suggest we don't look into the finaliser.}\jake{We always look into a finaliser. It's just that if the user tries to put a regular Rust reference inside a \lstinline{Gc::new} we will immediately bork with an error. What we're saying is that we do allow raw pointers inside GCable types, and we don't check for raw pointer dereferences inside a finaliser, because this requires unsafety from the user anyway.}\laurie{i still find this confusing: other examples don't show us borking when we put \lstinline{&} in a \lstinline{Gc::new}?}
+\jake{I think I'm confused why you're confused now. Which other examples do we put a \lstinline{&} inside a \lstinline{Gc::new}? If we did that \rustc should bork and not even bother looking inside the drop method}
 As with references, this same unsoundness can be caused by storing raw pointers
 inside a \lstinline{Gc} (either immutable \lstinline{*const} or mutable
 \lstinline{*mut}) and then dereferencing them in a finaliser. However, \ourgc
