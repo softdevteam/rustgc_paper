@@ -823,7 +823,8 @@ is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 guessing you thought the prose was self explanatory enough?}\laurie{no: i just
 thought the example will mislead readers as it said the problem was within the
 finaliser, but that's not actually what causes the problem. if/when the error
-reported matches the algorithm below, i'd happily reinstate the example!}
+reported matches the algorithm below, i'd happily reinstate the example!}\jake{Shall we reinstate the example without the side-by-side FSA error?
+I think it is useful to show how a finaliser which uses a regular Rust reference can cause a dangling pointer.}
 
 The \lstinline{Gc<T>} type can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
@@ -844,7 +845,7 @@ finaliser)\footnote{We could relax this even further by allowing the presence of
 finaliser if it does not access a stored reference, but that is more tricky to
 implement, and we did not find a particular need for it.}.
 
-To implement this aspect of FSA, \ourgc uses auto traits. We introduce a new
+To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref}. We introduce a new
 unsafe marker trait \lstinline{ReferenceFree}, which denotes a type which does
 not contain a reference. A type whose fields are all \lstinline{ReferenceFree}
 is itself \lstinline{ReferenceFree}. We `bootstrap' the process by defining
