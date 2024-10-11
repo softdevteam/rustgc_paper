@@ -959,7 +959,7 @@ we'd have to write \lstinline{!NotFinalizerSafe} for every other type instead
 of just opt-ing out for one type -- \lstinline{Gc}}\laurie{couldn't we just
 impl \lstinline{NotFinalizerSafe} for \lstinline{Gc<T>} and let that pollute
 types that contain it appropriately? basically i'm struggling to see why the
-negative impl is necessary in this case}.
+negative impl is necessary in this case}.\jake{But that's not how auto traits work. If you define an auto trait, it is automatically applied to every type, and then the negative impl pollutes upwards.}
 
 
 When \ourgc is compiled with unordered finalisation, it prevents drop methods
