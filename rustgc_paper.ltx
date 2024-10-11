@@ -729,42 +729,6 @@ impl<T: ?Sized> Drop for Gc<T> {
 
 \subsection{Optimising premature finaliser prevention}
 
-% \begin{figure}[t]
-% % \begin{algorithm}
-% \begin{algorithmic}
-% \Function{RemoveElidableDrops}{$func$}
-%       \ForEach {$basic\_block \in func$}
-%             \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-%                 \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-%                 \If {\Call{IsGcType}{$ty$}}
-%                     \If {\NOT \Call{RequiresFinaliser}{$ty$}}
-%                         \State \Call{ReplaceTerminator}{$basic\_block$}
-%                     \EndIf
-%                 \EndIf
-%             \EndIf
-%       \EndFor
-% \EndFunction
-% \Function{ReplaceTerminator}{$basic\_block$}
-%     \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-%     \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-%     \State $block.terminator \gets last\_block.terminator$
-% \EndFunction
-% \end{algorithmic}
-% % \end{algorithm}
-%   \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
-%   for types with elided finalisers. This pass is registered inside \rustc,
-%   where it is invoked on all \textit{func}s in the program. The
-%   \textit{RemoveElidableDrops} iterates each basic block in a function in order
-%   to inspect whether the terminator is a call to a drop method as these are the
-%   only terminators of interest in this pass. If a ``drop terminator'' is found,
-%   then we check the type of the value being dropped. If the type of the value
-%   being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
-%   the drop terminator can be replaced. We can then replace these terminators by
-%   ``leaping over'' the drop method and patching it to the next basic block in
-%   the control flow.}
-%   \label{alg:barrier_removal}
-% \end{figure}
-
 The drop method we add to \lstinline{Gc<T>} fully prevents premature
 finalisation. It also solves a performance problem with the suggested solution
 for C++ in~\cite[Solution~1]{boehm07optimization}, which requires keeping alive
@@ -799,7 +763,8 @@ The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies destructor terminators which reference elidable finalisers (using
 the \lstinline{requires_finaliser} intrinsic from
 \cref{requires_finaliser_intrinsic}), and turns them into `goto' terminators
-to the basic block's successor.
+to the basic block's successor. \cref{alg:barrier_removal} in the appendix
+gives a more formal version of this algorithm.
 
 
 \section{Finaliser Safety Analysis}
@@ -1415,5 +1380,49 @@ language design and, in particular, \rustc.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
+
+\clearpage
+
+\appendix
+
+\section{Algorithms}
+
+In this appendix, we show more formal versions of the algorithm descriptions
+from the main body of the paper for those who may benefit from them.
+
+\begin{figure}[b]
+\begin{algorithmic}
+\Function{RemoveElidableDrops}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinaliser}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
+                    \EndIf
+                \EndIf
+            \EndIf
+      \EndFor
+\EndFunction
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+    \State $block.terminator \gets last\_block.terminator$
+\EndFunction
+\end{algorithmic}
+% \end{algorithm}
+  \captionof{algorithm}{The MIR pass for removing premature finaliser barriers
+  for types with elided finalisers. This pass is registered inside \rustc,
+  where it is invoked on all \textit{func}s in the program. The
+  \textit{RemoveElidableDrops} iterates each basic block in a function in order
+  to inspect whether the terminator is a call to a drop method as these are the
+  only terminators of interest in this pass. If a ``drop terminator'' is found,
+  then we check the type of the value being dropped. If the type of the value
+  being dropped is a \lstinline{Gc<T>}, and its finaliser can be elided, then
+  the drop terminator can be replaced. We can then replace these terminators by
+  ``leaping over'' the drop method and patching it to the next basic block in
+  the control flow.}
+  \label{alg:barrier_removal}
+\end{figure}
 
 \end{document}
