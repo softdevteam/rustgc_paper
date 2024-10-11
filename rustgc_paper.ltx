@@ -875,6 +875,7 @@ for TOs that they have audited.}
 
 
 \subsubsection{Relaxing the \lstinline{Send + Sync} restriction}
+\label{sec:relaxed}
 
 Requiring that finalisation is only possible for types that implement both \lstinline{Send} and
 \lstinline{Sync} can be frustrating, in part because more types
@@ -900,27 +901,25 @@ for Rust in the future.
 \begin{figure}[tb]
 \lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
   firstline=5]{listings/finalisation_cycle.rs}
-\captionof{lstlisting}{An example of the problems that cycles cause
-  finalisation. This seemingly innocuous variation of~\cref{fig:first_example}
-  would non-deterministically print \lstinline{2 0} or \lstinline{1 0}
+\captionof{lstlisting}{An example of the problems that come from mixing cycles
+  and finalisation. The salient difference from~\cref{fig:first_example} is that
+  the drop method sets the value of a field inside \lstinline{nbr}. Running this
+  program on a strong memory model machine would non-deterministically print \lstinline{2 0} or \lstinline{1 0}
   depending on whether \lstinline{gc1} or \lstinline{gc2} is finalised first.
-  Note that neither possibility includes the `seemingly expected' values of
-  \lstinline{1 2} or \lstinline{2 1}: whichever GCed value is finalised first
-  changes what the other GCed value sees in its finaliser. \jake{I think it's
-  important to point out that the problem here is that one of prints does an
-  invalid read, so it is unsound. Furthermore, if this were combined with a
-  Boxed value, it could even segfault because that Box may have been freed
-  first (as part of one of the finalisers}}
+  The `seemingly expected' output of \lstinline{1 2} or \lstinline{2 1} would
+  never be printed: whichever GCed value is finalised first changes what the
+  other GCed value sees in its finaliser. As that implies, this example is
+  unsound: the second finaliser to run leads to undefined behaviour.}
 \label{fig:finaliser_cycle}
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
 data structures. However, finalisers run into problems if they directly
-reference cycles. \cref{fig:cycles_and_finalisation} shows an example of the
+reference cycles. \cref{fig:finaliser_cycle} shows an example of the
 problem, which is caused when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
 run in, at least one of the finalisers will see the other GCed value as partly
-or wholly `finalised'.
+or wholly `finalised', leading to undefined behaviour.
 
 There is no fully automatic solution to this problem. The closest a GC can get
 is to provide weak references, which allows users to detect when finalisation
@@ -928,20 +927,34 @@ cycles have been broken and deal with them accordingly. Fundamentally, most
 languages and systems we know of assume that the user either doesn't run into
 this problem (finalisation cycles are considered rare in GC'd
 languages~\citep[p.~229]{jones16garbage}), or knows how to deal
-with it when they do (by e.g.~splitting finalisable objects out of the
-cycle~\cite[p.~11]{boehm03destructors}).
+with it when they do (e.g.~refactoring the types into parts that do and don't
+require finalisation~\cite[p.~11]{boehm03destructors}).
 
 \ourgc takes a different approach: if a destructor, directly or indirectly,
 dereferences a \lstinline{Gc<T>} type, then that destructor is an invalid
 finaliser. This rule guarantees that finalisers cannot have problems in the
 presence of cycles, statically preventing users from causing themselves
-trouble. However, the rule is also rather draconian: it could be somewhat
+trouble. However, the rule is rather draconian: it could be somewhat
 relaxed (e.g.~one may be able to statically prove that a \lstinline{Gc<T>}
 cannot form a cycle with a \lstinline{Gc<U>}, such that the former's finaliser
-can reference the latter), though we have not yet had need to do so.
+can reference the latter), though we have not yet had sufficient cause to
+do so.
 
+The way this check is implemented is in essence a variation of the `relaxed'
+check of~\cref{sec:relaxed}. We want to check all transitively reachable drop
+methods for access to \lstinline{Gc<T>} fields. To do so, we once again use a
+marker auto trait \lstinline{FinalizerSafe}. In contrast to our earlier use of
+marker auto traits, we explicitly mark \lstinline{Gc<T>} as not
+\lstinline{FinalizerSafe} using the `negative implementation' operator:
 
-\subsubsection{Implementation}
+\begin{lstrustsmall}
+impl<T> !FinalizerSafe for Gc<T> {}
+\end{lstrustsmall}
+
+\laurie{is a negative type impl necessary? Couldn't we implement this as a
+`NotFinalizerSafe` auto trait, and have it pollute in the same way as other
+types?}
+
 
 When \ourgc is compiled with unordered finalisation, it prevents drop methods
 from dereferencing fields which point to other \lstinline{Gc} objects.
@@ -952,16 +965,17 @@ which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
 analysis} (described in \autoref{fsa}) to detect this.
 
 This is implemented by first adding a negative implementation of
-\lstinline{FinaliserSafe} to the \lstinline{Gc<T>} type:
+\lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
 
 \begin{lstrustsmall}
-impl<T> !FinaliserSafe for Gc<T> {}
+impl<T> !FinalizerSafe for Gc<T> {}
 \end{lstrustsmall}
 
 FSA then uses this to identify the specific field which was unsafely
-dereferenced and will generates an error message different from those to do with
-thread-safety.
+dereferenced and generates an error message different from those to do with
+thread-safety. \laurie{is it FSA that does this, or normal rustc?}
 
+\laurie{i don't see the check in this paragraph in algorithm 2?}
 However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
 a drop method could dereference a \lstinline{Gc} field in a way that FSA could
 not detect e.g.~by doing so behind an opaque function call. In such cases
@@ -1019,20 +1033,6 @@ side of caution, favouring soundness by refusing to compile the program.
   \captionof{algorithm}{}
   \label{alg:fsa}
 \end{figure}
-
-Extends Rust's type system to reject programs whose destructors are not
-provably safe to be used as finalisers. At compile-time, a static analysis is
-performed over the drop methods of each value used in a \lstinline{Gc}.
-
-
-\subsubsection{Ensuring thread-safety}
-
-The basic idea is that whenever a type is used in a \lstinline{Gc}, that type's
-drop method needs to be checked to ensure it only accesses fields which are
-safe to be used inside a finaliser. Performing this check only when such types
-are used in \lstinline{Gc} is important as it prevents FSA from breaking
-existing Rust programs: drop methods with unsound finalisation behaviour are
-not a problem if they are never used in a \lstinline{Gc}.
 
 \subsubsection{Limitations}
 
