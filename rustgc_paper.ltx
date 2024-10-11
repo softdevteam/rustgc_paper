@@ -914,31 +914,28 @@ for Rust in the future.
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
-data structures. However, finalisers run into problems if they directly
-reference cycles. \cref{fig:finaliser_cycle} shows an example of the
-problem, which is caused when two GCed values create a cycle and both their
+data structures. However, finalisers can cause problems if they directly
+reference cycles. \cref{fig:finaliser_cycle} shows an example of undefined
+behaviour when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
 run in, at least one of the finalisers will see the other GCed value as partly
-or wholly `finalised', leading to undefined behaviour.
+or wholly `finalised'.
 
-There is no fully automatic solution to this problem. The closest a GC can get
-is to provide weak references, which allows users to detect when finalisation
-cycles have been broken and deal with them accordingly. Fundamentally, most
-languages and systems we know of assume that the user either doesn't run into
+Most languages and systems seem to assume that the user either doesn't run into
 this problem (finalisation cycles are considered rare in GC'd
 languages~\citep[p.~229]{jones16garbage}), or knows how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
-require finalisation~\cite[p.~11]{boehm03destructors}).
+require finalisation~\cite[p.~11]{boehm03destructors}). There is no fully
+automatic solution to this problem, with the closest solution being those GCs
+which offer weak references, allowing users to detect when finalisation cycles
+have been broken, though they still have to deal with the consequences
+manually.
 
 \ourgc takes a different approach: if a destructor, directly or indirectly,
 dereferences a \lstinline{Gc<T>} type, then that destructor is an invalid
 finaliser. This rule guarantees that finalisers cannot have problems in the
 presence of cycles, statically preventing users from causing themselves
-trouble. However, the rule is rather draconian: it could be somewhat
-relaxed (e.g.~one may be able to statically prove that a \lstinline{Gc<T>}
-cannot form a cycle with a \lstinline{Gc<U>}, such that the former's finaliser
-can reference the latter), though we have not yet had sufficient cause to
-do so.
+trouble.
 
 The way this check is implemented is in essence a variation of the `relaxed'
 check of~\cref{sec:relaxed}. We want to check all transitively reachable drop
