@@ -988,8 +988,9 @@ side of caution, favouring soundness by refusing to compile the program.
 \subsection{The Analysis}
 \label{sec:fsa}
 
-\begin{figure}[t!]
-% \begin{algorithm}
+\begin{algorithm}[t]
+  \captionof{algorithm}{Finaliser safety analysis}
+  \label{alg:fsa}
   \begin{algorithmic}[1]
     \Function{FinaliserSafetyAnalysis}{\textit{func}}
       \ForEach {\textit{basic\_block} $\in$ \textit{func}}
@@ -1035,10 +1036,7 @@ side of caution, favouring soundness by refusing to compile the program.
     \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinaliserSafe}}}}
 \EndFunction
 \end{algorithmic}
-% \end{algorithm}
-  \captionof{algorithm}{}
-  \label{alg:fsa}
-\end{figure}
+\end{algorithm}
 
 \subsubsection{Limitations}
 
