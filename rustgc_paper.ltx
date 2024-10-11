@@ -867,16 +867,28 @@ of FSA on specific types. See this commit for details
 We use this ourselves in various places when getting programs ready for our
 benchmarking suites, but it also helps because it lets us opt-out types from
 other crates, which would be otherwise tricky due to orphan rules}
+\laurie{what other types do we opt-out from? would any normal user ever want to do this?}
 
 
-\subsubsection{Relaxing}
+\subsubsection{Relaxing the \lstinline{Send + Sync} restriction}
 
-Most Rust types implement \lstinline{Send} though fewer implement
-\lstinline{Sync}. FSA thus prevents more types from being used with GC than we
-might hope. \ourgc thus semi-experimentally relaxes the \lstinline{Send} and
-\lstinline{Sync} instruction.
+Requiring that finalisation is only possible for types that implement both \lstinline{Send} and
+\lstinline{Sync} can be frustrating, in part because more types
+implement \lstinline{Send} than \lstinline{Sync}. FSA thus implements a more
+relaxed check, analysing all drop methods reachable from a type's fields, to
+see if those drop methods access elements that do themselves implement
+\lstinline{Send} and \lstinline{Sync}.
 
-\laurie{more to come}
+Simplifying slightly, rather than forcing an entire type to be thread-safe, FSA
+checks a weaker property: are drop methods thread safe? Rust's semantics do not
+currently forbid this assumption and our examination of the compiler tool-chain
+(i.e.~\rustc and LLVM) showed that it does not implement the analyses and
+optimisations needed to undermine this assumption. Note that this assumption is
+not true for all languages (for example our assumption would be unsafe
+in Java due to synchronisation removal~\cite{wang06escape}) and may not be true
+for Rust in the future.
+
+\laurie{in our benchmark suite, how often does this relaxation make a difference?}
 
 
 \subsection{Cycles and Finalisation}
