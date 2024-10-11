@@ -1091,7 +1091,7 @@ We ran four main experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
-  \Egcrc & the relative performance of \texttt{Gc<T>} over \texttt{Rc<T>} \\
+  \Egcrc & the relative performance of \texttt{Gc<T>} over \texttt{Rc<T>} \laurie{and rust-gc and typed-arena, at least where possible?} \\
   \Eelision & the performance gains of finaliser elision \\
   \Eprem & the costs of premature finaliser prevention \\
   \Epremopt & the performance gains from optimising premature finaliser prevention
@@ -1125,6 +1125,16 @@ intervals.
 
 
 \subsection{Results}
+
+\autoref{table:binary_trees} shows the results for this experiment. The results
+shows that for Binary Trees (an allocation heavy benchmark)
+\textsc{Typed-arena} was the fastest as it never performs any deallocation
+during the benchmark run, it simply deallocates all memory at the end.
+
+\rustgc performs poorly for two reasons. First, it uses a form of reference
+counting to track the roots for each garbage collected object. Second, it has a
+naive implementation of the mark-sweep algorithm and does not use parallel
+collector threads.
 
 \begin{figure}[t!]
 \begin{minipage}[b]{0.45\linewidth}
@@ -1194,31 +1204,6 @@ intervals.
      \yksom}
 \end{figure}
 
-\subsection{Comparison between other GCs}
-\label{othergcs}
-
-My fifth and final experiment aims to understand the performance costs of
-\ourgc against other garbage collected approaches in Rust.
-
-The overall question I would like this experiment to answer is: how fast is
-\ourgc when compared with the other garbage collected options available in Rust?
-While I have been able to provide a more detailed assessment of \ourgc's
-performance when used to implement other languages, I am only able to provide
-a limited comparison of \ourgc's performance relative to other collectors:
-converting benchmarks to Luster's unusual approach was prohibitively
-difficult; and Bronze crashed with many benchmarks. In addition, I had
-difficultly finding suitable Rust programs which were practical enough to modify
-to use the various tracing GC implementations while also performing enough heap
-allocations to be useful. Fortunately, and despite these restrictions, this
-experiment is still able to provide valuable insights.
-
-In this experiment, I compare the performance of \ourgc against three different
-approaches to managing memory: using a indexed-arena,
-\rustgc (\autoref{alloy_related}), and Rust's standard reference counting library. I
-run each configuration on the Binary Trees benchmark from the Computer Language
-Benchmark Game for 30 process executions. The wall-clock times are
-recorded before and after each process execution using the multitime tool.
-
 \makeatletter
 \newcommand*\ExpandableInputBinTrees[1]{\@@input#1 }
 \makeatother
@@ -1238,39 +1223,6 @@ recorded before and after each process execution using the multitime tool.
          \label{table:binary_trees}
      \end{center}
 \end{table*}
-
-\subsection{How other languages deal with finalisers}
-
-The D programming language uses a conservative mark-sweep GC for heap
-allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
-not specify an order for finalisers. Users can specify their own allocators for
-RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
-calls.
-
-Oilpan, the conservative mark-sweep garbage collector in Chrome's rendering
-engine, Blink, uses two levels of finalisation: full finalisation, which happen
-off-thread after a GC cycle has completed but do not allow object fields to be
-dereferenced; and pre-finalisers, which happen during the sweep phase, but allow
-all of an objects fields to be dereferenced. Pre-finalisers are generally
-avoided because of their performance overhead since they cannot be scheduled to
-run on other threads and increase the stop-the-world time.
-
-\jake{TODO: Nim}
-
-
-\subsection{GC in Rust}
-
-\subsection{Results}
-
-\autoref{table:binary_trees} shows the results for this experiment. The results
-shows that for Binary Trees (an allocation heavy benchmark)
-\textsc{Typed-arena} was the fastest as it never performs any deallocation
-during the benchmark run, it simply deallocates all memory at the end.
-
-\rustgc performs poorly for two reasons. First, it uses a form of reference
-counting to track the roots for each garbage collected object. Second, it has a
-naive implementation of the mark-sweep algorithm and does not use parallel
-collector threads.
 
 
 \section{Threats to validity}
@@ -1419,6 +1371,23 @@ ownership. However, this is fundamentally unsound, and allows programs which
 violate memory safety to be written in safe Rust using Bronze.
 \autoref{lst:bronze_unsound} shows an example of how this can violate memory
 safety by causing a write from deallocated memory.
+
+
+\subsection{How other languages deal with finalisers}
+
+The D programming language uses a conservative mark-sweep GC for heap
+allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
+not specify an order for finalisers. Users can specify their own allocators for
+RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
+calls.
+
+Oilpan, the conservative mark-sweep garbage collector in Chrome's rendering
+engine, Blink, uses two levels of finalisation: full finalisation, which happen
+off-thread after a GC cycle has completed but do not allow object fields to be
+dereferenced; and pre-finalisers, which happen during the sweep phase, but allow
+all of an objects fields to be dereferenced. Pre-finalisers are generally
+avoided because of their performance overhead since they cannot be scheduled to
+run on other threads and increase the stop-the-world time.
 
 
 \begin{figure}[!t]
