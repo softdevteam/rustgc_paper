@@ -860,6 +860,14 @@ may be finished with it and have its finaliser run while the non-GCed value is
 still in scope, meaning that both the mutator and finaliser threads may access
 the underlying value simultaneously.
 
+\jake{We also provide \lstinline{FinaliseUnchecked<T>}, a zero-cost wrapper
+type (in the style of \lstinline{ManuallyDrop}) which allows users to opt-out
+of FSA on specific types. See this commit for details
+\lstinline{https://github.com/softdevteam/alloy/commit/547930615e2ff241846a9e666a05fbe480267920}.
+We use this ourselves in various places when getting programs ready for our
+benchmarking suites, but it also helps because it lets us opt-out types from
+other crates, which would be otherwise tricky due to orphan rules}
+
 
 \subsubsection{Relaxing}
 
