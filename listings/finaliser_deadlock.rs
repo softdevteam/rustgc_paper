@@ -14,7 +14,7 @@ impl Drop for GcNode {
 fn main() {
   let counter = Rc::new(Mutex::new(0));
   { let _ = Gc::new(GcNode { value: Rc::clone(&counter), nbr: None }); }
-  let r1 = counter.lock().unwrap(); // Can deadlock
+  let r1 = counter.lock().unwrap();
   force_gc();
   assert_eq!(*r1, 0);
 }
