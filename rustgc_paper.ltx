@@ -991,38 +991,38 @@ side of caution, favouring soundness by refusing to compile the program.
 \begin{figure}[t!]
 % \begin{algorithm}
   \begin{algorithmic}[1]
-\Function{FinaliserSafetyAnalysis}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \State $t \gets$ $basic\_block.terminator$
+    \Function{FinaliserSafetyAnalysis}{\textit{func}}
+      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
+            \State $t \gets$ \textit{basic\_block.terminator}
             \If {\NOT \Call{IsGcConstructorCall}{$t$}}
                 \State \textbf{continue}
             \EndIf
-            \State $ty \gets$ \Call{GetTyOfGcValue}{$t$}
-            \If {\Call{isFinaliserUnchecked}{$ty$} \OR \NOT \Call{RequiresFinaliser}{$ty$}}
+            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
+            \If {\Call{isFinaliserUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinaliser}{\textit{ty}}}
               \State \textbf{continue}
             \EndIf
-            \If { \NOT \Call{ImplementsTrait}{$ty$, $ReferenceFree$}}
+            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
             \State \Call{EmitReferenceError}{}
             \Else
-            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{$ty$}}
-              \If { \NOT \Call{IsMIRAvailable}{$drop\_method$}}
+            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
+              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
                   \State \Call{EmitFinaliserUnsafeErr}{}
               \EndIf
-              \State \Call{CheckDropMethodSafety}{$drop\_method$}
+              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
             \EndFor
             \EndIf
       \EndFor
 \EndFunction
 \State{}
-\Function{CheckDropMethodSafety}{$drop$}
-    \State $ty \gets$ \Call{GetTyOfDropValue}{$drop$}
-    \If {\Call{IsFinaliserSafe}{$ty$}}
+    \Function{CheckDropMethodSafety}{\textit{drop}}
+    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
+    \If {\Call{IsFinaliserSafe}{\textit{ty}}}
       \State \Return
     \EndIf
-      \ForEach {$basic\_block \in drop$}
-        \ForEach {$statement \in basic\_block$}
-            \ForEach {$projection \in statement$}
-              \If{\NOT \Call{IsFinaliserSafe}{$projection.element$}}
+      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
+        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
+            \ForEach {$\textit{projection} \in \textit{statement}$}
+              \If{\NOT \Call{IsFinaliserSafe}{\textit{projection.element}}}
                   \State \Call{EmitFinaliserUnsafeErr}{}
               \EndIf
             \EndFor
@@ -1031,8 +1031,8 @@ side of caution, favouring soundness by refusing to compile the program.
 
 \EndFunction
 \State{}
-\Function{IsFinaliserSafe}{$ty$}
-    \State \Return{\Call{Impls}{$ty$, $Send$} \AND {\Call{Impls}{$ty$, $Sync$}} \AND {\Call{Impls}{$ty$, $FinaliserSafe$}}}
+  \Function{IsFinaliserSafe}{\textit{ty}}
+    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinaliserSafe}}}}
 \EndFunction
 \end{algorithmic}
 % \end{algorithm}
