@@ -868,6 +868,10 @@ We use this ourselves in various places when getting programs ready for our
 benchmarking suites, but it also helps because it lets us opt-out types from
 other crates, which would be otherwise tricky due to orphan rules}
 \laurie{what other types do we opt-out from? would any normal user ever want to do this?}
+\jake{The most common one is trait objects. FSA can't look into their drop
+methods, (because they're dispatched dynamically, and the concrete type is not
+known statically). So users can say \lstinline{Gc<FinalizeUnchecked<MyTO>>>}
+for TOs that they have audited.}
 
 
 \subsubsection{Relaxing the \lstinline{Send + Sync} restriction}
