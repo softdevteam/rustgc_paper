@@ -804,9 +804,9 @@ finaliser).
 To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref}. We introduce a new
 unsafe marker trait \lstinline{ReferenceFree}, which denotes a type which does
 not contain a reference. A type whose fields are all \lstinline{ReferenceFree}
-is itself \lstinline{ReferenceFree}. We `bootstrap' the process by defining
-primitive types such as integers as \lstinline{ReferenceFree}. Crucially,
-reference types themselves are not \lstinline{ReferenceFree}: using a reference
+is itself \lstinline{ReferenceFree}. As an auto trait, \rustc ensures that
+every type automatically implements \lstinline{ReferenceFree}. Crucially,
+we ensure that reference types themselves are not \lstinline{ReferenceFree} using a negative implementation \lstinline{ReferenceFree}: using a reference
 type as a field thus `pollutes' that latter type. When a program contains a
 \lstinline{Gc<T>} type, \ourgc checks whether it has a finaliser: if it does,
 and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
