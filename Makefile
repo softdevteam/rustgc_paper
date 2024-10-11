@@ -37,7 +37,8 @@ GRAPHS = graphs/bounce_memory.pdf graphs/bubblesort_memory.pdf \
 		 graphs/wlambda_bar.pdf graphs/som_bar_new.pdf \
 		 graphs/som_rs_finalisers.pdf graphs/yksom_finalisers.pdf \
 		 graphs/som_rs_perf.pdf graphs/som_rs_barriers.pdf \
-		 graphs/yksom_barriers.pdf
+		 graphs/yksom_barriers.pdf graphs/binary_trees.pdf \
+		 graphs/regex_redux.pdf
 
 all: rustgc_paper.pdf
 
