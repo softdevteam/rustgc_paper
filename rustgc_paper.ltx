@@ -834,9 +834,7 @@ one is refactoring or experimenting with existing code.
 FSA therefore uses a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finaliser (i.e.~\lstinline{T}
 has no destructor, or finaliser elision has removed the \lstinline{Gc<T>}'s
-finaliser)\footnote{We could relax this even further by allowing the presence of a
-finaliser if it does not access a stored reference, but that is more tricky to
-implement, and we did not find a particular need for it.}.
+finaliser).
 
 To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref}. We introduce a new
 unsafe marker trait \lstinline{ReferenceFree}, which denotes a type which does
@@ -850,65 +848,63 @@ and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
 raised.
 
 
-\subsection{Destructors Must Be \lstinline{Send}able To Another Thread}
+\subsection{Destructors and finaliser threads}
 
 \begin{figure}[t]
 \lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
  firstline=10]{listings/finaliser_deadlock.rs}
-\captionof{lstlisting}{An example showing how a potential deadlock can be
-  caused if finalisers are run on the mutator thread. A shared counter is
-  created using a reference counted container, a reference to this is then
-  placed inside a garbage collected container. This is potentially short-lived,
-  as it is only reachable by the \lstinline{gc} variable until the end of the
-  inner scope. If \ourgc decides to schedule a collection after this then the
-  \lstinline{Rc} could be considered garbage, where a finaliser would run its
-  drop method (line 10). If this happens while the main mutator thread already
-  holds \lstinline{counter.lock()} (line 32-36) then this program can deadlock.
-  When finalisers are run on the same thread, there is nothing the programmer
-  can do in this situation to guarantee that this kind of deadlock does not
-  occur.}
+\captionof{lstlisting}{How destructors can cause deadlocks when used as
+  finalisers. The mutator creates a reference-counted mutex (line 6),
+  placing a copy in a \lstinline{GcNode} that immediately goes out of scope
+  (line 7). The mutator then acquires the lock (line 8) but before it
+  can release the lock a GC cycle occurs and the \lstinline{GcNode}'s
+  finaliser run (line 9). If the finaliser is run on the same thread
+  as the mutator, then it will fail to grab the lock (line 2) and cause
+  a deadlock as the mutator cannot continue and release the lock.}
 \label{fig:finaliser_deadlock}
 \end{figure}
 
-\jake{I think this bit should come before cycles because a) it explains why we end up moving stuff off thread and b) The FSA for cycles (which introduces and checks for the \lstinline{FinaliserSafe} trait) is an extension of the FSA for off-thread finalisation (which checks for the \lstinline{Send + Sync} traits)}
+Virtually all destructors access shared state, either in the object they are
+attached to or global state. When used as finalisers, accessing such state can
+be problematic, turning `correct' destructors into `incorrect' finalisers. For
+example, acquiring a lock can cause deadlocks if the mutator has already
+acquired that lock and the finaliser is run on the same thread as the
+mutator~\cite[section~3.3]{boehm03destructors}. Locks are not the only problem:
+data races of other kinds are also possible when destructors are run as
+finalisers and can interleave with mutator code~\cite{niko13destructors}.
 
-For a finaliser to be at all useful, it must be able to access fields from
-other objects or even global state. However, as mentioned in
-\cref{sec:general_challenges}, finalisers which access shared state can
-deadlock and introduce race conditions when run on the same thread as the
-mutator, even at no fault of the user.
+The solution to these problems is to ensure that finalisers are never
+interleaved with mutator code on the same thread. The most general, and
+practical, way to achieve this is to run finalisers on a thread(s) that never
+runs mutator code. While such a thread(s) could perform other non-mutator work,
+it is simplest to think of a thread dedicated solely to running finalisers and
+hence we refer to it as the \emph{finaliser thread}.
 
-Though at first it may seem like one solution to prevent deadlocks would be to
-prevent finalisers from acquiring locks at all, this can still cause race-like
-bugs because of how finalisers can interleave asynchronously with the
-mutator~\citep{niko13destructors}.
+We must therefore ensure that it is safe to run a type's destructor on the
+finaliser thread. Fortunately, Rust's type system already encodes the necessary
+information via the marker auto traits \lstinline{Send} (is a type safe to be
+moved permanently from one thread to another?) and \lstinline{Sync} (is a type
+safe to be accessed from more than one thread?).
 
-We see the only solution to this problem is ensuring that finalisers are run on
-a separate thread. Unfortunately, this now means that shared data, or other
-objects accessed from a finaliser must be done in a thread-safe way. The problem
-with this is that because we run a type's drop glue as a finaliser, this may
-not be thread-safe, because those drop methods were not originally written with
-any awareness that they may be used in this context. An example of how this can be unsound\jake{is unsoundness the correct term here? are deadlocks technically unsound?} is in \cref{fig:finaliser_deadlock}.
+FSA therefore requires that if a type \lstinline{Gc<T>} has a finaliser,
+\lstinline{T} must implement both the \lstinline{Send} and \lstinline{Sync}
+traits. Note that it is not sufficient for \lstinline{T} to implement
+\lstinline{Send} alone, as shared state (e.g.~stored in an \lstinline{Arc})
+between a GCed value and non-GCed value. In such a case, the \lstinline{Gc<T>}
+may be finished with and have its finaliser run while the non-GCed value is
+still in scope, meaning that both the mutator and finaliser threads may access
+the underlying value simultaneously.
 
-\jake{We're going to have to explain how Rust does thread-safety now,
-introducing the Send and Sync auto traits, I've had a brief go below}.
 
-Rust is already able to statically determine whether types are thread-safe. It
-does this with the use of two special auto-traits : \lstinline{Send} and
-\lstinline{Sync}. A value whose type implements \lstinline{Send} can be moved
-to other threads. Almost all types in Rust implement the \lstinline{Send} trait
-save for a few exceptions (e.g. \lstinline{Rc<T>}, because it does not perform
-reference counts atomically). The corollary trait, \lstinline{Sync}, is
-implemented on types whose values perform mutation in a thread-safe manner. For
-example, a \lstinline{Mutex<T>} is \lstinline{Sync}, whereas a
-\lstinline{RefCell} (which performs dynamic borrow-checking non-atomically) is
-not \lstinline{Sync}. Just like our \lstinline{ReferenceFree} auto trait, both
-of these traits also pollute their container types.
+\subsubsection{Relaxing}
 
-Now that we have established that finalisers must be thread-safe, what this
-means in practice is that any type used in a drop method must implement
-\lstinline{Send} and \lstinline{Sync}. \jake{Do we explain the analysis
-algorithm (\cref{alg:fsa}) here? or add a forward ref to The Analysis section?}
+Most Rust types implement \lstinline{Send} though fewer implement
+\lstinline{Sync}. FSA thus prevents more types from being used with GC than we
+might hope. \ourgc thus semi-experimentally relaxes the \lstinline{Send} and
+\lstinline{Sync} instruction.
+
+\laurie{more to come}
+
 
 \subsection{Cycles and Finalisation}
 
