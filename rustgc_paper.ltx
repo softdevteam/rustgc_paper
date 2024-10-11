@@ -854,9 +854,9 @@ safe to be accessed from more than one thread?).
 FSA therefore requires that if a type \lstinline{Gc<T>} has a finaliser,
 \lstinline{T} must implement both the \lstinline{Send} and \lstinline{Sync}
 traits. Note that it is not sufficient for \lstinline{T} to implement
-\lstinline{Send} alone, as shared state (e.g.~stored in an \lstinline{Arc})
+\lstinline{Send} alone, as shared state (e.g.~stored in an \lstinline{Arc}) \jake{...``can be referenced''..?}
 between a GCed value and non-GCed value. In such a case, the \lstinline{Gc<T>}
-may be finished with and have its finaliser run while the non-GCed value is
+may be finished with it and have its finaliser run while the non-GCed value is
 still in scope, meaning that both the mutator and finaliser threads may access
 the underlying value simultaneously.
 
