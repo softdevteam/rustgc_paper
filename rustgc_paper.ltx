@@ -953,7 +953,10 @@ impl<T> !FinalizerSafe for Gc<T> {}
 
 \laurie{is a negative type impl necessary? Couldn't we implement this as a
 `NotFinalizerSafe` auto trait, and have it pollute in the same way as other
-types?}
+types?}\jake{It's not strictly necessary but it would be confusing and a lot of
+boilerplate the other way around: auto traits are auto applied to all types. So
+we'd have to write \lstinline{!NotFinalizerSafe} for every other type instead
+of just opt-ing out for one type -- \lstinline{Gc}}.
 
 
 When \ourgc is compiled with unordered finalisation, it prevents drop methods
@@ -973,9 +976,9 @@ impl<T> !FinalizerSafe for Gc<T> {}
 
 FSA then uses this to identify the specific field which was unsafely
 dereferenced and generates an error message different from those to do with
-thread-safety. \laurie{is it FSA that does this, or normal rustc?}
+thread-safety. \laurie{is it FSA that does this, or normal rustc?}\jake{I've added line numbers to \cref{alg:fsa}, it's on lines (24-25) }
 
-\laurie{i don't see the check in this paragraph in algorithm 2?}
+\laurie{i don't see the check in this paragraph in algorithm 2?}\jake{You're right, this is missing. I've added it (lines 13-14)}
 However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
 a drop method could dereference a \lstinline{Gc} field in a way that FSA could
 not detect e.g.~by doing so behind an opaque function call. In such cases
@@ -987,7 +990,7 @@ side of caution, favouring soundness by refusing to compile the program.
 
 \begin{figure}[t!]
 % \begin{algorithm}
-\begin{algorithmic}
+  \begin{algorithmic}[1]
 \Function{FinaliserSafetyAnalysis}{$func$}
       \ForEach {$basic\_block \in func$}
             \State $t \gets$ $basic\_block.terminator$
@@ -1002,6 +1005,9 @@ side of caution, favouring soundness by refusing to compile the program.
             \State \Call{EmitReferenceError}{}
             \Else
             \ForEach {$drop\_method \in$ \Call{GetDropGlue}{$ty$}}
+              \If { \NOT \Call{IsMIRAvailable}{$drop\_method$}}
+                  \State \Call{EmitFinaliserUnsafeErr}{}
+              \EndIf
               \State \Call{CheckDropMethodSafety}{$drop\_method$}
             \EndFor
             \EndIf
