@@ -838,7 +838,7 @@ and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
 raised.
 
 
-\subsection{Destructors need to be runnable on finaliser thread}
+\subsection{Destructors need to be runnable on the finaliser thread}
 
 \begin{figure}[t]
 \lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
@@ -854,8 +854,8 @@ raised.
 \label{fig:finaliser_deadlock}
 \end{figure}
 
-Virtually all destructors access shared state, either in the object they are
-attached to or global state. When used as finalisers, accessing such state can
+Virtually all destructors access shared state, whether that is in the value they are
+attached to, or global state. When used as finalisers, accessing such state can
 be problematic, turning `correct' destructors into `incorrect' finalisers. For
 example, acquiring a lock can cause deadlocks if the mutator has already
 acquired that lock and the finaliser is run on the same thread as the
@@ -871,52 +871,45 @@ it is simplest to think of a thread dedicated solely to running finalisers and
 hence we refer to it as the \emph{finaliser thread}.
 
 We must therefore ensure that it is safe to run a type's destructor on the
-finaliser thread. Fortunately, Rust's type system already encodes the necessary
-information via the marker auto traits \lstinline{Send} (is a type safe to be
+finaliser thread. A conservative definition is that \lstinline{Gc<T>} is
+is safe to use if \lstinline{T}'s destructor implements both of Rust's existing \lstinline{Send} (is a type safe to be
 moved permanently from one thread to another?) and \lstinline{Sync} (is a type
-safe to be accessed from more than one thread?).
-
-FSA therefore requires that if a type \lstinline{Gc<T>} has a finaliser,
-\lstinline{T} must implement both the \lstinline{Send} and \lstinline{Sync}
-traits. Note that it is not sufficient for \lstinline{T} to implement
+safe to be accessed from more than one thread?) auto traits.
+Note that it is not sufficient for \lstinline{T} to implement
 \lstinline{Send} alone, because a finaliser may access
 state (e.g.~stored in an \lstinline{Arc}) shared between a GCed value and
 non-GCed value. If the finaliser runs while the non-GCed value is still in
 scope, the mutator and finaliser threads may access
 the underlying value simultaneously.
 
-\jake{We also provide \lstinline{FinaliseUnchecked<T>}, a zero-cost wrapper
-type (in the style of \lstinline{ManuallyDrop}) which allows users to opt-out
-of FSA on specific types. See this commit for details
-\lstinline{https://github.com/softdevteam/alloy/commit/547930615e2ff241846a9e666a05fbe480267920}.
-We use this ourselves in various places when getting programs ready for our
-benchmarking suites, but it also helps because it lets us opt-out types from
-other crates, which would be otherwise tricky due to orphan rules}
-\laurie{what other types do we opt-out from? would any normal user ever want to do this?}
-\jake{The most common one is trait objects. FSA can't look into their drop
-methods, (because they're dispatched dynamically, and the concrete type is not
-known statically). So users can say \lstinline{Gc<FinalizeUnchecked<MyTO>>>}
-for TOs that they have audited.}
-
 
 \subsubsection{Relaxing the \lstinline{Send + Sync} restriction}
 \label{sec:relaxed}
 
 Requiring that finalisation is only possible for types that implement both \lstinline{Send} and
-\lstinline{Sync} can be frustrating, in part because more types
+\lstinline{Sync} can occasionally be frustrating, in part because more types
 implement \lstinline{Send} than \lstinline{Sync}. FSA thus implements a more
 relaxed check, analysing all drop methods reachable from a type's fields, to
 see if those drop methods access elements that do themselves implement
 \lstinline{Send} and \lstinline{Sync}.
 
 Simplifying slightly, rather than forcing an entire type to be thread-safe, FSA
-checks a weaker property: are drop methods thread safe? Rust's semantics do not
-currently forbid this assumption and our examination of the compiler tool-chain
+checks a weaker property: are destructor methods thread safe? In essence, we check
+whether the fields that all transitively reachable drop methods directly or indirectly access implement
+\lstinline{Send} and \lstinline{Sync}: accessing a field which does not implement
+both traits causes a type to fail FSA.
+
+In safe Rust, the property we are checking is a non-strict subset of `does the containing
+type implement both \lstinline{Send} and \lstinline{Sync}?'. However, it is clearly
+of a different nature, moving from checking `obviously' static properties to
+`potentially' dynamic properties. Rust's semantics, as at the time of writing,
+do not undermine our assumptions and our examination of the compiler tool-chain
 (i.e.~\rustc and LLVM) showed that it does not implement the analyses and
 optimisations needed to undermine this assumption. Note that this assumption is
 not true for all languages (for example our assumption would be unsafe
-in Java due to synchronisation removal~\cite{wang06escape}) and may not be true
-for Rust in the future.
+in Java due to synchronisation removal~\cite{wang06escape}). We leave as an
+open question to others as to whether Rust should deliberately permit or forbid
+such checks in its semantics.
 
 \laurie{in our benchmark suite, how often does this relaxation make a difference?}
 
@@ -939,16 +932,16 @@ for Rust in the future.
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
-data structures. However, finalisers can cause problems if they directly
-reference cycles. \cref{fig:finaliser_cycle} shows an example of undefined
+data structures. However, finalisers can cause problems if they change
+state shared within a cycle. \cref{fig:finaliser_cycle} shows an example of undefined
 behaviour when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
 run in, at least one of the finalisers will see the other GCed value as partly
 or wholly `finalised'.
 
-Most languages and systems seem to assume that the user either doesn't run into
-this problem (finalisation cycles are considered rare in GC'd
-languages~\citep[p.~229]{jones16garbage}), or knows how to deal
+Most languages and systems we are aware of assume that users either don't run into
+this problem (finalisation cycles are considered rare in GCed
+languages~\citep[p.~229]{jones16garbage}), or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalisation~\cite[p.~11]{boehm03destructors}). There is no fully
 automatic solution to this problem, with the closest solution being those GCs
@@ -956,59 +949,55 @@ which offer weak references, allowing users to detect when finalisation cycles
 have been broken, though they still have to deal with the consequences
 manually.
 
-\ourgc takes a different approach: if a destructor, directly or indirectly,
-dereferences a \lstinline{Gc<T>} type, then that destructor is an invalid
-finaliser. This rule guarantees that finalisers cannot have problems in the
-presence of cycles, statically preventing users from causing themselves
-trouble.
+None of the existing languages and systems we know of attempts to statically
+rule out problems with finalisation and cycles. In \ourgc, in contrast, we can
+make use of the explicit \lstinline{Gc<T>} type to rule out such problems. FSA
+therefore forbids destructors from, directly or indirectly, dereferencing
+\lstinline{Gc<T>} types. This statically guarantees that finalisers cannot have
+problems in the presence of cycles.
 
-The way this check is implemented is in essence a variation of the `relaxed'
-check of~\cref{sec:relaxed}. We want to check all transitively reachable drop
-methods for access to \lstinline{Gc<T>} fields. To do so, we once again use a
-marker auto trait \lstinline{FinalizerSafe}. In contrast to our earlier use of
-marker auto traits, we explicitly mark \lstinline{Gc<T>} as not
-\lstinline{FinalizerSafe} using the `negative implementation' operator:
-
-\begin{lstrustsmall}
-impl<T> !FinalizerSafe for Gc<T> {}
-\end{lstrustsmall}
-
-\laurie{is a negative type impl necessary? Couldn't we implement this as a
-`NotFinalizerSafe` auto trait, and have it pollute in the same way as other
-types?}\jake{It's not strictly necessary but it would be confusing and a lot of
-boilerplate the other way around: auto traits are auto applied to all types. So
-we'd have to write \lstinline{!NotFinalizerSafe} for every other type instead
-of just opt-ing out for one type -- \lstinline{Gc}}\laurie{couldn't we just
-impl \lstinline{NotFinalizerSafe} for \lstinline{Gc<T>} and let that pollute
-types that contain it appropriately? basically i'm struggling to see why the
-negative impl is necessary in this case}.\jake{But that's not how auto traits work. If you define an auto trait, it is automatically applied to every type, and then the negative impl pollutes upwards.}
-
-
-When \ourgc is compiled with unordered finalisation, it prevents drop methods
-from dereferencing fields which point to other \lstinline{Gc} objects.
-\autoref{fig:unsound_finalisation_cycle_error} shows the error message that is
-displayed when the example in \autoref{fig:unsound_finalisation_cycle} is
-compiled. It has identified that the user is trying to access field \lstinline{b},
-which contains a \lstinline{Gc} type. I extend \ourgc's \emph{finaliser safety
-analysis} (described in \autoref{fsa}) to detect this.
-
-This is implemented by first adding a negative implementation of
-\lstinline{FinalizerSafe} to the \lstinline{Gc<T>} type:
+The way this check is implemented is a variation of the `relaxed'
+check of~\cref{sec:relaxed}, though here we want to check that no transitively reachable drop
+methods a \lstinline{Gc<T>} field. We introduce
+another auto trait \lstinline{FinalizerSafe}, whose sole negative implementation
+is on \lstinline{Gc<T>} itself:
 
 \begin{lstrustsmall}
 impl<T> !FinalizerSafe for Gc<T> {}
 \end{lstrustsmall}
 
-FSA then uses this to identify the specific field which was unsafely
-dereferenced and generates an error message different from those to do with
-thread-safety. \laurie{is it FSA that does this, or normal rustc?}\jake{I've added line numbers to \cref{alg:fsa}, it's on lines (24-25) }
 
-\laurie{i don't see the check in this paragraph in algorithm 2?}\jake{You're right, this is missing. I've added it (lines 13-14)}
-However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
-a drop method could dereference a \lstinline{Gc} field in a way that FSA could
-not detect e.g.~by doing so behind an opaque function call. In such cases
-where the MIR for the entire drop method cannot be checked, FSA will err on the
-side of caution, favouring soundness by refusing to compile the program.
+\subsection{Bypassing FSA checks when necessary}
+
+FSA is deliberately conservative. In particular, when checking whether drop
+methods satisfy certain properties, FSA naturally checks whether all code
+reachable from those drop methods satisfies those properties. If a reachable
+function cannot be examined then FSA assumes it fails to meet the stated
+property. This can happen because a function is externally linked (e.g.~an FFI
+call to C) or due to dynamic dispatch in \emph{trait objects}, where we don't
+know which of many possible implementations of a method will actually be
+called.
+
+In many cases, users are able to prove to their satisfaction that the resulting
+false positives are unnecessary (e.g.~because the C function they are calling
+has no side effects). They can then can override FSA's checks by implementing
+the unsafe \lstinline{FinalizerSafe} trait for a given type. However, because
+this applies to a type, and thus all values that instantiate that type, it can
+sometimes be difficult to convince oneself that doing so is correct.
+
+We therefore provide a second standard way of overriding FSA's checks via the
+\lstinline{FinalizerUnchecked<T>} newtype. In essence,
+\lstinline{FinalizerUnchecked} allows users to inform FSA that certain uses of
+a type \lstinline{T} satisfy its properties. We still want to require the user
+to explicitly opt-in to unsafe Rust when using
+\lstinline{FinalizerUnchecked<T>}, since incorrect use will undermine
+correctness, but Rust structs cannot be marked unsafe directly. Instead we mark
+the struct's constructor \lstinline{FinalizerUnchecked::new} as
+unsafe. Note that, unlike auto traits, any user can write an exact
+equivalent of \lstinline{FinalizerUnchecked<T>} in their own code: we provide
+it both for convenience and as a standard, recognisable, means of informing
+code readers about the original programmer's intentions.
+
 
 \subsection{The Analysis}
 \label{sec:fsa}
@@ -1063,26 +1052,23 @@ side of caution, favouring soundness by refusing to compile the program.
 \end{algorithmic}
 \end{algorithm}
 
+As a helpful aid to 
+
+FSA then uses this to identify the specific field which was unsafely
+dereferenced and generates an error message different from those to do with
+thread-safety. \laurie{is it FSA that does this, or normal rustc?}\jake{I've added line numbers to \cref{alg:fsa}, it's on lines (24-25) }
+
+\laurie{i don't see the check in this paragraph in algorithm 2?}\jake{You're right, this is missing. I've added it (lines 13-14)}
+However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
+a drop method could dereference a \lstinline{Gc} field in a way that FSA could
+not detect e.g.~by doing so behind an opaque function call. In such cases
+where the MIR for the entire drop method cannot be checked, FSA will err on the
+side of caution, favouring soundness by refusing to compile the program.
+
+
 \subsubsection{Limitations}
 
-As with any static analysis, FSA is inherently conservative: some drop methods
-are impossible to analyse at compile-time so in these cases \ourgc will err on
-the side of caution and reject potentially safe programs. This is most likely
-to happen in two situations.
 
-First, a drop method may contain a call to an opaque (i.e. externally linked)
-function for which the compiler does not have the MIR. If a reference to a field
-which would be unsafe to use in a finaliser is passed to this function, then FSA
-would reject the program. This function call \emph{could} be safe, but FSA has
-no way of knowing, and will reject it.
-
-Second, if a finaliser is used on a trait object which is called using dynamic
-dispatch in Rust. At compile-time, it is not possible to know the concrete type
-of a trait object, so FSA does not know which drop method to check.
-
-In both cases, the user has the option of explicitly informing the compiler a
-particular drop method is safe to use as a finaliser. We observe that this is
-rare in practice.
 
 
 \section{Performance Evaluation}
