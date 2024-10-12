@@ -774,7 +774,7 @@ safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the second problem.
 
-In this section we introduce the various factors that collectively constitute
+In this section we introduce the three main factors that constitute
 Finaliser Safety Analysis (FSA).
 We extend Rust's static analyses, and alter the relevant parts
 of \rustc, to reject a type \lstinline{T}'s destructor if it
@@ -783,31 +783,53 @@ is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 
 \subsection{Rust references}
 
-The \lstinline{Gc<T>} type can store, directly or indirectly, normal Rust
+\lstinline{Gc<T>} can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
 However, finalisers can dynamically extend the lifetime of a
-\lstinline{Gc<T>}: if a finaliser were to access a reference stored in a
-\lstinline{Gc<T>} it could (and, indeed, in most cases will) implicitly
-undermine Rust's borrow checking rules.
-
+\lstinline{Gc<T>}: if a finaliser accesses a reference stored in a
+\lstinline{Gc<T>} it implicitly undermines Rust's borrow checking rules.
 The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
-from storing, directly or indirectly, references. While storing references in
-a \lstinline{Gc<T>} might seem useless, it is sometimes useful, including when
+from storing, directly or indirectly, references.
+
+While storing references in
+a \lstinline{Gc<T>} might seem pointless -- after all, doing so prevents the
+\lstinline{Gc<T>} from having a dynamic lifetime, which is part of the utility
+of a GC -- it is sometimes useful, including when
 one is refactoring or experimenting with existing code.
-FSA therefore uses a more relaxed rule: a \lstinline{Gc<T>} can only store,
+FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finaliser (i.e.~\lstinline{T}
 has no destructor, or finaliser elision has removed the \lstinline{Gc<T>}'s
 finaliser).
 
-To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref}. We introduce a new
-unsafe marker trait \lstinline{ReferenceFree}, which denotes a type which does
-not contain a reference. A type whose fields are all \lstinline{ReferenceFree}
-is itself \lstinline{ReferenceFree}. As an auto trait, \rustc ensures that
-every type automatically implements \lstinline{ReferenceFree}. Crucially,
-we ensure that reference types themselves are not \lstinline{ReferenceFree} using a negative implementation \lstinline{ReferenceFree}: using a reference
-type as a field thus `pollutes' that latter type. When a program contains a
-\lstinline{Gc<T>} type, \ourgc checks whether it has a finaliser: if it does,
+To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref},
+which can be thought of as marker traits that the compiler recognises and
+handles in a special way. Since we use auto traits repeatedly in FSA,
+it is worth understanding how they work. In essence, an auto trait \lstinline{A}
+will be automatically implemented for a type \lstinline{T} unless
+one of the following is true: there is an explicit \emph{negative
+implementation} of \lstinline{A} for \texttt{T}; or \texttt{T}
+contains a field that is not itself \lstinline{A}. Informally, we
+say that a negative implementation of an auto-trait \emph{pollutes} containing
+types. Auto traits can only be added by the compiler itself (i.e.~a user-level
+GC library could not use auto traits), and they have some implications on
+backwards API compatibility: in our situation, since we are introducing GC to
+Rust, there are no such compatibility worries.
+
+We therefore introduce a new auto trait \lstinline{ReferenceFree}, which
+denotes a type which does not contain a reference. Crucially, \ourgc defines
+two negative (`\lstinline{!}') implementations of \lstinline{ReferenceFree} for
+reference types:
+
+\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
+impl<T> !ReferenceFree for &T {}
+impl<T> !ReferenceFree for &mut T {}
+\end{lstlisting}
+
+Thus, thanks to auto traits, any type \lstinline{T} which implements
+\lstinline{ReferenceFree} is guaranteed to be free of references. When a
+program contains a \lstinline{Gc<T>} type, \ourgc checks whether it has a
+finaliser: if it does,
 and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
 raised.
 
