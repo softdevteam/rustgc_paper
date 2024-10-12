@@ -82,9 +82,10 @@ reclaimed by Rust's implicit memory management) but this makes it impossible to
 provide finalisers for types in external libraries.
 
 The obvious solution to this problem is to allow existing Rust destructors to
-be automatically used as finalisers. However, in the nearest context to our
-work, a GC proposal for C++, this solution was explicitly ruled out as it
-introduces seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We break these problems down into three
+be automatically used as finalisers. However, no existing GC for Rust does
+this and in the nearest context to our
+work, a GC proposal for C++, this ruled out as it
+introduces seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We place these problems into four
 categories:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run prematurely;
