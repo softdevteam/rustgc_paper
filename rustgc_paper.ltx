@@ -730,7 +730,7 @@ impl<T: ?Sized> Drop for Gc<T> {
 \subsection{Optimising premature finaliser prevention}
 
 The drop method we add to \lstinline{Gc<T>} fully prevents premature
-finalisation. It also solves a performance problem with the suggested solution
+finalisation. It also naturally solves a performance problem with the suggested solution
 for C++ in~\cite[Solution~1]{boehm07optimization}, which requires keeping alive
 all pointers, no matter their type, for their full scope. By definition, our
 solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
@@ -743,27 +743,26 @@ Fortunately, we can optimise premature finaliser prevention further by
 piggy-backing on finaliser elision: if a finaliser can be
 elided, there is no finaliser to be called prematurely, and no need for
 resulting values to be kept alive. Intuitively, we want to avoid generating drop methods
-for \lstinline{Gc<T>} types that do not require finalisation. However,
-inside \rustc, it is easier for us to remove drop method calls to elidable finalisers:
-this is functionally equivalent to not generating the drop methods in the first place, though
-our approach does put an extra burden on dead-code elimination in the compiler tool-chain.
+for \lstinline{Gc<T>} types that do not require finalisation,
+but this is difficult to do directly inside \rustc. Instead,
+we suppress calls to the drop methods of such types: the two approaches
+are functionally equivalent, though ours
+does put an extra burden on dead-code elimination in the compiler tool-chain.
 
-We therefore add a new pass
-\lstinline{remove_elidable_drops}\footnote{Internally, \rustc sometimes
-conflates `drop' and `destructor'; we avoid doing so except where it would make
-it difficult to reconcile our explanation with \rustc's implementation.} to
+We add a new pass
+\lstinline{remove_elidable_drops} to
 \rustc's Mid-Level Intermediate Representation (MIR) processing. MIR is best
 thought of as the main IR inside \rustc: it contains the complete set of
 functions in the program, where each function consists of a sequence of basic
-blocks. Simplifying somewhat, function and destructor calls are represented as
-different kinds of \emph{terminators} on basic blocks, where such terminators
-reference both the callee and a successor block.
+blocks. Simplifying somewhat, function and drop method calls are represented as
+different kinds of \emph{terminators} on basic blocks. Terminators
+reference both a callee and a successor basic block.
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
-identifies destructor terminators which reference elidable finalisers (using
+identifies drop method terminators which reference elidable finalisers (using
 the \lstinline{requires_finaliser} intrinsic from
 \cref{requires_finaliser_intrinsic}), and turns them into `goto' terminators
-to the basic block's successor. \cref{alg:barrier_removal} in the appendix
+to the successor basic basic block. \cref{alg:barrier_removal} in the appendix
 gives a more formal version of this algorithm.
 
 
