@@ -351,7 +351,7 @@ to GC by enabling the allocator and assigning it to an arbitrarily-named variabl
 Although we use some uncommon, and extend other, parts of \boehm, there is
 nothing inherently unique about \boehm from \ourgc's perspective.
 
-We made the following changes to \boehm. First, we disabled \boehm's parallel collector threads
+We made the following changes to \boehm. First, we disabled \boehm's parallel collector
 because, for reasons we don't fully understand, it worsens \ourgc's
 performance. Second, \boehm cannot scan pointers stored in thread locals
 because these are platform dependent. Fortunately, \rustc uses LLVM's
@@ -361,21 +361,17 @@ this ELF segment during each collection. Third,
 \boehm normally dynamically intercepts thread creation calls so that it can
 then can scan their stacks, but (for bootstrapping
 reasons) it is unable to do so in our context: we explicitly changed \ourgc
-to register new threads with \boehm. Fourth, we modified \boehm to run finalisers
-on a separate thread (see \laurie{Section XYZ}).
+to register new threads with \boehm.
 
-\laurie{jake: for the time being, briefly dump in here what you did to
-introduce a dedicated finaliser thread into \boehm. i may move the text later
-if needed}
+We made one conceptually larger -- though fairly small in terms of lines of
+code \laurie{how many?} -- change to \boehm, to run all finalisers on a
+separate thread (see~\cref{sec:general_challenges,sec:fsa_finaliser_thread} for
+motivation). We lazily create a thread dedicated to this once the collector has
+first identified objects that need finalising. The finaliser thread then runs
+until the end of the program waiting for further work; rather than spinning,
+the collector notifies the finaliser thread of additional work via a condition
+variable.
 
-The changes we ended up with in the end were quite simple. \ourgc runs without
-a finaliser thread up until the first GC cycle which produces finalisable
-objects. At the end of this collection (immediately after the STW pause) a
-finaliser thread is lazily spawned. This finaliser thread loops infinitely,
-checking whether there is any finalisation work to do (via an existing \boehm
-API). It uses a condition variable to sleep when it has no work left to do,
-which is notified by the collector in subsequent cycles if more finalisers get
-added to the list.
 
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
@@ -847,6 +843,7 @@ raised.
 
 
 \subsection{Destructors need to be runnable on the finaliser thread}
+\label{sec:fsa_finaliser_thread}
 
 \begin{figure}[t]
 \lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
