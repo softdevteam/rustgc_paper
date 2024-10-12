@@ -578,9 +578,9 @@ shown in \cref{alg:elision} a \rustc compiler intrinsic \lstinline{requires_fina
 
 In essence, \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalisation unless it also implements the
-\lstinline{DropMethodFinaliserElidable} \emph{marker trait} (i.e.~a
-trait without methods). The latter trait is defined by \ourgc, and must be
-manually implemented by users: it signifies that a type's drop method need
+new \lstinline{DropMethodFinaliserElidable} \emph{marker trait} (i.e.~a
+trait without methods). This trait and can be
+used by a programmer to signify that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. However,
 \lstinline{DropMethodFinaliserElidable} only refers to the `top-level' type: if
 a transitively reachable field has a type which implements the \lstinline{Drop}
