@@ -793,6 +793,7 @@ is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 
 
 \subsection{Rust references}
+\label{sec:fsa_rust_references}
 
 \lstinline{Gc<T>} can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
@@ -982,32 +983,32 @@ methods satisfy certain properties, FSA naturally checks whether all code
 reachable from those drop methods satisfies those properties. If a reachable
 function cannot be examined then FSA assumes it fails to meet the stated
 property. This can happen because a function is externally linked (e.g.~an FFI
-call to C) or due to dynamic dispatch in \emph{trait objects}, where we don't
-know which of many possible implementations of a method will actually be
+call to C) or due to dynamic dispatch in \emph{trait objects}, where we can't
+tell which of many possible implementations of a method will actually be
 called.
 
-In many cases, users are able to prove to their satisfaction that the resulting
+In some cases, users are able to prove to their satisfaction that the resulting
 false positives are unnecessary (e.g.~because the C function they are calling
 has no side effects). They can then can override FSA's checks by implementing
 the unsafe \lstinline{FinalizerSafe} trait for a given type. However, because
 this applies to a type, and thus all values that instantiate that type, it can
-sometimes be difficult to convince oneself that doing so is correct.
+be difficult to convince oneself that doing so is correct.
 
-We therefore provide a second standard way of overriding FSA's checks via the
+We therefore provide a second way of overriding FSA's checks with the
 \lstinline{FinalizerUnchecked<T>} newtype. In essence,
 \lstinline{FinalizerUnchecked} allows users to inform FSA that certain uses of
 a type \lstinline{T} satisfy its properties. We still want to require the user
 to explicitly opt-in to unsafe Rust when using
-\lstinline{FinalizerUnchecked<T>}, since incorrect use will undermine
-correctness, but Rust structs cannot be marked unsafe directly. Instead we mark
-the struct's constructor \lstinline{FinalizerUnchecked::new} as
-unsafe. Note that, unlike auto traits, any user can write an exact
-equivalent of \lstinline{FinalizerUnchecked<T>} in their own code: we provide
+\lstinline{FinalizerUnchecked<T>}, since incorrect use is dangerous,
+but Rust structs cannot be marked as unsafe directly. Instead we mark
+the struct's constructor (\lstinline{FinalizerUnchecked::new}) as
+unsafe. Note that, unlike auto traits, programmers can recreate
+\lstinline{FinalizerUnchecked<T>} in their own code: we provide
 it both for convenience and as a standard, recognisable, means of informing
 code readers about the original programmer's intentions.
 
 
-\subsection{The Analysis}
+\subsection{Putting it all together}
 
 \begin{algorithm}[t]
   \captionof{algorithm}{Finaliser safety analysis}
@@ -1028,7 +1029,7 @@ code readers about the original programmer's intentions.
             \Else
             \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
               \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
-                  \State \Call{EmitFinaliserUnsafeErr}{}
+                  \State \Call{EmitFinaliserUnsafeError}{}
               \EndIf
               \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
             \EndFor
@@ -1045,7 +1046,7 @@ code readers about the original programmer's intentions.
         \ForEach {$\textit{statement} \in \textit{basic\_block}$}
             \ForEach {$\textit{projection} \in \textit{statement}$}
               \If{\NOT \Call{IsFinaliserSafe}{\textit{projection.element}}}
-                  \State \Call{EmitFinaliserUnsafeErr}{}
+                  \State \Call{EmitFinaliserUnsafeError}{}
               \EndIf
             \EndFor
         \EndFor
@@ -1059,23 +1060,23 @@ code readers about the original programmer's intentions.
 \end{algorithmic}
 \end{algorithm}
 
-As a helpful aid to 
+\cref{alg:fsa} puts all the parts of FSA together. In essence, it iterates over
+every function in \rustc's MIR and checks whether types used in a
+\lstinline{Gc<T>} satisfy FSA. To simplify the presentation, the algorithm as
+presented performs no caching \laurie{presumably the implementation does?!}, so
+a type can be checked multiple times. As the algorithm shows, the seemingly
+separate parts of FSA are able to use much of the same machinery (and reuse
+algorithms from earlier sections).
 
-FSA then uses this to identify the specific field which was unsafely
-dereferenced and generates an error message different from those to do with
-thread-safety. \laurie{is it FSA that does this, or normal rustc?}\jake{I've added line numbers to \cref{alg:fsa}, it's on lines (24-25) }
-
-\laurie{i don't see the check in this paragraph in algorithm 2?}\jake{You're right, this is missing. I've added it (lines 13-14)}
-However, as explained in \autoref{fsa}, FSA is not complete. It is possible that
-a drop method could dereference a \lstinline{Gc} field in a way that FSA could
-not detect e.g.~by doing so behind an opaque function call. In such cases
-where the MIR for the entire drop method cannot be checked, FSA will err on the
-side of caution, favouring soundness by refusing to compile the program.
-
-
-\subsubsection{Limitations}
-
-
+The \lstinline{Emit*Error} functions represent an important convenience. Rather
+than just inform a user that `your drop method has not passed FSA', \ourgc
+pinpoints precisely which field or line in a drop method caused FSA to fail.
+\lstinline{EmitReferenceError} informs the user when a reference in a type
+is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}).
+\lstinline{EmitFinaliserUnsafeError} informs the user when a drop method
+contains code which is unsafe (e.g.~references a \lstinline{Gc<T>} type, an
+opaque function, etc.). \laurie{jake: let's add a figure showing whichever the
+easiest-to-grok error is as a result of running \ourgc}
 
 
 \section{Performance Evaluation}
