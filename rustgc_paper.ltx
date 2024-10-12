@@ -120,8 +120,8 @@ likely to generalise to other ownership-based languages.
 
 This paper's high-level structure is: background (\cref{sec:background});
 \ourgc's design (\cref{sec:alloy_design}); destructor and finaliser challenges
-and solutions (\cref{sec:destructor challenges}); and evaluation
-(\cref{sec:evaluation}). The first three of these parts have the challenge that our work
+and solutions (\cref{sec:destructor challenges,sec:elision,sec:premature_finalise_prevention,sec:fsa}); and evaluation
+(\cref{sec:evaluation}). The first three parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
 tried to provide sufficient material for readers expert in one of these
 areas to gain adequate familiarity with the other, without undue prolixity, but perfection is beyond our
@@ -640,6 +640,7 @@ finaliser' checks have no run-time cost at all.
 
 
 \section{Premature Finaliser Prevention}
+\label{sec:premature_finalise_prevention}
 
 \begin{figure}[tb]
 \begin{lstlisting}[
@@ -776,6 +777,7 @@ gives a more formal version of this algorithm.
 
 
 \section{Finaliser Safety Analysis}
+\label{sec:fsa}
 
 In this section we address two problems: running finalisers on the same thread
 as a paused collector can cause race conditions and deadlocks; and some safe destructors are not
@@ -1006,7 +1008,6 @@ code readers about the original programmer's intentions.
 
 
 \subsection{The Analysis}
-\label{sec:fsa}
 
 \begin{algorithm}[t]
   \captionof{algorithm}{Finaliser safety analysis}
