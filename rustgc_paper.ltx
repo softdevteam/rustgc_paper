@@ -368,6 +368,14 @@ on a separate thread (see \laurie{Section XYZ}).
 introduce a dedicated finaliser thread into \boehm. i may move the text later
 if needed}
 
+The changes we ended up with in the end were quite simple. \ourgc runs without
+a finaliser thread up until the first GC cycle which produces finalisable
+objects. At the end of this collection (immediately after the STW pause) a
+finaliser thread is lazily spawned. This finaliser thread loops infinitely,
+checking whether there is any finalisation work to do (via an existing \boehm
+API). It uses a condition variable to sleep when it has no work left to do,
+which is notified by the collector in subsequent cycles if more finalisers get
+added to the list.
 
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
