@@ -1088,27 +1088,26 @@ easiest-to-grok error is as a result of running \ourgc}
 \toprule
   Benchmark & Version & Description \\
 \midrule
-  \somrsast & VM git \#\somrsversion  & SOM AST VM\\
-  \somrsbc & VM git \#\somrsversion  & SOM Bytecode VM\\
-  \yksom & VM git \#\yksomversion  & SOM Bytecode VM\\
-  \grmtools & \grmtoolsversion  & YACC compatible Lexer/Parser library\\
-  \sws & \swsversion  & HTTP/1 - HTTP/2 compliant web server\\
-  \minimoka & \minimokaversion  & Concurrent cache library for Rust\\
-  \binarytrees & Debian CLBG \binarytreesversion  & Stresses heap allocation\\
-  \regexredux & Debian CLBG \regexreduxversion  & Pattern matching very large expression\\
+  \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark \\
+  \grmtools & \grmtoolsversion  & Lexer / parser library \\
+  \minimoka & \minimokaversion  & Concurrent cache library \\
+  \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching \\
+  \sws & \swsversion  & Web server\\
+  \midrule
+  \somrsast & git \#\somrsversion  & SOM AST VM\\
+  \somrsbc & git \#\somrsversion  & SOM bytecode VM\\
+  \yksom & git \#\yksomversion  & SOM bytecode VM\\
 \bottomrule
 \end{tabular}
 \end{center}
 
   \vspace{5pt}
-  \caption{The benchmarks used in our experiments. We used the same version of
-  the `Are We Fast Yet?' benchmark suite (git\#\awfyversion) for both \somrs
-  variants and \yksom. \sws is built on top of  the \emph{Hyper}
-  (\hyperversion) HTTP library, which uses atomic reference counting in its
-  implementation. We convert this to use \ourgc's \lstinline{Gc} type instead.
-  Both \grmtools and \regexredux benchmarks use Rust's \emph{Regex} library
-  (\regexversion), which we also converted from atomic reference counting to
-  \ourgc's \lstinline{Gc}. }
+  \caption{Our suite of benchmarks: we take these Rust programs and alter them
+  to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
+  etc.). The top half of the table shows a traditional suite of benchmarks. The
+  bottom half shows three SOM (a programming language) VMs. For all three SOM
+  VMs, we use the same SOM version of the `Are We Fast Yet?' benchmark suite
+  (git\#\awfyversion); each SOM VM is thus a proxy for 26 additional benchmarks.}
 \label{tab:benchmarks}
 \end{table}
 
@@ -1123,34 +1122,44 @@ We ran four main experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
-  \Egcrc & the relative performance of \texttt{Gc<T>} over \texttt{Rc<T>} \laurie{and rust-gc and typed-arena, at least where possible?} \\
+  \Egcrc & the relative performance of \texttt{Gc<T>} over other allocation strategies (e.g.~\texttt{Rc<T>}) \\
   \Eelision & the performance gains of finaliser elision \\
   \Eprem & the costs of premature finaliser prevention \\
   \Epremopt & the performance gains from optimising premature finaliser prevention
 \end{tabular}
 \vspace{10pt}
 
-There is no existing benchmark suite for GCs for Rust; even if one did exist, it
+There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our experiment because in experiment \Egcrc we
-wanted to compare programs with and without GC. We therefore took \laurie{how
-many?} existing Rust programs and manually converted them to use
-\lstinline{Gc<T>}. In some cases we simply had to search and replace
-`\lstinline{Rc<T>}' with `\lstinline{Gc<T>}'; in other cases we \laurie{jake:
-what was the weirdest/hardest porting problem(s) you encountered?}.
+want to compare programs a memory strategy such as \lstinline{Rc<T>} against
+\lstinline{Gc<T>}. We searched through tens of the most popular
+Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
+package system) looking for suitable candidates. Several that initially
+appeared suitable relied on unusual and/or unsafe features of their memory
+strategy that would have taken unreasonable time to adapt (\laurie{e.g.~XYZ}).
 
-\cref{tab:benchmarks} shows the benchmarks we use. Note that som-rs and yksom
-are separate implementations of the SOM programming languages: som-rs is a
-relatively faithful port of a Java SOM VM into Rust; yksom is a from-scratch
-rewrite. Both implementations allow us to run a full benchmark suite,
-effectively turning 1 `benchmark' into another benchmark suite. For our
-purposes, the absolute performance of som-rs and yksom is less important than
-that each serves as a sanity check on the other.
+\cref{tab:benchmarks} shows our eventual benchmark suite. \binarytrees and \regexredux
+are well-known microbenchmarks. \binarytrees is particularly allocation intensive.
+The remaining benchmarks are `real' libraries and programs: \grmtools is a
+parsing library which uses \lstinline{Rc<T>} extensively; \minimoka
+\laurie{uses what?}; \sws is built on top of the \emph{Hyper} HTTP library,
+which itself uses the \emph{tokio} async runtime and uses \lstinline{Arc<T>}
+extensively.
 
-We ran our experiments on an unloaded \benchmarkcpu with
-\benchmarkram, running \benchmarkos. We turned turbo boost and
-hyper-threading off, as both can unpredictably alter performance. We used
-rebench \laurie{cite} to run benchmarks \laurie{all benchmarks or just som-rs
-and yksom AWFY?}, which performs additional mitigations (e.g.~\laurie{xyz}).
+Our suite also includes three SOM VMs. SOM is a small, but complete,
+Smalltalk-esque language with a wide variety of implementations. \somrsast and
+\somrsbc are existing implementations, both relatively faithful ports of a Java
+SOM VMs into Rust that use \laurie{rc or arc?}. yksom is a from-scratch rewrite
+for this paper that is designed to be more idiomatic and higher performance.
+Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
+\laurie{cite} benchmark suite, turning what appears to be 1 benchmark into 26
+(mostly micro) benchmarks.
+
+Our benchmark suite includes programs which use the following memory
+strategies: \lstinline{Arc<T>}, \lstinline{Rc<T>}, \rustgc (an existing GC for
+Rust), and \typedarena (an arena library). We ported \binarytrees to each of
+these memory strategies and \ourgc. For all the other benchmarks, we ported
+them from their existing memory strategy to \ourgc.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 intervals.
@@ -1169,7 +1178,7 @@ intervals.
   AWFY suite. I've calculated the CIs using the log approach. The other results
   are taking the arithmetic mean with CIs calculated for arithmetic mean. The
   geomean CIs have different upper and lower bounds so I'm not sure how best
-  to display them (we can't use \textpm)}}
+  to display them (we can't use \textpm)}\laurie{my suggestion is to switch the x and y axes around, then use a `midrule' to separate the SOM VMs from the rest; you can then report CIs in different ways in different parts of the table if necessary. that said, i don't understand why the geomean CIs wouldn't be symmetric given that our data is expected to be normally distributed}}
 \end{table}
 
 \autoref{table:binary_trees} shows the results for this experiment. The results
@@ -1182,8 +1191,6 @@ counting to track the roots for each garbage collected object. Second, it has a
 naive implementation of the mark-sweep algorithm and does not use parallel
 collector threads.
 
-
-
 \begin{figure}[t!]
     \centering
     \includegraphics[width=1\textwidth]{graphs/som_rs_perf.pdf}
@@ -1192,8 +1199,6 @@ collector threads.
     executions, where the error bars represent 99\% confidence intervals.}
 \label{graph:som_rs_finalisers}
 \end{figure}
-
-\subsection{Finaliser elision}
 
 \begin{figure}[t!]
     \centering
@@ -1216,8 +1221,6 @@ collector threads.
     the error bars represent 99\% confidence intervals.}
 \label{graph:yksom_finalisers}
 \end{figure}
-
-\subsection{Early finaliser prevention}
 
 \begin{figure}[t!]
     \centering
