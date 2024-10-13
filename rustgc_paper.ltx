@@ -89,7 +89,7 @@ introduces seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We place t
 categories:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run prematurely;
-(3) running finalisers on the same thread as a paused collector \jake{Is this supposed to be paused mutator?} can cause race conditions and deadlocks;
+(3) running finalisers on the same thread as a paused mutator can cause race conditions and deadlocks;
 (4) some safe destructors are not safe finalisers.
 All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of (2), has
@@ -495,7 +495,7 @@ problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run prematurely;
-(3) running finalisers on the same thread as a paused collector \jake{mutator?} can cause race conditions and deadlocks;
+(3) running finalisers on the same thread as a paused mutator can cause race conditions and deadlocks;
 (4) some safe destructors are not safe finalisers.
 
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
@@ -688,45 +688,40 @@ finalisable.
 
 In our context, it is trivial to define premature finalisation as a (dynamic) finaliser
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
-has gone out of scope. Our solution to this is equivalent
-to~\cite[Solution~1]{boehm07optimization}: we must ensure that the dynamic
+has gone out of scope. Similar to the high-level proposal mooted
+in~\cite[Solution~1]{boehm07optimization}, we must therefore ensure that the dynamic
 lifetime of a GC pointer matches, or exceeds, the static lifetime of the
-\lstinline{Gc<T>} owner. In this section, we first turn this
-solution into reality, and then show how to optimise it.
+\lstinline{Gc<T>} owner.
 
+Our solution relies on using \lstinline{Gc<T>}'s drop method to \emph{keep
+alive} GCed value for the static lifetime of the \lstinline{Gc<T>} itself. In
+other words, we ensure that the conservative GC cannot observe the GCed value
+being unused until all of its normal Rust owners of type \lstinline{Gc<T>} have
+gone out of scope.
 
-\subsection{Realising premature finaliser prevention}
-
-\jake{I think we need to first state what we want to do with this drop method (i.e. we want to insert compiler barriers so the \lstinline{Gc} lives long enough). We start talking by talking about drop methods but at this point the reader won't understand what they have to do with anything.}We want to delay the finalisation of a \lstinline{Gc<T>} value until at least the
-point that the \lstinline{Gc<T>} owner would be destructed. However,
-\lstinline{Gc<T>} is copyable
-(see~\cref{gc_is_copyable}) and copyable types in Rust cannot have
-destructors\footnote{This restriction was needed in Rust's past when `dynamic
-drops' (roughly speaking, the dropping of partially initialised values) led to
-a value's backing memory being zeroed when dropped. That has not been the case
-since 2016~\cite{klock14nonzeroing}, at which point the
-`copyable types cannot have destructors' restriction has been unnecessary.}.
-We first modify both Rust's type system and \rustc \jake{Isn't one a subset of the other? What about ``we modify \rustc's type system...''} so that
-\lstinline{Gc<T>} is allowed to have a destructor. This is a
-relatively simple change to both type system and implementation,
-changing only a handful of lines of code.
-
-However, we must be very careful with the resulting destructor: each copy of
-\lstinline{Gc<T>} ends up with a call to the destructor, so the destructor
-itself must be idempotent (for this reason, we do not allow other copyable types
-to have a destructor). Our task is made easier because \lstinline{Gc<T>} has no
-drop glue: Rust does not add a destructor for pointer types, and from the
-perspective of the type system \lstinline{Gc<T>} is simply a wrapper around a
-pointer type.
+However, there is one major problem to overcome: copyable types such as
+\lstinline{Gc<T>} are forbidden from having destructors. The fundamental
+challenge we have to solve is that each copied value will have a destructor
+called on it, which has the potential for an underlying value to be destructed
+more than once. \ourgc explicitly allows \lstinline{Gc<T>} -- but no other
+copyable type -- to have a destructor, but to ensure it doesn't cause surprises
+in the face of arbitrary numbers of copies, the destructor must be idempotent.
+Our task is made easier because \lstinline{Gc<T>} has no drop glue: Rust does
+not add a destructor for pointer types, and from the perspective of the type
+system \lstinline{Gc<T>} is simply a wrapper around a pointer type.
 
 We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
 is idempotent. Fortunately, this is sufficient for our purposes: we want the drop
 method to inhibit finalisation but that does not require run-time side effects.
-We therefore use a memory fence\jake{it's a compiler fence, it emits no CPU instructions but prevents the compiler from optimising (on this note, should we say barrier instead for consistency with the rest of the paper?} in the form of a \emph{keep-alive}
-function. Keep-alive functions have both compile-time and run-time effects:
-they prevent both compilers and CPUs from reordering computations around a given value.\jake{It doesn't prevent CPU reordering}
+We therefore use a memory fence in the form of a keep-alive
+function. For our purposes, memory fences have both compile-time and run-time effects:
+they prevent compilers from reordering computations around a given address;
+and the manner in which this prevention occurs also ensure that CPUs
+cannot reorder computations relevant to that address.
 Keep-alive functions are highly platform (compiler, operating
-system, and CPU) specific: we use \boehm's \lstinline{GC_keep_alive} function
+system, and CPU) specific: we use \boehm's \lstinline{GC_reachable_here}
+function\footnote{This is actually a macro, and our fork of \boehm provides a
+function \lstinline{GC_keep_alive} to expose the macro to Rust.}
 which abstracts over these details. \lstinline{Gc<T>}'s
 implementation of the \lstinline{Drop} trait therefore looks as follows:
 
@@ -780,7 +775,7 @@ gives a more formal version of this algorithm.
 \label{sec:fsa}
 
 In this section we address two problems: running finalisers on the same thread
-as a paused collector \jake{mutator?} can cause race conditions and deadlocks; and some safe destructors are not
+as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
 safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the second problem.
@@ -798,8 +793,8 @@ is not provably safe to be used as a finaliser in a \lstinline{Gc<T>}.
 \lstinline{Gc<T>} can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
-However, finalisers can dynamically extend the lifetime of a
-\lstinline{Gc<T>}\jake{I'm not sure about this phrasing. Don't we really mean ''finalisers can dynamically extend the lifetime of the inner \lstinline{&} rust ref''}: if a finaliser accesses a reference stored in a
+However, finalisers can dynamically extend the lifetime of a GCed value,
+including any stored reference: if a finaliser accesses a reference stored in a
 \lstinline{Gc<T>} it implicitly undermines Rust's borrow checking rules.
 The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
 from storing, directly or indirectly, references.
@@ -823,10 +818,7 @@ one of the following is true: there is an explicit \emph{negative
 implementation} of \lstinline{A} for \texttt{T}; or \texttt{T}
 contains a field that is not itself \lstinline{A}. Informally, we
 say that a negative implementation of an auto-trait \emph{pollutes} containing
-types. Auto traits can only be added by the compiler itself (i.e.~a user-level
-GC library could not use auto traits)\jake{Not true, but they are unstable, and feature-gated}, and they have some implications on
-backwards API compatibility\jake{I don't think they do?}: in our situation, since we are introducing GC to
-Rust, there are no such compatibility worries.
+types.
 
 We therefore introduce a new auto trait \lstinline{ReferenceFree}, which
 denotes a type which does not contain a reference. Crucially, \ourgc defines
@@ -863,7 +855,7 @@ raised.
 \label{fig:finaliser_deadlock}
 \end{figure}
 
-Virtually all destructors access shared state\jake{how are we defining shared state here? Is this really true, what about a MutexGuard, that doesn't access shared state? (providing it's not accessing a field of some shared pointer \lstinline{Arc/Rc} value)}, whether that is in the value they are
+Virtually all destructors access state, whether that is in the GCed value (or a subpart) they are
 attached to, or global state. When used as finalisers, accessing such state can
 be problematic, turning `correct' destructors into `incorrect' finalisers. For
 example, acquiring a lock can cause deadlocks if the mutator has already
@@ -904,26 +896,28 @@ see if those drop methods access elements that do themselves implement
 
 Simplifying slightly, rather than forcing an entire type to be thread-safe, FSA
 checks a weaker property: are destructor methods thread-safe? In essence, we check
-whether the fields that all transitively reachable drop methods directly or indirectly access implement
-\lstinline{Send} and \lstinline{Sync}\jake{This is correct but hard to parse}: accessing a field which does not implement
-both traits causes a type to fail FSA.
+all reachable code from a destructor to ensure that: any fields used implement both
+\lstinline{Send} and \lstinline{Sync}: and no thread locals are used. The latter
+check is necessary \laurie{i guess because \lstinline{LocalKey} is Send and Sync?}.
+
+\jake{It's occurred to me that we have not mentioned an edge-case: thread-locals. Finalisers must not access thread-locals because we're not on the same thread anymore. We used to have such a check in Alloy, but it's no longer there (I think it got splatted in a rebase, I'm going to re-add it}
 
 In safe Rust, the property we are checking is a non-strict subset of `does the containing
-type implement both \lstinline{Send} and \lstinline{Sync}?'. However, it is clearly
-of a different nature, moving from checking `obviously' static properties to
-`potentially' dynamic properties.\jake{I get what you're saying here, it's about whether the compiler could optimise away locks etc but it took me a few passes of this sentence to understand what was meant} Rust's semantics, as at the time of writing,
-do not undermine our assumptions and our examination of the compiler tool-chain
+type implement both \lstinline{Send} and \lstinline{Sync}?'. However, the two
+properties have subtly different natures: our original restriction checks `obviously' static properties,
+but the relaxed restriction deals with `potentially' dynamic properties. The latter
+is clearly harder to reason about: is it safe? We believe that
+this relaxed check is compatible with Rust's semantics (at least at the time of writing),
+and our examination of the compiler tool-chain
 (i.e.~\rustc and LLVM) showed that it does not implement the analyses and
-optimisations needed to undermine this assumption. Note that this assumption is
-not true for all languages (for example our assumption would be unsafe
+optimisations that could undermined our check. However, there are
+other languages and implementations where our check would not be valid
+(for example our assumption would be unsafe
 in Java due to synchronisation removal~\cite{wang06escape}). We leave as an
 open question to others as to whether Rust should deliberately permit or forbid
 such checks in its semantics.
 
-\jake{It's occurred to me that we have not mentioned an edge-case: thread-locals. Finalisers must not access thread-locals because we're not on the same thread anymore. We used to have such a check in Alloy, but it's no longer there (I think it got splatted in a rebase, I'm going to re-add it}
-
 \laurie{in our benchmark suite, how often does this relaxation make a difference?}\jake{I will post a write-up here once I have the numbers from all the benchmarks}
-
 
 \jake{I think we can make a more convincing argument though if we frame the
 relaxation as essential for cyclic data structures which drop: without the
@@ -931,6 +925,8 @@ relaxed rule, we could not allow \lstinline{Gc<T>}s to hold references to other
 Gcs if any of them had drop methods. This is because we'd have no idea whether
 those Gc's value reference a \lstinline{Gc} in their drop method from within a
 cycle (which is obviously unsound), and so we'd have to disallow those drops entirely.}
+\laurie{i don't get it: can you give me an example?}
+
 
 \subsection{Cycles and Finalisation}
 
@@ -950,7 +946,7 @@ cycle (which is obviously unsound), and so we'd have to disallow those drops ent
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
-data structures. However, finalisers can cause problems\jake{can be unsound?} if they change \jake{access}
+data structures. However, finalisers can can be unsound if they access
 state shared within a cycle. \cref{fig:finaliser_cycle} shows an example of undefined
 behaviour when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
