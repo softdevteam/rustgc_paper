@@ -1088,13 +1088,24 @@ easiest-to-grok error is as a result of running \ourgc}
 \toprule
   Benchmark & Version & Description \\
 \midrule
-  som-rs & VM git \#\laurie{...}  & SOM VM\\
-  yksom & VM git \#\laurie{...} & SOM VM\\
+  \somrsast & VM git \#\somrsversion  & SOM AST VM\\
+  \somrsbc & VM git \#\somrsversion  & SOM Bytecode VM\\
+  \yksom & VM git \#\yksomversion  & SOM Bytecode VM\\
+  \grmtools & \grmtoolsversion  & YACC compatible Lexer/Parser library\\
+  \sws & \swsversion  & HTTP/1 - HTTP/2 compliant web server\\
+  \minimoka & \minimokaversion  & Concurrent cache library for Rust\\
+  \binarytrees & Debian CLBG \binarytreesversion  & Stresses heap allocation\\
+  \regexredux & Debian CLBG \regexreduxversion  & Pattern matching very large expression\\
 \bottomrule
 \end{tabular}
   \caption{The benchmarks used in our experiments. We used the same version of
-  the `Are We Fast Yet?' benchmark suite (git\#\laurie{...}) for both som-rs
-  and yksom.}
+  the `Are We Fast Yet?' benchmark suite (git\#\awfyversion) for both \somrs
+  variants and \yksom. \sws is built on top of  the \emph{Hyper}
+  (\hyperversion) HTTP library, which uses atomic reference counting in its
+  implementation. We convert this to use \ourgc's \lstinline{Gc} type instead.
+  Both \grmtools and \regexredux benchmarks use Rust's \emph{Regex} library
+  (\regexversion), which we also converted from atomic reference counting to
+  \ourgc's \lstinline{Gc}. }
 \label{tab:benchmarks}
 \end{center}
 \end{table}
@@ -1133,8 +1144,8 @@ effectively turning 1 `benchmark' into another benchmark suite. For our
 purposes, the absolute performance of som-rs and yksom is less important than
 that each serves as a sanity check on the other.
 
-We ran our experiments on an unloaded Intel Xeon \laurie{CPU spec} with
-\laurie{xyz}GiB RAM, running Debian 12 (`bookworm'). We turned turbo boost and
+We ran our experiments on an unloaded \benchmarkcpu with
+\benchmarkram, running \benchmarkos. We turned turbo boost and
 hyper-threading off, as both can unpredictably alter performance. We used
 rebench \laurie{cite} to run benchmarks \laurie{all benchmarks or just som-rs
 and yksom AWFY?}, which performs additional mitigations (e.g.~\laurie{xyz}).
@@ -1155,18 +1166,18 @@ counting to track the roots for each garbage collected object. Second, it has a
 naive implementation of the mark-sweep algorithm and does not use parallel
 collector threads.
 
-\begin{figure}[t!]
-\begin{minipage}[b]{0.45\linewidth}
-    \includegraphics[width=\linewidth]{graphs/regex_redux.pdf}
-    \caption{Regex-Redux}
-\end{minipage}
-\hfill
-\begin{minipage}[b]{0.45\linewidth}
-    \includegraphics[width=\linewidth]{graphs/binary_trees.pdf}
-    \caption{Binary Trees}
-\end{minipage}
-  \caption{Computer Language Benchmark Games which perform heap allocation in Rust.\jake{TODO: These look really ugly, but I'm just getting the data in the paper and we can fix the aesthetics later.}}
-\end{figure}
+\begin{table}[h]
+\scalebox{0.7}{%
+  \input{table_overview}
+}
+  \caption{Overview of results across all benchmarks \jake{TODO: grmtools and
+  mini-moka}\jake{The \somrsbc results are showing the geomean over the entire
+  AWFY suite. I've calculated the CIs using the log approach. The other results
+  are taking the arithmetic mean with CIs calculated for arithmetic mean. The
+  geomean CIs have different upper and lower bounds so I'm not sure how best
+  to display them (we can't use \textpm)}}
+\end{table}
+
 
 \begin{figure}[t!]
     \centering
@@ -1215,34 +1226,6 @@ collector threads.
      subset of benchmarks on the Rebench benchmarking suite for 30 process
      executions, where I report 99\% confidence intervals.}
 \end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/yksom_barriers.pdf}
-     \caption{Results showing the performance of early finaliser prevention on
-     \yksom}
-\end{figure}
-
-\makeatletter
-\newcommand*\ExpandableInputBinTrees[1]{\@@input#1 }
-\makeatother
- \begin{table*}[t]
-     \begin{center}
-     \begin{tabular}{llll}
- \toprule
-\ExpandableInputBinTrees{./table_binary_trees.tex}
- \bottomrule
-     \end{tabular}
- \vspace{6pt}
-     \caption{Results from my experiment comparing \ourgc against three other
-         garbage collection configurations on the Binary Trees benchmark for 30
-         process executions, where I report 99\% confidence intervals. This
-         clearly shows that except for the index-arena (which deallocates all
-         its memory at once) \ourgc is the fastest configuration.}
-         \label{table:binary_trees}
-     \end{center}
-\end{table*}
-
 
 \section{Threats to validity}
 
