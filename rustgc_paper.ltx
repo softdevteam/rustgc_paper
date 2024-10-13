@@ -925,6 +925,13 @@ such checks in its semantics.
 \laurie{in our benchmark suite, how often does this relaxation make a difference?}\jake{I will post a write-up here once I have the numbers from all the benchmarks}
 
 
+\jake{I think we can make a more convincing argument though if we frame the
+relaxation as essential for cyclic data structures which drop: without the
+relaxed rule, we could not allow \lstinline{Gc<T>}s to hold references to other
+Gcs if any of them had drop methods. This is because we'd have no idea whether
+those Gc's value reference a \lstinline{Gc} in their drop method from within a
+cycle (which is obviously unsound), and so we'd have to disallow those drops entirely.}
+
 \subsection{Cycles and Finalisation}
 
 \begin{figure}[tb]
