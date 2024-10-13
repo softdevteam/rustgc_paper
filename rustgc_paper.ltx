@@ -1098,6 +1098,9 @@ easiest-to-grok error is as a result of running \ourgc}
   \regexredux & Debian CLBG \regexreduxversion  & Pattern matching very large expression\\
 \bottomrule
 \end{tabular}
+\end{center}
+
+  \vspace{5pt}
   \caption{The benchmarks used in our experiments. We used the same version of
   the `Are We Fast Yet?' benchmark suite (git\#\awfyversion) for both \somrs
   variants and \yksom. \sws is built on top of  the \emph{Hyper}
@@ -1107,7 +1110,6 @@ easiest-to-grok error is as a result of running \ourgc}
   (\regexversion), which we also converted from atomic reference counting to
   \ourgc's \lstinline{Gc}. }
 \label{tab:benchmarks}
-\end{center}
 \end{table}
 
 To understand the performance of \ourgc, and the various aspects that make it
@@ -1156,6 +1158,20 @@ intervals.
 
 \subsection{Results}
 
+\begin{table}[t]
+\scalebox{0.8}{%
+  \input{table_overview}
+}
+
+  \vspace{5pt}
+  \caption{Overview of results across all benchmarks \jake{TODO: grmtools and
+  mini-moka}\jake{The \somrsbc results are showing the geomean over the entire
+  AWFY suite. I've calculated the CIs using the log approach. The other results
+  are taking the arithmetic mean with CIs calculated for arithmetic mean. The
+  geomean CIs have different upper and lower bounds so I'm not sure how best
+  to display them (we can't use \textpm)}}
+\end{table}
+
 \autoref{table:binary_trees} shows the results for this experiment. The results
 shows that for Binary Trees (an allocation heavy benchmark)
 \textsc{Typed-arena} was the fastest as it never performs any deallocation
@@ -1166,17 +1182,6 @@ counting to track the roots for each garbage collected object. Second, it has a
 naive implementation of the mark-sweep algorithm and does not use parallel
 collector threads.
 
-\begin{table}[h]
-\scalebox{0.7}{%
-  \input{table_overview}
-}
-  \caption{Overview of results across all benchmarks \jake{TODO: grmtools and
-  mini-moka}\jake{The \somrsbc results are showing the geomean over the entire
-  AWFY suite. I've calculated the CIs using the log approach. The other results
-  are taking the arithmetic mean with CIs calculated for arithmetic mean. The
-  geomean CIs have different upper and lower bounds so I'm not sure how best
-  to display them (we can't use \textpm)}}
-\end{table}
 
 
 \begin{figure}[t!]
