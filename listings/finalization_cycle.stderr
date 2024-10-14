@@ -1,0 +1,16 @@
+error: `RefCell::new(GcNode{value: 2, nbr: None})` cannot be safely finalized.
+  --> finalization_cycle.rs:11:21
+   |
+7  |   fn drop(&mut self) { self.value = 0; println!("{}",
+			    self.nbr.unwrap().borrow().value); }
+   |                        --------
+   |                        |
+   |                        caused by the expression in `fn drop(&mut)` here because
+   |                        it uses a type which is not safe to use in a finalizer.
+...
+11 |   let gc2 = Gc::new(RefCell::new(GcNode{value: 2, nbr: None}));
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   			 has a drop method which cannot be safely finalized.
+   |
+   = help: `Gc` runs finalizers on a separate thread, so drop methods
+           must only use values whose types implement `Send + Sync + FinalizerSafe`.
