@@ -1182,20 +1182,16 @@ Smalltalk-esque language with a wide variety of implementations. \somrsast and
 SOM VMs into Rust that use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
 for this paper that is designed to be more idiomatic and higher performance.
 Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
-benchmark suite~\cite{marr16cross} , turning what appears to be 1 benchmark into 26
+benchmark suite~\cite{marr16cross}, turning what appears to be 1 benchmark into 26
 (mostly micro) benchmarks.
 
 One confounding factor we have controlled for is the underlying memory
-allocator. Without wishing to imply anything about the quality of \boehm as a
-`pure' allocator (i.e.~if we ignore its GC aspects), we observe that its core
-dates to the late 1980s. Allocator technology has moved on since and newer
-allocators have the advantage of being developed from the beginning to fit into
-modern hardware's performance quirks. Particularly in allocator intensive
-benchmarks, \boehm is noticably slower than its successors such as jemalloc
-\laurie{can we give readers a rough idea of by how much? we might be able to
-say something like ``In a subset of our experiments, this slowdown was in the
-range X-Y\%''?}. We therefore use \boehm as the allocator for all our
-benchmarks.
+allocator. \boehm's core dates to the 1980s and allocators have made
+many advances since. A quick experiment showed us that modern system
+allocators are much faster than \boehm: comparing \ourgc with \boehm
+to \rustc with a modern system allocator would be uncomfortably
+close to apples and oranges. We therefore use \boehm as the allocator
+for both \ourgc and \rustc.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wall clock time of a pexec or ...)}
@@ -1273,38 +1269,41 @@ collector threads.
 \label{graph:elision}
 \end{figure}
 
+
 \section{Threats to validity}
 
-We cannot state with certainty that the solutions we presented for finalizers'
-problems are complete or correct. We have introduced a number of new tests
-\laurie{how many?} into \ourgc's test suite to target specific problems. We
-have ported a number of existing programs to use \ourgc, since some GC problems
-only manifest at scale. However, we could undoubtedly have performed much wider
+We cannot state with certainty that the solutions we have presented are
+complete or correct. We have tried to mitigate this by relatively extensive
+testing. We have created a number of new tests inside our \rustc fork
+\laurie{how many?}. We also ported a number of existing programs to \ourgc --
+including programs that we did not expect to make good benchmarks -- since some
+GC problems only manifest at scale. However, we could undoubtedly have performed wider
 testing, investigated fuzzing, and so on: it is inevitable that there will be
-bugs in \ourgc that are entirely our fault (i.e.~are not simply inherited from
-\rustc or \boehm).
+bugs in \ourgc that are entirely our fault. Some of these bugs might have
+coloured our performance results.
 
 Our definition of the problems, the design of our solutions, and the way we
 implemented them are presented in a fairly informal manner. Though we must
-admit that this partly reflects our backgrounds, a formal definition, let alone
-verification, would be challenging for two reasons. First, the problematic
+admit that this partly reflects our backgrounds, a truly formal definition
+would be challenging for two reasons. First, at the time of
+writing, Rust's semantics remain imprecise and incomplete, though this
+situation is gradually improving. Second, the problematic
 aspects of GC we tackle in this paper have resulted from careful analysis of
 running systems (e.g.~\cite{boehm03destructors}): to the best of our knowledge,
-no formalism of GC exists which truly covers these aspects. We suspect this is
-a mixture of a lack of research on this problem and also the challenging
-temporal aspects, which may not be an easy fit with many existing formalisms.
-Perhaps the closest analogue is the evolving research literature on memory
-models which, in a sense, modern GC is a superset of. Second, at the time of
-writing, Rust's semantics remain somewhat imprecise and incomplete, though this
-situation is gradually improving.
+no formalism of GC exists which fully covers these aspects. We suspect this is
+a mixture of: a lack of research on this problem; the challenging
+temporal aspects of GC; and, possibly, a poor fit with existing formalisms.
+The closest analogue we know of is the evolving research literature on memory
+models which, in a sense, modern GC is a superset of.
 
 Any performance judgements we make are necessarily contingent on our particular
 benchmark suite. We cannot say, for example, that finalizer elision will always
 improve performance by the \laurie{X\%} we see in our experiment: there
-undoubtedly exist reasonable, non-pathological, programs which will gain more
-or less from such factors. It would help if there was a more widely accepted
-set of programs to serve as a benchmark for GC in Rust. Since the benchmark
-suite in this paper is the largest for any GC in Rust \laurie{is that true of
+undoubtedly exist reasonable, non-pathological, programs which will see
+performance changes beyond those our results suggest. Although the \Egcrc
+experiment requires a very specific benchmark suite, our other experiments
+would probably be a good fit for a standard benchmarking suite.
+Since the benchmark suite in this paper is the largest for any GC in Rust \laurie{is that true of
 Bronze?}, it may serve as a partial basis for such a suite in the future.
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
