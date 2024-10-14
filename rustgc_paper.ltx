@@ -944,6 +944,7 @@ fn main() {
 allowed. We'd de facto be preventing GC cycles from having finalisers because
 we can't tell if the finaliser derefs the \lstinline{nbr} field or not.}
 \laurie{this seems unrelated to Send+Sync? this is only relevant for `cycles and finalisation', right?}
+\jake{That's right. But I think it makes for a more convincing argument for relaxed FSA rather than the convenience factor}
 
 
 \subsection{Cycles and Finalisation}
