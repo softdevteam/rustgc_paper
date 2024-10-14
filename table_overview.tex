@@ -1,11 +1,10 @@
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-& \multicolumn{1}{c}{\binarytrees (ms)} & \multicolumn{1}{c}{\regexredux (ms)} & \multicolumn{1}{c}{\somrsbc (ms)} & \multicolumn{1}{c}{\sws (req/s)} \\
+& \multicolumn{1}{c}{\ourgc} & \multicolumn{1}{c}{\rc} & \multicolumn{1}{c}{\rustgc} & \multicolumn{1}{c}{\typedarena} & \multicolumn{1}{c}{\arc} \\
 \midrule
-\ourgc & 9888 \footnotesize{CI [54.82, 54.82]} & 4629 \footnotesize{CI [52.43, 52.43]} & 290 \footnotesize{CI [279.80, 301.56]} & 44280 \footnotesize{CI [1327.84, 1327.84]} \\
-Arc & - & - & - & 43730 \footnotesize{CI [3781.14, 3781.14]} \\
-Rc & 15193 \footnotesize{CI [81.92, 81.92]} & 4246 \footnotesize{CI [5.70, 5.70]} & 268 \footnotesize{CI [258.92, 277.46]} & - \\
-Rust-GC & 59304 \footnotesize{CI [1927.50, 1927.50]} & - & - & - \\
-Typed Arena & 1911 \footnotesize{CI [12.99, 12.99]} & - & - & - \\
+\binarytrees & - & 9691 \footnotesize{CI [87.12, 87.12]} & 15043 \footnotesize{CI [15.48, 15.48]} & 56913 \footnotesize{CI [115.53, 115.53]} & 1908 \footnotesize{CI [2.94, 2.94]} \\
+\regexredux & - & 4598 \footnotesize{CI [28.10, 28.10]} & 4219 \footnotesize{CI [3.01, 3.01]} & - & - \\
+\somrs & - & 283 \footnotesize{CI [269.94, 296.92]} & 266 \footnotesize{CI [253.88, 278.04]} & - & - \\
+\sws & 46992 \footnotesize{CI [518.34, 518.34]} & 47024 \footnotesize{CI [443.94, 443.94]} & - & - & - \\
 \bottomrule
 \end{tabular}

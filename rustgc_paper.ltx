@@ -1145,7 +1145,10 @@ want to compare programs a memory strategy such as \lstinline{Rc<T>} against
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates. Several that initially
 appeared suitable relied on unusual and/or unsafe features of their memory
-strategy that would have taken unreasonable time to adapt (\laurie{e.g.~XYZ}).
+strategy that would have taken unreasonable time to adapt (\emph{RustPython},
+\emph{Boa}, \emph{Rkyv}) while other popular crates did not seem like suitable
+candidates as they did not make use of other shared ownership strategies (e.g.
+\lstinline{Rc<T}) in their performance critical areas.
 
 \cref{tab:benchmarks} shows our eventual benchmark suite. \binarytrees and \regexredux
 are well-known microbenchmarks. \binarytrees is particularly allocation intensive.
@@ -1158,7 +1161,7 @@ extensively.
 Our suite also includes three SOM VMs. SOM is a small, but complete,
 Smalltalk-esque language with a wide variety of implementations. \somrsast and
 \somrsbc are existing implementations, both relatively faithful ports of a Java
-SOM VMs into Rust that use \laurie{rc or arc?}. yksom is a from-scratch rewrite
+SOM VMs into Rust that use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
 for this paper that is designed to be more idiomatic and higher performance.
 Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
 \cite{marr16cross} benchmark suite, turning what appears to be 1 benchmark into 26
@@ -1173,25 +1176,27 @@ them from their existing memory strategy to \ourgc.
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 intervals.
 
+\jake{We replaced the allocator with the \boehm for every benchmark so that we
+are comparing the strategies only. We should make a note of this in our threats
+to validity.}
+
+\jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
+
 
 \subsection{Results}
 
 \begin{table}[t]
-\scalebox{0.8}{%
+\scalebox{0.7}{%
   \input{table_overview}
 }
-
   \vspace{5pt}
   \caption{Overview of results across all benchmarks \jake{TODO: grmtools and
-  mini-moka}\jake{The \somrsbc results are showing the geomean over the entire
-  AWFY suite. I've calculated the CIs using the log approach. The other results
-  are taking the arithmetic mean with CIs calculated for arithmetic mean. The
-  geomean CIs have different upper and lower bounds so I'm not sure how best
-  to display them (we can't use \textpm)}\laurie{my suggestion is to switch the x and y axes around, then use a `midrule' to separate the SOM VMs from the rest; you can then report CIs in different ways in different parts of the table if necessary. that said, i don't understand why the geomean CIs wouldn't be symmetric given that our data is expected to be normally distributed}}
+  mini-moka}}
+  \label{table:overview}
 \end{table}
 
-\autoref{table:binary_trees} shows the results for this experiment. The results
-shows that for Binary Trees (an allocation heavy benchmark)
+\autoref{table:overview} shows the results for this experiment. The results
+shows that for \binarytrees (an allocation heavy benchmark)
 \textsc{Typed-arena} was the fastest as it never performs any deallocation
 during the benchmark run, it simply deallocates all memory at the end.
 
