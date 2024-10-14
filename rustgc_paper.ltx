@@ -776,9 +776,10 @@ gives a more formal version of this algorithm.
 
 In this section we address two problems: running finalisers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
-safe finalisers. Addressing the first problem is conceptually simple --
+safe finalisers. Addressing the former problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
-is sound. We therefore consider this a specific instance of the second problem.\jake{Should we reorder this now to fit with the new layout}
+is sound. We therefore consider this a specific instance of the latter problem,
+treating all equally in this section.
 
 In this section we introduce the three main factors that constitute
 Finaliser Safety Analysis (FSA).
@@ -877,7 +878,7 @@ In \ourgc, we wanted to ensure that users cannot accidentally find themselves
 making such a mistake. A first stab at this might seem to be that a
 \lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
 \lstinline{Gc<T>}. This would indeed prevent the mistakes we want to catch but
-at the cost of not allowing \lstinline{Gc<T>} to specify cyclic GC types!\jake{only with a drop method remember}
+at the cost of not allowing \lstinline{Gc<T>} with a finaliser to specify cyclic GC types!
 
 Our approach is therefore very different to normal Rust type checks: instead of
 checking an entire type, we check only that the type's destructor does not,
