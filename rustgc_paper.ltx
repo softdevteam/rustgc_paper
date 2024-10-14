@@ -1082,9 +1082,14 @@ pinpoints precisely which field or line in a drop method caused FSA to fail.
 is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}).
 \lstinline{EmitFinaliserUnsafeError} informs the user when a drop method
 contains code which is unsafe (e.g.~references a \lstinline{Gc<T>} type, an
-opaque function, etc.). \laurie{jake: let's add a figure showing whichever the
-easiest-to-grok error is as a result of running \ourgc}
+opaque function, etc.).
 
+\begin{figure}[tb]
+
+\lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily]{listings/finalisation_cycle.stderr}
+           \captionof{lstlisting}{The compiler error produced by FSA for the example in \cref{fig:finaliser_cycle}}
+\label{fig:finaliser_cycle_err}
+\end{figure}
 
 \section{Performance Evaluation}
 \label{sec:evaluation}
