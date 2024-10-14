@@ -9,7 +9,8 @@ LATEX_FILES = rustgc_paper.ltx
 PLOTS = plots/som_rs_bc_elision.pdf plots/som_rs_ast_elision.pdf \
 	 plots/som_rs_bc_barriers.pdf plots/som_rs_ast_barriers.pdf \
 	 plots/yksom_elision.pdf plots/yksom_barriers.pdf \
-	 plots/elision.pdf plots/barriers.pdf
+	 plots/elision.pdf plots/barriers.pdf \
+	 plots/grmtools.pdf plots/grmtools_mem.pdf
 
 all: rustgc_paper.pdf
 

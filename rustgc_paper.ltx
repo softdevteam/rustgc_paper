@@ -1505,6 +1505,21 @@ of the paper for those who may benefit from them.
 
 \begin{figure}[t!]
     \centering
+    \begin{subfigure}{0.45\textwidth}
+    \includegraphics[width=1\textwidth]{plots/grmtools.pdf}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.45\textwidth}
+    \includegraphics[width=1\textwidth]{plots/grmtools_mem.pdf}
+    \end{subfigure}
+    \caption{Performance (left) and memory (right) results of the \grmtools
+    experiment. Each benchmark is run for 30 process executions, where the
+    error bars represent 99\% confidence intervals.}
+\label{graph:barriers}
+\end{figure}
+
+\begin{figure}[t!]
+    \centering
     \begin{subfigure}{\textwidth}
     \includegraphics[width=1\textwidth]{plots/som_rs_ast_elision.pdf}
     \caption{\somrsast}
