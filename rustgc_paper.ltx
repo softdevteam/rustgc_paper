@@ -778,7 +778,7 @@ In this section we address two problems: running finalisers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
 safe finalisers. Addressing the first problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
-is sound. We therefore consider this a specific instance of the second problem.
+is sound. We therefore consider this a specific instance of the second problem.\jake{Should we reorder this now to fit with the new layout}
 
 In this section we introduce the three main factors that constitute
 Finaliser Safety Analysis (FSA).
@@ -856,7 +856,7 @@ raised.
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
-data structures. However, finalisers can can be unsound if they access
+data structures. However, finalisers can be unsound if they access
 state shared within members of a cycle. \cref{fig:finaliser_cycle} shows an example of undefined
 behaviour when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
@@ -877,7 +877,7 @@ In \ourgc, we wanted to ensure that users cannot accidentally find themselves
 making such a mistake. A first stab at this might seem to be that a
 \lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
 \lstinline{Gc<T>}. This would indeed prevent the mistakes we want to catch but
-at the cost of not allowing \lstinline{Gc<T>} to specify cyclic GC types!
+at the cost of not allowing \lstinline{Gc<T>} to specify cyclic GC types!\jake{only with a drop method remember}
 
 Our approach is therefore very different to normal Rust type checks: instead of
 checking an entire type, we check only that the type's destructor does not,
