@@ -1140,19 +1140,23 @@ We ran four main experiments:
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our experiment because in experiment \Egcrc we
-want to compare programs a memory strategy such as \lstinline{Rc<T>} against
+want to compare programs using existing shared ownership approaches such as \lstinline{Rc<T>} against
 \lstinline{Gc<T>}. We searched through tens of the most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
-package system) looking for suitable candidates. Several that initially
-appeared suitable relied on unusual and/or unsafe features of their memory
-strategy that would have taken unreasonable time to adapt (\emph{RustPython},
-\emph{Boa}, \emph{Rkyv}) while other popular crates did not seem like suitable
-candidates as they did not make use of other shared ownership strategies (e.g.
-\lstinline{Rc<T}) in their performance critical areas.
+package system) looking for suitable candidates. Many that use
+shared ownership strategies do not use them in performance
+critical areas (\laurie{give two examples}): any resulting benchmark would be
+unlikely to show anything of interest to this paper . Some relied on
+unusual and/or unsafe features of their memory strategy that were too difficult
+or time-consuming to adapt (e.g.~\emph{RustPython}, \emph{Rkyv}).
 
-\cref{tab:benchmarks} shows our eventual benchmark suite. \binarytrees and \regexredux
-are well-known microbenchmarks. \binarytrees is particularly allocation intensive.
-The remaining benchmarks are `real' libraries and programs: \grmtools is a
+\cref{tab:benchmarks} shows our eventual benchmark suite, including programs
+using the following shared ownership strategies: \lstinline{Arc<T>}, \lstinline{Rc<T>}, \rustgc (an existing GC for
+Rust), and \typedarena (an arena library). \binarytrees and \regexredux
+are well-known microbenchmarks. \binarytrees is both allocation intensive
+and sufficiently simple that we could port it to a variety of shared ownership strategies.
+The remaining benchmarks are `real' libraries and programs that we
+ported from their existing shared ownership strategy to \lstinline{Gc<T>}: \grmtools is a
 parsing library which uses \lstinline{Rc<T>} extensively; \minimoka
 \laurie{uses what?}; \sws is built on top of the \emph{Hyper} HTTP library,
 which itself uses the \emph{tokio} async runtime and uses \lstinline{Arc<T>}
@@ -1164,22 +1168,23 @@ Smalltalk-esque language with a wide variety of implementations. \somrsast and
 SOM VMs into Rust that use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
 for this paper that is designed to be more idiomatic and higher performance.
 Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
-\cite{marr16cross} benchmark suite, turning what appears to be 1 benchmark into 26
+benchmark suite~\cite{marr16cross} , turning what appears to be 1 benchmark into 26
 (mostly micro) benchmarks.
 
-Our benchmark suite includes programs which use the following memory
-strategies: \lstinline{Arc<T>}, \lstinline{Rc<T>}, \rustgc (an existing GC for
-Rust), and \typedarena (an arena library). We ported \binarytrees to each of
-these memory strategies and \ourgc. For all the other benchmarks, we ported
-them from their existing memory strategy to \ourgc.
+One confounding factor we have controlled for is the underlying memory
+allocator. Without wishing to imply anything about the quality of \boehm as a
+`pure' allocator (i.e.~if we ignore its GC aspects), we observe that its core
+dates to the late 1980s. Allocator technology has moved on since and newer
+allocators have the advantage of being developed from the beginning to fit into
+modern hardware's performance quirks. Particularly in allocator intensive
+benchmarks, \boehm is noticably slower than its successors such as jemalloc
+\laurie{can we give readers a rough idea of by how much? we might be able to
+say something like ``In a subset of our experiments, this slowdown was in the
+range X-Y\%''?}. We therefore use \boehm as the allocator for all our
+benchmarks.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
-intervals.
-
-\jake{We replaced the allocator with the \boehm for every benchmark so that we
-are comparing the strategies only. We should make a note of this in our threats
-to validity.}
-
+intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wall clock time of a pexec or ...)}
 \jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
 
 
@@ -1286,6 +1291,17 @@ or less from such factors. It would help if there was a more widely accepted
 set of programs to serve as a benchmark for GC in Rust. Since the benchmark
 suite in this paper is the largest for any GC in Rust \laurie{is that true of
 Bronze?}, it may serve as a partial basis for such a suite in the future.
+
+Using \boehm as the allocator for all benchmarks has the advantage of removing
+`pure' allocator performance as a confounding factor, but does mean that some
+of the performance characteristics of benchmarks will be changed (e.g.~the
+impact on CPU caches). A generic, modern conservative GC, using the insights of
+recent non-GC allocators, would probably give a better idea of the true
+performance of \ourgc relative to other shared ownership strategies.
+Unfortunately, we are not aware of work on a modern, generic conservative GC.
+Based on the work that modern allocators require, we suspect it would take
+several person years to develop a truly competitive generic, modern
+conservative GC.
 
 
 \section{Related work}
