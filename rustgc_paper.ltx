@@ -932,7 +932,7 @@ hence we refer to it as the \emph{finaliser thread}.
 
 We must therefore ensure that it is safe to run a type's destructor on the
 finaliser thread. A conservative definition is that \lstinline{Gc<T>} is
-is safe to use if \lstinline{T}'s destructor implements both of Rust's existing \lstinline{Send} (is a type safe to be
+is safe to use if \lstinline{T} implements both of Rust's existing \lstinline{Send} (is a type safe to be
 moved permanently from one thread to another?) and \lstinline{Sync} (is a type
 safe to be accessed from more than one thread?) auto traits.
 Note that it is not sufficient for \lstinline{T} to implement
@@ -990,9 +990,12 @@ called.
 In some cases, users are able to prove to their satisfaction that the resulting
 false positives are unnecessary (e.g.~because the C function they are calling
 has no side effects). They can then can override FSA's checks by implementing
-the unsafe \lstinline{FinalizerSafe} trait for a given type \jake{and Send + Sync too!}\laurie{why? i guess this is just ``one possible design choice'' but is there anything deeper going on?}\jake{FSA checks that all of these traits (Send + Sync + FinalizerSafe) are implemented for a type if any are not, then it borks. This makes it less nice to use, but it is a deliberate design decision (one that you told me to do :P!): FinalizerSafe is deliberately unimplemented on anything in the standard library that isn't both Send + Sync. If a user in an external crate has made something !Send or !Sync, then this would not apply to FinalizerSafe (they didn't know about it) and we could therefore potentially allow use of an unsafe type in a finaliser }. However, because
+the unsafe \lstinline{FinalizerSafe} trait for a given type\footnote{Note that
+this deliberately does not override the `does \lstinline{T} implement
+\lstinline{Send} and \lstinline{Sync} traits' check; users can provide (if
+necessary) unsafe implementations of those traits if they so desire.}. However, because
 this applies to a type, and thus all values that instantiate that type, it can
-be difficult to convince oneself that doing so is correct. \jake{Also because if they have to make something Send + Sync too, this can have implications for that type when used outside of Gc -- all of a sudden, the rest of Rust thinks that your \lstinline{T} is safe to access concurrently!}
+be difficult to convince oneself that doing so is correct.
 
 We therefore provide a second way of overriding FSA's checks with the
 \lstinline{FinalizerUnchecked<T>} newtype. In essence,
