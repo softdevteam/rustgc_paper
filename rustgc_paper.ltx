@@ -1335,29 +1335,30 @@ which were intended to model `full' GC, though whose implementation did not
 progress beyond reference counting. This support was removed\footnote{In commit
 \url{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}.}
 around a year before the first stable release of Rust. This was not the end
-of the story for `GC as a part of Rust', with the core team soon after
-defining the problem space in more detail~\citep{felix15specifying, felix16roots,
+of the story for `GC as a core part of Rust', with core Rust developers exploring
+the problem space in more detail~\citep{felix15specifying, felix16roots,
 manish16gc}. However, efforts in this direction seem to have petered out,
 at which point those interested in GC for Rust largely moved from anticipating
-\rustc support to expecting everything to be done in user-level libraries.
+\rustc support to expecting to have to do everything in user-level libraries.
 
 One of the earliest user-level GC for Rust libraries is
 \textsc{BaconRajanGC}~\citep{rustbacon}, an implementation of the well-known GC
 algorithm~\citep{bacon01concurrent}. This provides a type \lstinline{Cc<T>}
 which is similar in intention to \ourgc's \lstinline{Gc<T>}, though using
-reference counting and manually invoked tracing cycle detection via the
+reference counting and manually invoked cycle detection via the
 \lstinline{collect_cycles} function. In order for this function to correctly
 trace fields, users must manually implement a \texttt{Trace} trait which
-traverses a type's fields. Destruction in \textsc{BaconRajanGC} is largely
-deterministic: non-cycles have destructors run as soon as a reference count is
-0; cycles at the end of the \lstinline{collect_cycles} function. Destructors
+traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
 \cref{sec:fsa_rust_references}, \textsc{BaconRajanGC} imposes a \lstinline{T: Static}
 bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictive
 than \ourgc's \lstinline{Gc<T>}. However, unlike our approach in
 \cref{sec:cycles_and_finalization}, it does not prevent finalizers accessing
 shared data, and so seemingly safe destructors can undermined soundness (see
-\laurie{let's put an example in the appendix}).
+\laurie{let's put an example in the appendix}). Unlike most other GCs for
+Rust, destruction in \textsc{BaconRajanGC} can be
+seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
+0; GCed values inside cycles cycles at the end of the \lstinline{collect_cycles} function.
 
 Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
 covered in \cref{sec:destructor challenges}). \rustgc provides an API closer to
@@ -1368,15 +1369,15 @@ is not, and indeed cannot be, copyable, thus always requiring calls to
 tracing sweeps to identify cycles, though \rustgc performs cycle detection
 automatically (i.e.~it doesn't require manual calls to a function such as
 \lstinline{collect_cycles}). Drop methods are not used as finalizers: if a
-finalizer is required, a manual implementation of the \lstinline{Finalize}
-must be provided; though finalizer glue can be largely, though not fully (see
+finalizer is required, a manual implementation of the \lstinline{Finalize} trait
+must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by use of the provided
 \lstinline{trace} macro . \laurie{does \rustgc solve the `finalizers mustn't do
 things with cycles' problem?}
 
-To move beyond using reference counting at the core of a GC type, some Rust
-libraries have experimented with alternative mechanisms for findings roots. The
-experimental \shifgrethor~\cite{shifgrethor} requires \lstinline{Gc} values to
+To move beyond reference counting as an aspect of GC for Rust, some
+libraries have experimented with alternative mechanisms for finding roots.
+\shifgrethor~\cite{shifgrethor} requires \lstinline{Gc} values to
 be created by a \lstinline{Root<'root>} value; the former become references of
 the latter, implicitly tying the lifetime of a \lstinline{Gc<'root, T>} to a
 \lstinline{Root<'root>}. This allows roots to be precisely identified, but
@@ -1386,10 +1387,10 @@ to manually implement a \lstinline{Finalize} trait, though \shifgrethor's is
 more restrictive: not only can other GCed values not be accessed (implicitly
 solving the same problem as \cref{sec:cycles_and_finalization}) but any other
 type type without the same \lstinline{'root} lifetime as the GCed value is
-forbidden. In practise, this means that many finalizers are likely to require
-implementing the unsafe \lstinline{UnsafeFinalize} trait. One way of
-evaluating \shifgrethor is that it shows that accurately tracking GC roots
-in normal Rust is possible but difficult.
+forbidden. In practise, this means that many finalizers require
+implementing the unsafe \lstinline{UnsafeFinalize} trait. We view
+\shifgrethor as proof that accurately tracking GC roots
+in normal Rust is possible, though not yet easy.
 
 A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena}. In
 essence, \textsc{GcArena} uses `branding' in a similar way to
@@ -1408,13 +1409,10 @@ One of several extensions of \rustgc is \textsc{Bronze}, which aims to improve
 upon \rustgc in two ways~\citep{coblenz21bronze}. First, \textsc{Bronze} tries
 to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stackmaps (a run-time mechanism for accurately
-tracking active pointers). Precise tracking of GC roots has the  major
-advantage over \ourgc's conservative GC: \textsc{Bronze} cannot accidentally
-keep objects alive due to false positive `pointers'. However, as well as not
-tackling the problem that pointers can be cast to and from \lstinline{usize}
-(see \cref{sec:basic design}), \textsc{Bronze} does not track nested
-references. If a \lstinline{Gc<T>} is used as a field in a struct, it will not
-be tracked for GC purposes, leading to crashes. Second, tries to give GC in
+tracking active pointers). Unlike \ourgc, \textsc{Bronze} cannot accidentally
+keep objects alive due to false positive `pointers'. However, \textsc{Bronze}
+does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it will not
+be tracked for GC purposes, leading to crashes. Second, \textsc{Bronze} tries to give GC in
 Rust similar semantics to non-ownership languages such as Java. It does this by
 allowing shared mutation, undermining Rust's borrow checker, and undermining
 the soundness of seemingly safe Rust code (see \cref{lst:bronze_unsound} for an
