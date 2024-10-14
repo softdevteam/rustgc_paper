@@ -1,6 +1,6 @@
 ALLOYSV=0772ea06e71bd5643688a90a5b61fd980e8cfc92
 EXAMPLES=first_example.out rc_example.out dangling_reference.stderr \
-	 finaliser_deadlock.stderr
+	 finalizer_deadlock.stderr
 
 
 all: $(EXAMPLES)

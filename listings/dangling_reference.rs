@@ -12,7 +12,7 @@ fn main() {
    let gc1 = Gc::new(GcNode{value: &*b, nbr: None});
  } // b is dropped and its memory deallocated
 
- // causes `gc::drop` finaliser to run which
+ // causes `gc::drop` finalizer to run which
  // holds a reference to `b`.
  force_gc();
 }
