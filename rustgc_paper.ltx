@@ -171,16 +171,18 @@ intellectually stimulating, but of no practical value.
 However, there are many programs which need to express data structures which
 are sound but which do not fit into the restrictions of affine types and
 ownerships. These are often described as `cyclic data-structures', though
-the mere potential for cycles is sufficient to cause the problem
-(e.g.~interpreters for dynamically typed languages are examples of programs
-which must be able to create cycles, though they may not always do so).
+that sometimes gives the incorrect impression that only data structures
+such as linked lists are of interest. In reality, programs as diverse as
+interpreters for dynamically typed languages have need to use such types,
+so we prefer the slightly more abstract term `shared ownership'.
+(e.g.~interpreters for dynamically typed languages
 Rust cannot directly express
 such programs, forcing programmers to use various workarounds
 
 Probably the most common -- or, at least, the most easily recognised in other's
 code -- workaround is the reference counting type \lstinline{Rc<T>} in Rust's
 standard library. For many data-structures, reference counting is a reasonable
-solution, but using it for values which may have multiple owners requires
+solution, but using it for values which may have shared ownership requires
 juggling strong and weak counts. This complicates the program (see~\cref{fig:rc_example}) and makes
 it easy for values to live for shorter or longer than intended.
 
@@ -191,15 +193,13 @@ stale, dangle, or may never have been valid in the first place. The programmer
 must also manually deal with issues such as detecting unused values,
 compaction, and so on. In other words, such workarounds force the programmer
 to write a partial GC themselves. A variant on this idea are
-arenas, which gradually accumulate multiple values but free all of them in one go: values
+\emph{arenas}, which gradually accumulate multiple values but free all of them in one go: values
 can no longer be reclaimed too early, but, equally, individual values cannot be
 reclaimed until all values are determined to be unneeded.
 
 A type-based approach is \lstinline{GhostCell}s~\cite{yanovski21ghostcell},
-which allow data-structures that have multiple owners to be built
-by statically guaranteeing that
-there is a single owner for the entire data-structure at any point in the
-program. However, this implicitly prevents multiple owners (e.g.~in different threads)
+which allows shared ownership there is a single owner for an entire data-structure at any
+given point in the program. However, this implicitly prevents multiple owners (e.g.~in different threads)
 from reading or mutating different parts of the structure.
 
 Although it is easily overlooked, some workarounds (e.g.~\lstinline{Rc<T>})
@@ -235,8 +235,7 @@ A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
 from the roots can then be \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
-in most GC literature, henceforth we use `GC' to mean `tracing GC' unless
-explicitly stated otherwise.
+in most GC literature, henceforth we use `GC' to mean `tracing GC'.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}, though in practise all heap memory in \ourgc is allocated by the
@@ -245,7 +244,7 @@ same conservative GC. We use the term `GC value' to refer both to the pointer wr
 pointers / wrappers can refer to a single value on the heap, unless doing so
 would lead to ambiguity.
 
-We use ``\ourgc'' to refer to the combination of: our extension to the Rust
+We use `\ourgc' to refer to the combination of: our extension to the Rust
 language; our modifications to the \lstinline{rustc} compiler; and our
 integration of the Boehm-Demers-Weiser GC (\boehm) into the runtime of programs
 compiled with our modified \lstinline{rustc}.
@@ -297,11 +296,11 @@ keyword still allows arbitrary conversions.}.
 
 \label{conservative_gc}
 Having acknowledged that pointers may end up disguised as integers, it is then
-inevitable that \ourgc must be a conservative GC: if, when considered as a
-pointer, a reachable word's address falls within a GCed block of memory,
+inevitable that \ourgc must be a conservative GC: if a machine word's integer
+value, when considered as a pointer, falls within a GCed block of memory,
 then that block itself is considered reachable (and thus transitively scanned).
 Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
-bits that also happens to make it a valid pointer, this over-approximates the
+bits that happens to match a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
 most extensive study we know of suggests the false detection rate in Java
 programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
@@ -340,7 +339,7 @@ than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion and have
-added or changed approximately 3,150 Lines Of Code (LOC). Users must opt-in
+added or changed approximately 3,150 Lines of Code (LoC). Users must opt-in
 to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
 
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
@@ -364,12 +363,11 @@ then can scan their stacks, but (for bootstrapping
 reasons) it is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm.
 
-We made one conceptually larger -- though fairly small in terms of lines of
-code (~60LoC) -- change to \boehm, to run all finalisers on a
+We made one conceptually larger -- though only 60LoC -- change to \boehm, to run all finalisers on a
 separate thread (see~\cref{sec:general_challenges,sec:fsa_finaliser_thread} for
 motivation). We lazily create a thread dedicated to this once the collector has
 first identified objects that need finalising. The finaliser thread then runs
-until the end of the program waiting for further work; rather than spinning,
+until the end of the program waiting for further work;
 the collector notifies the finaliser thread of additional work via a condition
 variable.
 
@@ -377,7 +375,7 @@ variable.
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
-When a value in Rust is \emph{dropped} (e.g.~the value's owner went out of lexical
+When a value in Rust is \emph{dropped} (i.e.~the value's owner went out of lexical
 scope) its destructor is automatically run. Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
 automatically inserted \emph{drop glue}. Drop methods are optional; users
@@ -397,8 +395,8 @@ implement their own drop methods.
 
 Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
-a \lstinline{Finalise} trait. If a user type needs to be finalised, then
-the user must provide an implementation of the \lstinline{Finalise} trait for that type.
+a \lstinline{Finalize} trait. If a user type needs to be finalised, then
+the user must provide an implementation of the \lstinline{Finalize} trait for that type.
 However, doing so introduces a number of problems: (1) external libraries are
 unlikely to provide finalisers; (2) Rust's \emph{orphan
 rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
@@ -408,18 +406,18 @@ designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
 cannot replicate \rustc's refusal to allow calls to the equivalent of
 \lstinline{Drop::drop}.
 
-Programmers can workaround problems (1) and (2) in various ways. For example,
+Programmers can work around problems \#1 and \#2 in various ways. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalisers on those instead~\cite[Section~19.3]{klabnik18rust}.
 Doing so is tedious but not conceptually difficult.
 
-Problem (3) has partial solutions: for example, ~\cite{manish15rustgc} uses the
+Problem \#3 has partial solutions: for example, ~\cite{manish15rustgc} uses the
 \lstinline{Trace} macro to generate `finaliser glue' (our term) for
-\lstinline{struct} fields. This runs into an unsolvable variant of problem (2):
+\lstinline{struct} fields. This runs into an unsolvable variant of problem \#2:
 types in external libraries will not implement this trait and cannot be
 recursively scanned for finaliser glue.
 
-Problem (4) is impossible to solve in Rust as-is. One cannot define a function
+Problem \#4 is impossible to solve in Rust as-is. One cannot define a function
 that can never be called --- what use would such a function have? It might seem
 tempting to have the \lstinline{finalise} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
@@ -454,18 +452,18 @@ destructor~\cite[section~3.4]{boehm03destructors}.
 A less obvious difference relates to where destructors and finalisers are run.
 Destructors run in the same thread as the last owner of a value.
 However, running finalisers in the same thread as the last owner of the value
-ran in can cause race conditions and deadlocks if one or more finalisers try to access a resource that the mutator
+ran in can cause race conditions and deadlocks if one or more finalisers tries to access a resource that the mutator
 expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
-Although such problems can
-affect destructors, this is a clear case of programmer error, since they should
-have taken into account the predictable execution point of destructors. Since
+When such problems affect destructors in normal Rust code, it is the clear result of programmer error, since they should
+have taken into account the predictable execution point of destructors. However, since
 finalisers have no such predictable execution point, there is no way for finalisers
-to safely access shared resources if they are run on the same thread. Such
-problems can only be avoided by running
-finalisers on a non-mutator thread: however, not all Rust destructors
+to safely access shared resources if they are run on the same thread.
+In other words, running correct destructors as finalisers can cause nondeterministic
+problems. The only way to avoid this to run
+finalisers on a non-mutator thread: however, not all Rust types / destructors
 are safe to run on another thread.
 
-Finalisation and cycles are not happy bedfellows: finalisers
+Finally, finalisation and cycles are not happy bedfellows: finalisers
 can reference other GCed values that are partly, or wholly, `finalised' and may
 even have had their backing memory reused. A related, but
 distinct, problem is the ability of finalisers to `resurrect' values by
@@ -483,9 +481,9 @@ Over time, finalisers have come to be viewed with increasing suspicion. Java,
 for example, has deprecated, and intends eventually removing, per-type
 finalisers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
 prevents problems such as object resurrection~\cite{goetz21deprecated}. It
-is important to differentiate such mechanisms from the \lstinline{Finalise} trait that many existing GCs for
+is important to differentiate such mechanisms from the \lstinline{Finalize} trait that many existing GCs for
 Rust force users to manually implement: cleaners impose restrictions
-to make finalisers less problematic; existing \lstinline{Finalise} traits
+to make finalisers less problematic; existing \lstinline{Finalize} traits
 do not impose any such restrictions.
 
 Our desire that \ourgc should use existing Rust destructors as finalisers whenever
@@ -501,7 +499,7 @@ problems down into four:
 Fortunately for us, Rust's unusual static guarantees, suitably expanded by
 \ourgc, allow us to address each problem in novel, satisfying, ways. In the following
 section, we tackle these problems in the order above, noting that we tackle problems
-(1) and (2) separately, and (3) and (4) together.
+\#1 and \#2 separately, and \#3 and \#4 together.
 
 
 \section{Finaliser Elision}
@@ -517,7 +515,7 @@ must be maintained, whereas destructors can be run immediately; since finalisers
 some time after the last access of a value, running them is more likely to involve
 cache misses; and so on. Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
-not suggest that optimisations of the necessary magnitude could be made to it.
+not suggest that it is missing optimisations which would reduce most of this overhead.
 
 Instead, whenever possible, \ourgc \emph{elides} finalisers so that they do not need to be run at all.
 We are able to do this because many Rust destructors
@@ -526,7 +524,7 @@ such destructors are unnecessary.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
-by \lstinline{Box}'s drop method. We then make two observations. First,
+by \lstinline{Box}'s drop method. We can then make two observations. First,
 \lstinline{Box<T>}'s drop method solely consists of a call to \lstinline{free}\footnote{The
 function in the Rust API is actually called \lstinline{deallocate}, but that
 jars with the terminology we use elsewhere.}. Second, while we informally say
@@ -573,25 +571,26 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \label{requires_finaliser_intrinsic}
 The aim of finaliser elision is to statically determine which type's destructors do
 not require corresponding finalisers and elide them. Our approach is conservative,
-and deals correctly with drop glue and nested data types. We implement the approach
-shown in \cref{alg:elision} a \rustc compiler intrinsic \lstinline{requires_finaliser}.
+and deals correctly with drop glue.
 
-In essence, \cref{alg:elision} says that any type which implements
+The high-level \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalisation unless it also implements the
 new \lstinline{DropMethodFinaliserElidable} \emph{marker trait} (i.e.~a
 trait without methods). This trait and can be
 used by a programmer to signify that a type's drop method need
-not be called if the type is placed inside a \lstinline{Gc<T>}. However,
-\lstinline{DropMethodFinaliserElidable} only refers to the `top-level' type: if
-a transitively reachable field has a type which implements the \lstinline{Drop}
-trait but not the \lstinline{DropMethodFinaliserElidable} trait, then the
-top-level type still requires finalisation. This latter qualification is
-necessary to deal with drop glue.
+not be called if the type is placed inside a \lstinline{Gc<T>}. The `Drop'
+part of the trait name is deliberate: it allows the programmer to reason
+only about the `top-level' type. If the type has a transitively reachable field
+has a type which implements the \lstinline{Drop} trait but not the
+\lstinline{DropMethodFinaliserElidable} trait, then then the top-level type
+still requires finalisation. This not only checks drop glue, but allows the
+programmer to safely reason about types with type parameters without knowing
+the concrete types passed to those parameters.
 
 Even though neither normal Rust destructors or \ourgc finalisers are guaranteed
 to run, a program whose destructors or finalisers never run would probably not
-be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We have
-therefore chosen to make \lstinline{DropMethodFinaliserElidable} an unsafe
+be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We
+therefore make \lstinline{DropMethodFinaliserElidable} an unsafe
 trait, because implementing it inappropriately is likely to lead undesired
 (though not incorrect!) behaviour at run-time. To implement it one therefore
 needs to opt in to unsafe Rust:
@@ -604,7 +603,7 @@ unsafe impl<T> DropMethodFinaliserElidable for Box<T> {}
 \lstinline{DropMethodFinaliserElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
 not only are these types' drop methods compatible as-is with \lstinline{DropMethodFinaliserElidable},
-but these types are widely used in real Rust code: as we shall see in \cref{sec:evaluation},
+but they are extensively used in real Rust code: as we shall see in \cref{sec:evaluation},
 they are an important part of allowing us to elide significant numbers of finalisers in real code.
 
 \begin{figure}[t]
@@ -629,14 +628,15 @@ impl<T> Gc<T> {
 \end{figure}
 
 \cref{listing:elision_in_rustc} shows how we use the \lstinline{const} compiler intrinsinc
-\lstinline{requires_finaliser}. \lstinline{Gc::new} uses this intrinsic to decide
+\lstinline{requires_finaliser} to turn \cref{alg:elision} into reality in our
+\rustc fork. \lstinline{Gc::new} uses this intrinsic to decide
 whether a finaliser must be registered or not. Although this looks like
 a dynamic check, in fully optimised builds it turns into a static
 check: \lstinline{requires_finaliser} is
 evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
-finaliser' checks have no run-time cost at all.
+finaliser?' checks have no run-time cost at all.
 
 
 \section{Premature Finaliser Prevention}
@@ -677,7 +677,7 @@ show how we can turn a seemingly inefficient
 approach to premature finalisation prevention into a viable solution.
 
 There are two aspects to premature finalisation. First, language
-specifications often do not define, or not precisely define, when the earliest point that a value can
+specifications often do not define, or do not precisely define, when the earliest point that a value can
 be finalised is. While this means that, formally, there is no `premature' finalisation,
 it seems unlikely that language designers anticipated some of the resulting
 implementation surprises (see e.g.~this example in
@@ -714,9 +714,10 @@ We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
 is idempotent. Fortunately, this is sufficient for our purposes: we want the drop
 method to inhibit finalisation but that does not require run-time side effects.
 We therefore use a memory fence in the form of a keep-alive
-function. For our purposes, memory fences have both compile-time and run-time effects:
+function. Simplifying somewhat, memory fences can be thought of as having both
+compile-time and run-time effects:
 they prevent compilers from reordering computations around a given address;
-and the manner in which this prevention occurs also ensure that CPUs
+and the manner in which this is done also also ensures that CPUs
 cannot reorder computations relevant to that address.
 Keep-alive functions are highly platform (compiler, operating
 system, and CPU) specific: we use \boehm's \lstinline{GC_reachable_here}
@@ -774,7 +775,7 @@ gives a more formal version of this algorithm.
 \section{Finaliser Safety Analysis}
 \label{sec:fsa}
 
-In this section we address two problems: running finalisers on the same thread
+In this section we address two high-level problems: running finalisers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
 safe finalisers. Addressing the former problem is conceptually simple --
 finalisers must be run on a separate thread -- but we must ensure that doing so
@@ -797,15 +798,13 @@ subject to Rust's normal borrow checker rules and cannot outlive the reference.
 However, finalisers can dynamically extend the lifetime of a GCed value,
 including any stored reference: if a finaliser accesses a reference stored in a
 \lstinline{Gc<T>} it implicitly undermines Rust's borrow checking rules.
-The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
-from storing, directly or indirectly, references.
 
-While storing references in
-a \lstinline{Gc<T>} might seem pointless -- after all, doing so prevents the
-\lstinline{Gc<T>} from having a dynamic lifetime, which is part of the utility
-of a GC -- it is sometimes useful, including when
-one is refactoring or experimenting with existing code.
-FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
+The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
+from storing, directly or indirectly, references. This might seem to be
+no great loss: storing references in a \lstinline{Gc<T>} largely nullifies
+the `GCness' of \lstinline{Gc<T>}. We have found, however, that when refactoring
+or experimenting with existing code, it is useful to be able to store references
+in \lstinline{Gc<T>}. FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finaliser (i.e.~\lstinline{T}
 has no destructor, or finaliser elision has removed the \lstinline{Gc<T>}'s
 finaliser).
@@ -875,18 +874,18 @@ have been broken, though they still have to deal with the consequences
 manually.
 
 In \ourgc, we wanted to ensure that users cannot accidentally find themselves
-making such a mistake. A first stab at this might seem to be that a
-\lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
+making such a mistake. A first attempt at enforcing such a property might
+seem to be that a \lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
 \lstinline{Gc<T>}. This would indeed prevent the mistakes we want to catch but
-at the cost of not allowing \lstinline{Gc<T>} with a finaliser to specify cyclic GC types!
+at the cost of not allowing \lstinline{Gc<T>} with a finaliser to specify shared ownership!
 
 Our approach is therefore very different to normal Rust type checks: instead of
 checking an entire type, we check only that the type's destructor does not,
-directly or indirectly, access a \lstinline{Gc<T>}. This is implicitly a strict
+directly or indirectly, access a \lstinline{Gc<T>}. This is implicitly a non-strict
 subset of the normal type check, allowing GCed types to express cycles so long
 as their destructor(s) do not access other GC types.
 
-To make this check easier to implement, we we introduce
+To make this check easier to implement, we introduce
 another auto trait \lstinline{FinalizerSafe}, with a negative implementation on
 \lstinline{Gc<T>}:
 
@@ -915,9 +914,9 @@ check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 \label{fig:finaliser_deadlock}
 \end{figure}
 
-Virtually all destructors access state, whether that is in the GCed value (or a subpart) they are
+Virtually all destructors access state, whether that is in the GCed value they are
 attached to, or global state. When used as finalisers, accessing such state can
-be problematic, turning `correct' destructors into `incorrect' finalisers. For
+be problematic, turning sound destructors into unsound finalisers. For
 example, acquiring a lock can cause deadlocks if the mutator has already
 acquired that lock and the finaliser is run on the same thread as the
 mutator~\cite[Section~3.3]{boehm03destructors}. Locks are not the only problem:
@@ -948,16 +947,12 @@ the underlying value simultaneously.
 
 Requiring that finalisation is only possible for types that implement both \lstinline{Send} and
 \lstinline{Sync} can occasionally be frustrating, in part because more types
-implement \lstinline{Send} than \lstinline{Sync}.
-
-FSA thus experimentally extends the destructor-checking approach of
-\cref{sec:fsa_finaliser_thread}, ensuring the relaxed property that destructors
+implement \lstinline{Send} than \lstinline{Sync}. Experimentally, FSA
+does not check that the top-level types implement \lstinline{Send} than \lstinline{Sync},
+instead extending the destructor-checking approach of
+\cref{sec:fsa_finaliser_thread}: destructors
 may only access fields that implement both \lstinline{Send} and
-\lstinline{Sync}. However, this allows destructors to access thread locals,
-which is clearly incompatible with running finalisers on another thread. To
-ensure that destructors do not access thread locals, we piggy back off the
-existing \lstinline{FinalizerSafe} auto trait, adding a negative implementation
-to the \lstinline{LocalKey} type that represents thread locals.
+\lstinline{Sync}.
 
 This relaxed check is undoubtedly more dangerous than that of
 \cref{sec:fsa_finaliser_thread}, which is why we mark it as experimental. We
@@ -982,7 +977,7 @@ reachable from those drop methods satisfies those properties. Currently,
 function calls which are inlined are checked in detail, but all other function
 calls are assumed it fails to meet the stated
 property. Calls to non-lined normal Rust functions are not checked due to
-a minor limitation inside \ourgc, but other function calls are fundamentally
+a minor limitation inside \ourgc. Other kinds of function call are fundamentally
 hard or impossible to check, specifically: calls to externally linked (e.g.~an FFI
 call to C) function; or dynamic dispatch calls in \emph{trait objects}, where we can't
 tell which of many possible implementations of a method will actually be
@@ -998,10 +993,10 @@ satisfy the static trait implementation.
 
 One way to sidestep this problem is to provide a newtype that allows only a
 subset of values to be declared as safe to use in a finaliser: the newtype
-implements the \lstinline{FinalizerSafe}, \lstinline{Send}, or \lstinline{Sync}
+implements the \lstinline{FinalizerSafe}, \lstinline{Send}, and \lstinline{Sync}
 traits, implicitly blessing the type it wraps. We found a particular need for
 this when interfacing with external GC-unaware libraries. \ourgc thus provides
-a standard newtype {FinalizerUnchecked<T>} which allows allows users to inform
+a standard newtype \lstinline{FinalizerUnchecked<T>} which allows allows users to inform
 FSA that certain uses of
 a type \lstinline{T} satisfy its properties. We still want to require the user
 to explicitly opt-in to unsafe Rust when using
@@ -1330,7 +1325,7 @@ Unlike \ourgc, destruction in \citep{rustbacon} is deterministic: it occurs as
 soon as an object's last owner is gone; in the case of cyclic garbage, this
 means after the user calls \lstinline{collect_cycles}. However, like \ourgc it
 relies on the \lstinline{Drop} trait for destruction and does not implement
-it's own \lstinline{Finalise} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
+it's own \lstinline{Finalize} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
 This prevents the trapdoor reference in finalisers problem explained in
 \jake{section FSA}.
 
