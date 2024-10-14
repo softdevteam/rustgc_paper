@@ -1205,40 +1205,43 @@ counting to track the roots for each garbage collected object. Second, it has a
 naive implementation of the mark-sweep algorithm and does not use parallel
 collector threads.
 
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/som_rs_perf.pdf}
-    \caption{Results from the \somrs micro-benchmark experiment, where the SOM
-    benchmark suite is run to compare two configurations of \somrs: \somrsrcbdwgc, where SOM objects are managed with RC but use the BDWGC's allocator with GC disabled; and \somrsgc, where SOM objects are managed using \ourgc's GC library, which uses the BDWGC's allocator. Each benchmark is run for 100 process
-    executions, where the error bars represent 99\% confidence intervals.}
-\label{graph:som_rs_finalisers}
-\end{figure}
+% \begin{figure}[t!]
+%     \centering
+%     \includegraphics[width=1\textwidth]{plots/som_rs_perf.pdf}
+%     \caption{Results from the \somrs micro-benchmark experiment, where the SOM
+%     benchmark suite is run to compare two configurations of \somrs: \somrsrcbdwgc, where SOM objects are managed with RC but use the BDWGC's allocator with GC disabled; and \somrsgc, where SOM objects are managed using \ourgc's GC library, which uses the BDWGC's allocator. Each benchmark is run for 100 process
+%     executions, where the error bars represent 99\% confidence intervals.}
+% \label{graph:som_rs_finalisers}
+% \end{figure}
 
 \begin{figure}[t!]
     \centering
-    \includegraphics[width=1\textwidth]{graphs/som_rs_finalisers.pdf}
+    \begin{subfigure}{0.4\textwidth}
+    \includegraphics[width=0.9\textwidth]{plots/elision.pdf}
+    \caption{Performance}
+    \end{subfigure}
+    \begin{subfigure}{0.4\textwidth}
+    \includegraphics[width=0.9\textwidth]{plots/elision.pdf}
+      \caption{Peak Memory \jake{TODO replace graph}}
+    \end{subfigure}
     \caption{Results of a performance of \somrs using two configurations: naive
     finalisation (where no optimisation is performed); and \ourgc's finaliser
     elision optimisation (where finalisers which are used only to deallocate
     memory are removed). Each benchmark is run for 30 process executions, where
     the error bars represent 99\% confidence intervals.}
-\label{graph:som_rs_finalisers}
+\label{graph:elision}
 \end{figure}
 
 \begin{figure}[t!]
     \centering
-    \includegraphics[width=1\textwidth]{graphs/yksom_finalisers.pdf}
-    \caption{Results of a performance of \yksom using two configurations: naive
-    finalisation (where no optimisation is performed); and \ourgc's finaliser
-    elision optimisation (where finalisers which are used only to deallocate
-    memory are removed). Each benchmark is run for 30 process executions, where
-    the error bars represent 99\% confidence intervals.}
-\label{graph:yksom_finalisers}
-\end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \includegraphics[width=1\textwidth]{graphs/som_rs_barriers.pdf}
+    \begin{subfigure}{0.4\textwidth}
+    \includegraphics[width=0.9\textwidth]{plots/barriers.pdf}
+    \caption{Performance}
+    \end{subfigure}
+    \begin{subfigure}{0.4\textwidth}
+    \includegraphics[width=0.9\textwidth]{plots/barriers.pdf}
+      \caption{Peak Memory \jake{TODO replace graph}}
+    \end{subfigure}
      \caption{Results showing the performance of early finaliser prevention on
      \somrs, which uses three configurations: \textit{None} where there are
      no compiler barriers (which is unsound); \textit{All}, where every
@@ -1247,6 +1250,7 @@ collector threads.
      certain they are unnecessary. Each configuration is compared using a
      subset of benchmarks on the Rebench benchmarking suite for 30 process
      executions, where I report 99\% confidence intervals.}
+\label{graph:elision}
 \end{figure}
 
 \section{Threats to validity}
@@ -1526,5 +1530,69 @@ from the main body of the paper for those who may benefit from them.
   the control flow.}
   \label{alg:barrier_removal}
 \end{figure}
+
+\clearpage
+
+\section{Detailed Plots}
+
+In this appendix, we show detailed plots for the experiments from the main body
+of the paper for those who may benefit from them.
+
+\begin{figure}[t!]
+    \centering
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/som_rs_ast_elision.pdf}
+    \caption{\somrsast}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/som_rs_bc_elision.pdf}
+    \caption{\somrsbc}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/yksom_elision.pdf}
+    \caption{\yksom}
+    \end{subfigure}
+    \caption{Results of a performance of \Eelision using two configurations: naive
+    finalisation (where no optimisation is performed); and \ourgc's finaliser
+    elision optimisation (where finalisers which are used only to deallocate
+    memory are removed). Each benchmark is run for \benchmarkpexecs process executions, where
+    the error bars represent 99\% confidence intervals.}
+\label{plot:elision_breakdown}
+\end{figure}
+
+\begin{figure}[t!]
+    \centering
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/som_rs_ast_barriers.pdf}
+    \caption{\somrsast}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/som_rs_bc_barriers.pdf}
+    \caption{\somrsbc}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/yksom_barriers.pdf}
+    \caption{\yksom}
+    \end{subfigure}
+     \caption{Results showing the performance of \Epremopt on the SOM VMs, each
+     of which use three configurations: \textit{None} where there are no
+     compiler barriers (which is unsound); \textit{All}, where every single
+     \lstinline{Gc} reference has a corresponding barrier; and \textit{None},
+     where barriers are optimised away using \ourgc's optimisation (section
+     \jake{XYZ}) Each benchmark is run for \benchmarkpexecs process executions, where
+    the error bars represent 99\% confidence intervals.}
+\label{plot:barriers_breakdown}
+\end{figure}
+
+% \begin{figure}[t!]
+%     \centering
+%     \includegraphics[width=1\textwidth]{plots/yksom_finalisers.pdf}
+%     \caption{Results of a performance of \yksom using two configurations: naive
+%     finalisation (where no optimisation is performed); and \ourgc's finaliser
+%     elision optimisation (where finalisers which are used only to deallocate
+%     memory are removed). Each benchmark is run for 30 process executions, where
+%     the error bars represent 99\% confidence intervals.}
+% \label{graph:yksom_finalisers}
+
 
 \end{document}
