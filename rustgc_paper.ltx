@@ -857,7 +857,7 @@ raised.
 
 One of the main motivations for GCs is that they solve problems with cyclic
 data structures. However, finalisers can can be unsound if they access
-state shared within a cycle. \cref{fig:finaliser_cycle} shows an example of undefined
+state shared within members of a cycle. \cref{fig:finaliser_cycle} shows an example of undefined
 behaviour when two GCed values create a cycle and both their
 finalisers reference the other GCed value. Whichever order the finalisers are
 run in, at least one of the finalisers will see the other GCed value as partly
@@ -865,7 +865,7 @@ or wholly `finalised'.
 
 Most languages and systems we are aware of assume that users either don't run into
 this problem (finalisation cycles are considered rare in GCed
-languages~\citep[p.~229]{jones16garbage}), or know how to deal
+languages~\citep[p.~229]{jones16garbage}) or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalisation~\cite[p.~11]{boehm03destructors}). There is no fully
 automatic solution to this problem, with the closest solution being those GCs
@@ -873,23 +873,28 @@ which offer weak references, allowing users to detect when finalisation cycles
 have been broken, though they still have to deal with the consequences
 manually.
 
-None of the existing languages and systems we know of attempts to statically
-rule out problems with finalisation and cycles. In \ourgc, in contrast, we can
-make use of the explicit \lstinline{Gc<T>} type to rule out such problems. FSA
-therefore forbids destructors from, directly or indirectly, dereferencing
-\lstinline{Gc<T>} types. This statically guarantees that finalisers cannot have
-problems in the presence of cycles.
+In \ourgc, we wanted to ensure that users cannot accidentally find themselves
+making such a mistake. A first stab at this might seem to be that a
+\lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
+\lstinline{Gc<T>}. This would indeed prevent the mistakes we want to catch but
+at the cost of not allowing \lstinline{Gc<T>} to specify cyclic GC types!
 
-The way this check is implemented is a variation of the `relaxed'
-check of~\cref{sec:relaxed}, though here we want to check that no transitively reachable drop
-methods a \lstinline{Gc<T>} field. We introduce
-another auto trait \lstinline{FinalizerSafe}, with negative implementations on
-\lstinline{Gc<T>} and \lstinline{LocalKey}:
+Our approach is therefore very different to normal Rust type checks: instead of
+checking an entire type, we check only that the type's destructor does not,
+directly or indirectly, access a \lstinline{Gc<T>}. This is implicitly a strict
+subset of the normal type check, allowing GCed types to express cycles so long
+as their destructor(s) do not access other GC types.
+
+To make this check easier to implement, we we introduce
+another auto trait \lstinline{FinalizerSafe}, with a negative implementation on
+\lstinline{Gc<T>}:
 
 \begin{lstrustsmall}
 impl<T> !FinalizerSafe for Gc<T> {}
-impl<T> !FinalizerSafe for Localkey<T> {}
 \end{lstrustsmall}
+
+This naturally handles transitively reachable code, allowing FSA itself to only
+check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
 
 \subsection{Destructors need to be runnable on the finaliser thread}
@@ -939,27 +944,24 @@ the underlying value simultaneously.
 
 
 \subsubsection{Relaxing the \lstinline{Send + Sync} restriction}
-\label{sec:relaxed}
 
 Requiring that finalisation is only possible for types that implement both \lstinline{Send} and
 \lstinline{Sync} can occasionally be frustrating, in part because more types
-implement \lstinline{Send} than \lstinline{Sync}. FSA thus implements a more
-relaxed check, analysing all drop methods reachable from a type's fields, to
-see if those drop methods access elements that do themselves implement
-\lstinline{Send} and \lstinline{Sync}.
+implement \lstinline{Send} than \lstinline{Sync}.
 
-Simplifying slightly, rather than forcing an entire type to be thread-safe, FSA
-checks a weaker property: are destructor methods thread-safe? In essence, we check
-all reachable code from a destructor to ensure that: any fields used implement both
-\lstinline{Send} and \lstinline{Sync}: and no thread locals are used.
+FSA thus experimentally extends the destructor-checking approach of
+\cref{sec:fsa_finaliser_thread}, ensuring the relaxed property that destructors
+may only access fields that implement both \lstinline{Send} and
+\lstinline{Sync}. However, this allows destructors to access thread locals,
+which is clearly incompatible with running finalisers on another thread. To
+ensure that destructors do not access thread locals, we piggy back off the
+existing \lstinline{FinalizerSafe} auto trait, adding a negative implementation
+to the \lstinline{LocalKey} type that represents thread locals.
 
-In safe Rust, the property we are checking is a non-strict subset of `does the containing
-type implement both \lstinline{Send} and \lstinline{Sync}?'. However, the two
-properties have subtly different natures: our original restriction checks `obviously' static properties,
-but the relaxed restriction deals with `potentially' dynamic properties. The latter
-is clearly harder to reason about: is it safe? We believe that
-this relaxed check is compatible with Rust's semantics (at least at the time of writing),
-and our examination of the compiler tool-chain
+This relaxed check is undoubtedly more dangerous than that of
+\cref{sec:fsa_finaliser_thread}, which is why we mark it as experimental. We
+believe that it is compatible with Rust's semantics (at least at the time of
+writing), and our examination of the compiler tool-chain
 (i.e.~\rustc and LLVM) showed that it does not implement the analyses and
 optimisations that could undermined our check. However, there are
 other languages and implementations where our check would not be valid
@@ -969,33 +971,6 @@ open question to others as to whether Rust should deliberately permit or forbid
 such checks in its semantics.
 
 \laurie{in our benchmark suite, how often does this relaxation make a difference?}\jake{I will post a write-up here once I have the numbers from all the benchmarks}
-
-\jake{I think we can make a more convincing argument though if we frame the
-relaxation as essential for cyclic data structures which drop: without the
-relaxed rule, we could not allow \lstinline{Gc<T>}s to hold references to other
-Gcs if any of them had drop methods. This is because we'd have no idea whether
-those Gc's value reference a \lstinline{Gc} in their drop method from within a
-cycle (which is obviously unsound), and so we'd have to disallow those drops entirely.}
-\laurie{i don't get it: can you give me an example?}
-
-\begin{lstlisting}
-struct S{v: u8, nbr: Option<Gc<u8>};
-
-impl Drop for S {
-  fn drop(&mut self) {
-    self.v = 0;
-  }
-}
-fn main() {
-  let s = Gc::new(S{v: 1, nbr: Some(Gc::new(123))});
-}
-\end{lstlisting}
-
-\jake{Sure. If we didn't have the relaxed rule then the above would not be
-allowed. We'd de facto be preventing GC cycles from having finalisers because
-we can't tell if the finaliser derefs the \lstinline{nbr} field or not.}
-\laurie{this seems unrelated to Send+Sync? this is only relevant for `cycles and finalisation', right?}
-\jake{That's right. But I think it makes for a more convincing argument for relaxed FSA rather than the convenience factor}
 
 
 \subsection{Bypassing FSA checks when necessary}
