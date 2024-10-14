@@ -315,7 +315,9 @@ encounter these functions, they are a crucial part of the link between Rust's hi
 low-level features (e.g.~being used for the C Foreign Function Interface
 (FFI) alongside the ability to cast Rust references to pointer types and back).
 We believe that a viable GC for Rust must include this same
-ability, but doing so has a profound impact: Rust allows raw pointers to be
+ability, but doing so has a profound impact:\edd{replace colon with "because"?
+Because what follows after the colon isn't the impact itself, but rather a
+property that causes a yet-to-be-discussed impact, right?}Rust allows raw pointers to be
 converted to the integer type \lstinline{usize} and back\footnote{Although
 it is outside the scope of this paper, it would arguably
 be preferable for Rust to have different integer types for `data width' and
@@ -328,16 +330,19 @@ keyword still allows arbitrary conversions.}.
 Having acknowledged that pointers may end up disguised as integers, it is then
 inevitable that \ourgc must be a conservative GC: if a machine word's integer
 value, when considered as a pointer, falls within a GCed block of memory,
-then that block itself is considered reachable (and thus transitively scanned).
+then that block itself is considered reachable (and \edd{is} thus transitively scanned).
 Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
-bits that happens to match a valid pointer, this over-approximates the
+bits that happens to match\edd{s/match/look like/?} a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
 most extensive study we know of suggests the false detection rate in Java
 programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
-rarely a problem in practise.
+rarely a problem in practise\edd{although Rust more readily exposes programmers
+to memory addresses, so me may expect it to be a bit higher?}.
 
 Conservative GC occupies a grey zone in programming language semantics: in most
-languages, and most compiler's internal semantics, conservative GC relies on undefined behaviour; and
+languages, and most compiler's internal semantics, conservative GC relies on
+undefined behaviour\edd{I don't know what you mean by "relies on UB" -- relies
+on UB to work, or necessarily (due to pointer hiding) can cause UB to happen?}; and
 some languages (including Rust) allow arbitrary `bit fiddling' on pointers that temporarily
 obscures the address they are referring to. \ourgc's use of conservative GC means that it
 is, formally speaking, unsound. However, conservative GC is widely used,
@@ -348,7 +353,10 @@ to conservative GC: there is no cross-platform API for precise GC; and while
 some compilers such as LLVM provide some support for GC
 features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
 Despite the potential soundness worries, conservative GC thus remains a widely
-used technique.
+used technique.\edd{Can't you tell users that a prerequisite of \texttt{Gc<T>}
+is that you can't hide GC poniters? I suppose this hinders "bolting on" GC to
+existing programs that may already pointer hide, but I think it's a reasonable
+constraint for new code.}
 
 \label{gc_is_copyable}
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
@@ -360,9 +368,15 @@ is not just cloneable but also \emph{copyable}: duplication only requires copyin
 bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
 reducing the need for a function call entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
-also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
+also cloneable.}\edd{I knew what you meant, but I wonder if a non-rust
+programmer would. The detail perhaps missing is that things must be explicitely
+cloned, unless marked `Copy` (trait) at which point they get copied by value
+implicitely}. This is not just a syntactic convenience but also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} in \ourgc is is a cheaper and simpler operation
-than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).
+than in other GCs for Rust (or, indeed, an \lstinline{Rc<T>}).\edd{I think you
+are saying: we have no qualms making \texttt{Gc<T>} implement \texttt{Copy}
+because we don't copy what it references (which could be big), just the pointer pointing to the
+actual data (which is small)?}
 
 
 \subsection{Basic Implementation}
@@ -377,8 +391,11 @@ to GC by enabling the allocator and assigning it to an arbitrarily-named variabl
 #[global_allocator] static A: GcAllocator = GcAllocator
 \end{lstlisting}
 
-\ourgc uses the conservative Boehm-Demers-Weiser GC (\boehm)~\citep{boehm88garbage} as its collector.
-Although we use some uncommon, and extend other, parts of \boehm, there is
+\ourgc uses the conservative Boehm-Demers-Weiser GC
+(\boehm)~\citep{boehm88garbage}\edd{I think you've already cited and introduced
+the abbreviation prior}as its collector.
+Although we use some uncommon, and extend other, parts of \boehm\edd{doesn't
+quite parse}, there is
 nothing inherently unique about \boehm from \ourgc's perspective.
 
 We made the following changes to \boehm. First, we disabled \boehm's parallel collector
@@ -405,6 +422,8 @@ variable.
 \section{Destructors and Finalisers}
 \label{sec:destructor challenges}
 
+\edd{What you are describing here is "normal" rust drop, right? We've just come
+from a section talking about what you modified, so I was in that mode.}
 When a value in Rust is \emph{dropped} (i.e.~the value's owner went out of lexical
 scope) its destructor is automatically run. Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
@@ -418,17 +437,21 @@ we therefore use `destructor' as the umbrella term for both drop methods and dro
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
 value is dropped, the underlying resources it possesses (e.g.~file handles or heap memory)
-are released. Whether one considers all such uses
+are released. Whether one considers all such uses \edd{uses of what?}
 to be RAII or not, a brief perusal of Rust code will quickly show that
 types that have drop methods are used frequently and that users fairly often
 implement their own drop methods.
 
 Existing GCs for Rust have very separate notions of destructors and finalisers.
 Where the former have the \lstinline{Drop} trait, the later typically have
-a \lstinline{Finalize} trait. If a user type needs to be finalised, then
+a \lstinline{Finalize} trait. If a user type needs to be finalised\edd{It's not clear what the
+difference between destructors and finalisers are yet. Earlier you identified
+the drop method and the drop glue as being distinct phases, so does it follow
+that one is a destructor and one is a finaliser? Which one actually frees the
+memory?} then
 the user must provide an implementation of the \lstinline{Finalize} trait for that type.
 However, doing so introduces a number of problems: (1) external libraries are
-unlikely to provide finalisers; (2) Rust's \emph{orphan
+unlikely to provide finalisers\edd{why is that a problem?}; (2) Rust's \emph{orphan
 rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
 types defined in external libraries (i.e.~unless a library's types were
 designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
@@ -445,13 +468,15 @@ Problem \#3 has partial solutions: for example, ~\cite{manish15rustgc} uses the
 \lstinline{Trace} macro to generate `finaliser glue' (our term) for
 \lstinline{struct} fields. This runs into an unsolvable variant of problem \#2:
 types in external libraries will not implement this trait and cannot be
-recursively scanned for finaliser glue.
+recursively scanned for finaliser glue\edd{is finaliser glue and drop glue the
+same thing?}.
 
 Problem \#4 is impossible to solve in Rust as-is. One cannot define a function
 that can never be called --- what use would such a function have? It might seem
 tempting to have the \lstinline{finalise} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
-glue to be run afterwards.
+glue to be run afterwards.\edd{Could the function patch itself after first use
+and just return?}
 
 In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
 maintain most if not all of those properties for finalisation; but some parts
