@@ -989,26 +989,25 @@ called.
 
 In some cases, users are able to prove to their satisfaction that the resulting
 false positives are unnecessary (e.g.~because the C function they are calling
-has no side effects). They can then can override FSA's checks by implementing
-the unsafe \lstinline{FinalizerSafe} trait for a given type\footnote{Note that
-this deliberately does not override the `does \lstinline{T} implement
-\lstinline{Send} and \lstinline{Sync} traits' check; users can provide (if
-necessary) unsafe implementations of those traits if they so desire.}. However, because
-this applies to a type, and thus all values that instantiate that type, it can
-be difficult to convince oneself that doing so is correct.
+has no side effects). Depending on the error they receive, they can then
+implement the unsafe traits \lstinline{FinalizerSafe}, \lstinline{Send}, or
+\lstinline{Sync} appropriately. A challenge in all three cases is that
+implementing a trait implicitly guarantees that all dynamic values
+satisfy the static trait implementation.
 
-We therefore provide a second way of overriding FSA's checks with the
-\lstinline{FinalizerUnchecked<T>} newtype. In essence,
-\lstinline{FinalizerUnchecked} allows users to inform FSA that certain uses of
+One way to sidestep this problem is to provide a newtype that allows only a
+subset of values to be declared as safe to use in a finaliser: the newtype
+implements the \lstinline{FinalizerSafe}, \lstinline{Send}, or \lstinline{Sync}
+traits, implicitly blessing the type it wraps. We found a particular need for
+this when interfacing with external GC-unaware libraries. \ourgc thus provides
+a standard newtype {FinalizerUnchecked<T>} which allows allows users to inform
+FSA that certain uses of
 a type \lstinline{T} satisfy its properties. We still want to require the user
 to explicitly opt-in to unsafe Rust when using
 \lstinline{FinalizerUnchecked<T>}, since incorrect use is dangerous,
 but Rust structs cannot be marked as unsafe directly. Instead we mark
 the struct's constructor (\lstinline{FinalizerUnchecked::new}) as
-unsafe. Note that, unlike auto traits, programmers can recreate
-\lstinline{FinalizerUnchecked<T>} in their own code: we provide
-it both for convenience and as a standard, recognisable, means of informing
-code readers about the original programmer's intentions.
+unsafe.
 
 
 \subsection{Putting it all together}
