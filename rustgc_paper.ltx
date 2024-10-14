@@ -943,6 +943,7 @@ fn main() {
 \jake{Sure. If we didn't have the relaxed rule then the above would not be
 allowed. We'd de facto be preventing GC cycles from having finalisers because
 we can't tell if the finaliser derefs the \lstinline{nbr} field or not.}
+\laurie{this seems unrelated to Send+Sync? this is only relevant for `cycles and finalisation', right?}
 
 
 \subsection{Cycles and Finalisation}
