@@ -1295,22 +1295,23 @@ collector threads.
 
 \begin{figure}[t!]
     \centering
-    \begin{subfigure}{0.4\textwidth}
-    \includegraphics[width=0.9\textwidth]{plots/barriers.pdf}
-    \caption{Performance}
+    \begin{subfigure}{0.5\textwidth}
+    \includegraphics[width=1\textwidth]{plots/barriers.pdf}
     \end{subfigure}
+    \hfill
     \begin{subfigure}{0.4\textwidth}
     \includegraphics[width=0.9\textwidth]{plots/barriers.pdf}
       \caption{Peak Memory \jake{TODO replace graph}}
     \end{subfigure}
-     \caption{Results showing the performance of early finaliser prevention on
-     \somrs, which uses three configurations: \textit{None} where there are
-     no compiler barriers (which is unsound); \textit{All}, where every
-     single \lstinline{Gc} reference has a corresponding barrier; and
-     \textit{None}, where barriers can be optimised away where \ourgc is
-     certain they are unnecessary. Each configuration is compared using a
-     subset of benchmarks on the Rebench benchmarking suite for 30 process
-     executions, where I report 99\% confidence intervals.}
+    \caption{Performance (left) and memory (right) results of the \Epremopt
+    experiment. For all three SOM VMs, we use the same SOM version of the `Are
+    We Fast Yet?' benchmark suite and take the geometric mean of all 26
+    benchmarks. \emph{None} shows the results where there are no compiler
+    barriers (which is unsound); \emph{All}, where every single \lstinline{Gc}
+    reference has a corresponding barrier; and \emph{None}, where barriers can
+    be optimised away where \ourgc is certain they are unnecessary. Each
+    benchmark is run for 30 process executions, where the error bars represent
+    99\% confidence intervals.}
 \label{graph:elision}
 \end{figure}
 
