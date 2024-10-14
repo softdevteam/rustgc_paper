@@ -927,6 +927,23 @@ those Gc's value reference a \lstinline{Gc} in their drop method from within a
 cycle (which is obviously unsound), and so we'd have to disallow those drops entirely.}
 \laurie{i don't get it: can you give me an example?}
 
+\begin{lstlisting}
+struct S{v: u8, nbr: Option<Gc<u8>};
+
+impl Drop for S {
+  fn drop(&mut self) {
+    self.v = 0;
+  }
+}
+fn main() {
+  let s = Gc::new(S{v: 1, nbr: Some(Gc::new(123))});
+}
+\end{lstlisting}
+
+\jake{Sure. If we didn't have the relaxed rule then the above would not be
+allowed. We'd de facto be preventing GC cycles from having finalisers because
+we can't tell if the finaliser derefs the \lstinline{nbr} field or not.}
+
 
 \subsection{Cycles and Finalisation}
 
