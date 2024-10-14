@@ -1276,19 +1276,20 @@ collector threads.
 
 \begin{figure}[t!]
     \centering
+    \begin{subfigure}{0.5\textwidth}
+    \includegraphics[width=1\textwidth]{plots/elision.pdf}
+    \end{subfigure}
+    \hfill
     \begin{subfigure}{0.4\textwidth}
     \includegraphics[width=0.9\textwidth]{plots/elision.pdf}
-    \caption{Performance}
     \end{subfigure}
-    \begin{subfigure}{0.4\textwidth}
-    \includegraphics[width=0.9\textwidth]{plots/elision.pdf}
-      \caption{Peak Memory \jake{TODO replace graph}}
-    \end{subfigure}
-    \caption{Results of a performance of \somrs using two configurations: naive
-    finalisation (where no optimisation is performed); and \ourgc's finaliser
-    elision optimisation (where finalisers which are used only to deallocate
-    memory are removed). Each benchmark is run for 30 process executions, where
-    the error bars represent 99\% confidence intervals.}
+    \caption{Performance (left) and memory (right) results of the \Eelision
+    experiment. For all three SOM VMs, we use the same SOM version of the `Are
+    We Fast Yet?' benchmark suite and take the geometric mean of all 26
+    benchmarks. \emph{Elision} shows the results after \ourgc's finaliser
+    elision optimisation (\cref{sec:elision}) and \emph{Naive} is with no
+    optimisation applied. Each benchmark is run for 30 process executions,
+    where the error bars represent 99\% confidence intervals.}
 \label{graph:elision}
 \end{figure}
 
