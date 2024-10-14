@@ -5,7 +5,7 @@
 
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
-makes expressing data-structures whose values have multiple owners awkward, inefficient, or both.
+makes expressing data-structures whose values share multiple owners awkward, inefficient, or both.
 In this paper we explore a new design for, and implementation of GC in Rust, called
 \ourgc, identifying the key challenge as finalisation. Unlike previous
 approaches to GC in Rust, \ourgc maps existing Rust destructors to
@@ -50,7 +50,7 @@ non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lsti
 fit within this classification: it is not GCed but it has implicit memory management.
 Most portions of most Rust programs are as
 succinct as a GCed equivalent, but ownership is too inflexible to express
-data-structures that require multiple owners (e.g.~doubly linked lists).
+\emph{shared ownership} for data-structures that require multiple owners (e.g.~doubly linked lists).
 Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty.
 
@@ -84,8 +84,8 @@ provide finalisers for types in external libraries.
 The obvious solution to this problem is to allow existing Rust destructors to
 be automatically used as finalisers. However, no existing GC for Rust does
 this and in the nearest context to our
-work, a GC proposal for C++, this ruled out as it
-introduces seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We place these problems into four
+work, a GC proposal for C++, this approach was ruled out due to
+seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We place these problems into four
 categories:
 (1) finalisers are prohibitively slower than destructors;
 (2) finalisers can be run prematurely;
@@ -97,16 +97,16 @@ existing solutions.
 
 We introduce novel solutions, relying on Rust's unusual static
 guarantees, to each of these problems. We thus gain not just a better GC for
-Rust, but also solutions to open GC problems. Our solutions to the problems,
+Rust, but also solutions to open GC problems. Our solutions,
 in order, are:
 (1) \emph{finaliser elision} statically optimises away finalisers if the
 underlying destructor duplicates work the GC does anyway.
 (2) \emph{premature finaliser prevention} automatically inserts barriers to prevent
 optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead;
-(3) we run finalisers on a separate thread;
+(3) we run finalisers on a separate thread; and
 (4) \emph{finaliser safety analysis}
-extends Rust's type system to reject programs whose destructors are not
+extends Rust's static analyses to reject programs whose destructors are not
 provably safe to be used as finalisers.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust.
