@@ -287,6 +287,7 @@ the rest of the paper then goes into detail on the more advanced aspects.
 
 
 \subsection{Basic Design}
+\label{sec:basic design}
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
 reference counting type \lstinline{Rc<T>} from Rust's standard library, because
@@ -894,6 +895,7 @@ raised.
 
 
 \subsection{Cycles and Finalisation}
+\label{sec:cycles_and_finalisation}
 
 \begin{figure}[tb]
 \lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
@@ -1360,188 +1362,126 @@ conservative GC.
 \section{Related work}
 \label{sec:related_work}
 
-Throughout Rust's history, there have been several attempts to introduce some
-form of tracing garbage collection~\citep{felix15specifying, felix16roots,
-manish16gc}. In fact, early versions of Rust explored using a form of this as a
-first class feature of the language through the use of \emph{managed pointers}
-(with the syntax \lstinline{@T}).\jake{cite: } This was removed early in Rust's
-development before the first stable release \jake{cite removal commit
-\lstinline{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}}.
-
-\citep{rustbacon} is a Rust library implementation of~\citep{bacon01concurrent}
-which provides reference counting with tracing cycle collection. Like \ourgc it
-introduces a user-visible type (\lstinline{Cc<T>}) for managing memory. The
-underlying memory of a \lstinline{Cc<T>} object is reference counted, however,
-when the reference count is decremented to a non-zero value, it is added to a
-worklist so that it can later be checked for potential cycles (by a user
-invoked \lstinline{collect_cycles} function). This performs a local trace .
-
-Unlike \ourgc, destruction in \citep{rustbacon} is deterministic: it occurs as
-soon as an object's last owner is gone; in the case of cyclic garbage, this
-means after the user calls \lstinline{collect_cycles}. However, like \ourgc it
-relies on the \lstinline{Drop} trait for destruction and does not implement
-it's own \lstinline{Finalize} trait. \lstinline{Cc<T>} uses a \lstinline{T: 'static} bound, which prevents it from containing any regular rust references.
-This prevents the trapdoor reference in finalisers problem explained in
-\jake{section FSA}.
-
-There are several advantages of \citep{rustbacon} over \ourgc: first, it is
-purely library based, requiring no modifications to the Rust compiler to work;
-second, for non-cyclic data, values will be dropped immediately like
-\lstinline{Rc}; third, the deterministic nature of drop methods means that it
-does not need to be run on a separate thread, eliminating a whole class of
-synchronisation and concurrency errors present in traditional tracing-based
-finalisation \jake{cite fsa section}.
-
-It has several limitations when compared to \ourgc. First, it is single-thread
-(though a concurrent cycle detection algorithm is theoretically
-possible~\citep{bacon01concurrent}). Second, a \lstinline{Trace} trait,
-detailing how to traverse an objects fields during cycle detection must be
-manually implemented for any \lstinline{T} used inside a \lstinline{Cc}. This
-means that it cannot be used with types from external crates without the
-new-type workaround. Third, since drop methods are called on cyclic garbage,
-drop methods which dereference fields of other \lstinline{Cc} objects will
-result in a crash at runtime. \ourgc, on the other hand, will prevent such
-programs from compiling with FSA.
-
-In \autoref{sec:destructor challenges}, we introduced the most well-known tracing
-GC option in Rust \citep{rustgc}. \jake{That section already discusses the
-finalisation differences, so I won't repeat them here} The API for \rustgc is
-similar to \ourgc, with the notable exception that \lstinline{Gc} in \rustgc
-does not implement the \lstinline{Copy} trait. This means that in order to
-obtain additional pointers to garbage-collected objects, the \lstinline{Gc}
-must be cloned.
-
-\laurie{what is the practical difference between \rustbacon and \rustgc?
-from the description they sound identical from a user's perspective} \jake{the main difference is that a cycle collection must be explicitly invoked by the user for \rustbacon}
-\rustgc is implemented as a hybrid form of reference counting and tracing GC.
-There is no mechanism for scanning the stack for roots as in traditional GC, so
-roots are tracked using reference counting, with a mark-sweep then performed
-from these roots. Like \ourgc, \lstinline{Gc} references in \rustgc point to an
-underlying \lstinline{GcBox}. However, in \rustgc, this \lstinline{GcBox}
-maintains a count of all of its roots. \autoref{lst:rustgc_roots} shows how this
-count is updated as references are used. During a collection, the
-\lstinline{GcBox}'s on the heap are enumerated, and those with a non-zero root
-count are used as roots to begin marking. Like \rustbacon, \rustgc traces
-through objects by requiring types used in \lstinline{Gc} to implement a
-\lstinline{Trace} trait, which has a \lstinline{trace} method called during
-marking to traverse and mark objects during a collection.
-
-\rustgc makes implementing \lstinline{Trace} easy by providing a macro
-implemention, where types can be annotated with \lstinline{#[derive(Trace)]} and
-have it implemented automatically. It uses its own type, \lstinline{GcCell} in
-order to support interior mutability as a \lstinline{RefCell} cannot be used
-with \rustgc. The \lstinline{GcCell} provides additional support for rooting and
-unrooting objects across a borrow as they are mutated inside the \lstinline{Gc}.
-It provides a similar API to the user as \lstinline{RefCell}.
-
-Unlike \ourgc, objects are finalised by implementing a \lstinline{Finalise}
-trait. Though this reduces much of the complexity that \ourgc needs in order to
-support calling \lstinline{T::drop} from a finaliser or destructor context,
-\rustgc requires the programmer to ensure that a finaliser implementation is
-present for any type that may need to call \lstinline{Drop} on any of its
-component types. It is not easy to know which of these component types may need
-dropping, and forgetting to do so can cause memory leaks.
-
-The \emph{Bronze} collector is an optional GC implementation for Rust which was
-designed address usability concerns with Rust's borrow
-semantics~\citep{coblenz21bronze}. It was
-designed alongside an empirical study which measured how long it took students
-to complete a variety of Rust tasks by using standalone Rust, and Rust with
-Bronze for managing memory.
-
-Bronze bases much of its implementation on \rustgc but with two key differences.
-First, it tracks roots to GC objects by using a modified version of the Rust
-compiler. Bronze's rustgc implementation inserts calls to LLVM's
-\lstinline{gc.root} intrinsic at function entries in order to generate
-stackmaps. When a GC call is requested, Bronze iterates over the stackmaps
-generated its current call stack in order to locate the roots for garbage
-collection. However, Bronze does not implement this for transitive references
-from arbitrary objects. In other words, if a \lstinline{Gc<T>} exists as a field
-inside another object instead of directly on the stack, it is not tracked
-as a root for garbage collection.
-
-The second major difference between \rustgc and Bronze is that Bronze's
-\lstinline{Gc<T>} type allows the programmer to dereference its underlying type
-\lstinline{T} mutably more than once. \citet{coblenz21bronze} describes this
-as beneficial, because it makes it easier to use than other Rust shared
-ownership. However, this is fundamentally unsound, and allows programs which
-violate memory safety to be written in safe Rust using Bronze.
-\autoref{lst:bronze_unsound} shows an example of how this can violate memory
-safety by causing a write from deallocated memory.
+In this paper we have, we hope, given sufficient background on GC and the use
+of destructors and finalisers in general. In this section we first survey the major
+parts of the GC for Rust landscape more widely, though our survey is
+necessarily incomplete, in part because this is a rapidly evolving field, before
+briefly mentioning some non-Rust GC work that may give useful pointers.
 
 
-\subsection{How other languages deal with finalisers}
+\subsection{GCs for Rust}
 
+Early versions of Rust had managed pointers (using the \lstinline{@T} syntax)
+which were intended to model `full' GC, though whose implementation did not
+progress beyond reference counting. This support was removed\footnote{In commit
+\url{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}.}
+around a year before the first stable release of Rust. This was not the end
+of the story for `GC as a part of Rust', with the core team soon after
+defining the problem space in more detail~\citep{felix15specifying, felix16roots,
+manish16gc}. However, efforts in this direction seem to have petered out,
+at which point those interested in GC for Rust largely moved from anticipating
+\rustc support to expecting everything to be done in user-level libraries.
+
+One of the earliest user-level GC for Rust libraries is
+\textsc{BaconRajanGC}~\citep{rustbacon}, an implementation of the well-known GC
+algorithm~\citep{bacon01concurrent}. This provides a type \lstinline{Cc<T>}
+which is similar in intention to \ourgc's \lstinline{Gc<T>}, though using
+reference counting and manually invoked tracing cycle detection via the
+\lstinline{collect_cycles} function. In order for this function to correctly
+trace fields, users must manually implement a \texttt{Trace} trait which
+traverses a type's fields. Destruction in \textsc{BaconRajanGC} is largely
+deterministic: non-cycles have destructors run as soon as a reference count is
+0; cycles at the end of the \lstinline{collect_cycles} function. Destructors
+are used as finalisers: to avoid the problems with Rust references we solved in
+\cref{sec:fsa_rust_references}, \textsc{BaconRajanGC} imposes a \lstinline{T: Static}
+bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictive
+than \ourgc's \lstinline{Gc<T>}. However, unlike our approach in
+\cref{sec:cycles_and_finalisation}, it does not prevent finalisers accessing
+shared data, and so seemingly safe destructors can undermined soundness (see
+\laurie{let's put an example in the appendix}).
+
+Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
+covered in \cref{sec:destructor challenges}). \rustgc provides an API closer to
+\ourgc's \lstinline{Gc<T>}, with the notable exception that its \lstinline{Gc}
+is not, and indeed cannot be, copyable, thus always requiring calls to
+\lstinline{Gc::clone} \laurie{does it have into\_raw?}. Similarly to
+\textsc{BaconRajanGC}, GCed values are reference counted, with occasional
+tracing sweeps to identify cycles, though \rustgc performs cycle detection
+automatically (i.e.~it doesn't require manual calls to a function such as
+\lstinline{collect_cycles}). Drop methods are not used as finalisers: if a
+finaliser is required, a manual implementation of the \lstinline{Finalise}
+must be provided; though finaliser glue can be largely, though not fully (see
+\cref{sec:destructor challenges}), automatically created by use of the provided
+\lstinline{trace} macro . \laurie{does \rustgc solve the `finalisers mustn't do
+things with cycles' problem?}
+
+To move beyond using reference counting at the core of a GC type, some Rust
+libraries have experimented with alternative mechanisms for findings roots. The
+experimental \shifgrethor~\cite{shifgrethor} requires \lstinline{Gc} values to
+be created by a \lstinline{Root<'root>} value; the former become references of
+the latter, implicitly tying the lifetime of a \lstinline{Gc<'root, T>} to a
+\lstinline{Root<'root>}. This allows roots to be precisely identified, but
+requires explicitly having access to a \lstinline{Root<'root>} whenever a
+\lstinline{Gc<'root, T>} is used. As with \rustgc, \shifgrethor requires users
+to manually implement a \lstinline{Finalize} trait, though \shifgrethor's is
+more restrictive: not only can other GCed values not be accessed (implicitly
+solving the same problem as \cref{sec:cycles_and_finalisation}) but any other
+type type without the same \lstinline{'root} lifetime as the GCed value is
+forbidden. In practise, this means that many finalisers are likely to require
+implementing the unsafe \lstinline{UnsafeFinalize} trait. One way of
+evaluating \shifgrethor is that it shows that accurately tracking GC roots
+in normal Rust is possible but difficult.
+
+A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena}. In
+essence, \textsc{GcArena} uses `branding' in a similar way to
+\lstinline{GhostCell}s (see \cref{sec:background}), executing a function
+within the context of an arena: when that function finishes, the arena can be
+freed. Not only does this solve the problem of finding roots, but it is able to
+implicitly free cycles. However, it is possible for code to keep executing in
+an arena for too long, at which point the system can be starved of resources
+even if much of the arena is no longer used. \textsc{GcArena} was originally
+part of the \emph{Piccolo} VM  (which was itself previously called
+\emph{Luster}), a Lua VM written in Rust. Such VMs have a main loop which is a
+natural point for an arena-using function, but this is not true of many other
+GC-using programs.
+
+One of several extensions of \rustgc is \textsc{Bronze}, which aims to improve
+upon \rustgc in two ways~\citep{coblenz21bronze}. First, \textsc{Bronze} tries
+to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
+at function entries to generate stackmaps (a run-time mechanism for accurately
+tracking active pointers). Precise tracking of GC roots has the  major
+advantage over \ourgc's conservative GC: \textsc{Bronze} cannot accidentally
+keep objects alive due to false positive `pointers'. However, as well as not
+tackling the problem that pointers can be cast to and from \lstinline{usize}
+(see \cref{sec:basic design}), \textsc{Bronze} does not track nested
+references. If a \lstinline{Gc<T>} is used as a field in a struct, it will not
+be tracked for GC purposes, leading to crashes. Second, tries to give GC in
+Rust similar semantics to non-ownership languages such as Java. It does this by
+allowing shared mutation, undermining Rust's borrow checker, and undermining
+the soundness of seemingly safe Rust code (see \cref{lst:bronze_unsound} for an
+example of a program which has undefined behaviour).
+
+
+\subsection{Other relevant work}
+
+\laurie{i'm not sure this tells us much? is there something else useful we can say about D?}
 The D programming language uses a conservative mark-sweep GC for heap
 allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
 not specify an order for finalisers. Users can specify their own allocators for
 RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
 calls.
 
-Oilpan, the conservative mark-sweep garbage collector in Chrome's rendering
-engine, Blink, uses two levels of finalisation: full finalisation, which happen
-off-thread after a GC cycle has completed but do not allow object fields to be
-dereferenced; and pre-finalisers, which happen during the sweep phase, but allow
-all of an objects fields to be dereferenced. Pre-finalisers are generally
-avoided because of their performance overhead since they cannot be scheduled to
-run on other threads and increase the stop-the-world time.
-
-
-\begin{figure}[!t]
-\begin{lstrustsmall}
-fn main() {
-    let mut gr1 = GcRef::new(vec![1u16,2,3]);
-    let mut gr2 = gr1.clone();
-
-    let ref1 = gr1.as_mut();
-    let ref2 = gr2.as_mut();
-
-    // ref1 and ref2 now reference the same object:
-    ref1.push(4);
-    ref2.push(5);
-    ref1.push(6);
-
-    let ref1elem0 = ref1.get_mut(0).unwrap();
-    // Force reallocation of the underlying vec
-    ref2.resize(1024, 0);
-    // Now this writes to deallocated memory
-    *ref1elem0 = 42;
-}
-\end{lstrustsmall}
-    \caption{An example of unsoundness in Bronze based on its ability to allow
-    aliased mutable references. Here, we obtain two mutable references to the
-    same underlying vector (lines 5-6), before using the second reference to
-    resize the vector, which forces its backing store to be reallocated in
-    memory (line 15). Later, when we try to access an element through the first
-    reference, it no longer points to valid memory (line 15).
-    } \label{lst:bronze_unsound}
-\end{figure}
-
-\shifgrethor~\citep{shifgrethor} is an experimental GC API for Rust which investigated a way for
-potential GC implemenations to precisely identify and trace roots to GC'd
-objects. \shifgrethor is therefore not a full GC library, but instead an
-experimental design for how a GC could interface with the language.
-
-The basic idea is that in order to create a \lstinline{Gc} object, it must be
-created by, and exist alongside a corresponding \lstinline{Root<'root>} type on
-the stack. The \lstinline{Root<'root>} can then dish out references to the
-underlying \lstinline{Gc} which are tied to \lstinline{Root<'root>}'s lifetime.
-
-\laurie{can \gcarena handle cycles? what about finalisers?}
-\gcarena~\citep{gcarena} is another experimental approach at sound GC design in Rust. It was
-originally developed as part of the \emph{luster} VM~\citep{luster}: an experimental Lua VM
-written in Rust. Unlike \ourgc and the other approaches to GC in Rust seen so
-far, \gcarena does not retrofit Rust with a GC. Instead, it provides limited
-garbage collection in isolated garbage collected \emph{arenas}. Arenas carefully
-guard mutator access to their objects through closures, which, when executing,
-prevent the collector from running. This solves the difficult problem of finding
-roots which reside on the stack: when an arena is \emph{closed} to the mutator,
-no stack roots exist, so a collection can be safely scheduled. A single arena
-may contain several garbage collected objects, but they cannot be
-transferred between other arenas.
-
-Because \gcarena is so different in nature to the other GCs described in this
-chapter, it is difficult to compare it ergonomically to other approaches.
+Chrome's rendering engine \emph{Blink} uses a conservative GC called
+\textsc{Oilpan}. It has the interesting property that it has two classes of
+finalisers. `Full finalisers' are similar to finalisers in \ourgc, running on a
+finaliser thread at an indeterminate future point, but with the difference that
+they can only reference parts of a GCed value. To mitigate this,
+`pre-finalisers' are run as soon as an object as recognised as unused, and can
+access all of a GCed value. Pre-finalisers are not encouraged, because they
+hold up the GC. This reflects very different needs for \textsc{Oilpan} and
+\ourgc: latency is a significant issue for \emph{Blink} but not something we
+consider vital for \ourgc; instead we worry about the performance overhead of
+finalisation on a separate thread.
 
 
 \section{Conclusions}
@@ -1663,5 +1603,35 @@ of the paper for those who may benefit from them.
 %     the error bars represent 99\% confidence intervals.}
 % \label{graph:yksom_finalisers}
 
+
+\begin{figure}[!t]
+\begin{lstrustsmall}
+fn main() {
+    let mut gr1 = GcRef::new(vec![1u16,2,3]);
+    let mut gr2 = gr1.clone();
+
+    let ref1 = gr1.as_mut();
+    let ref2 = gr2.as_mut();
+
+    // ref1 and ref2 now reference the same object:
+    ref1.push(4);
+    ref2.push(5);
+    ref1.push(6);
+
+    let ref1elem0 = ref1.get_mut(0).unwrap();
+    // Force reallocation of the underlying vec
+    ref2.resize(1024, 0);
+    // Now this writes to deallocated memory
+    *ref1elem0 = 42;
+}
+\end{lstrustsmall}
+    \caption{An example of unsoundness in Bronze based on its ability to allow
+    aliased mutable references. Here, we obtain two mutable references to the
+    same underlying vector (lines 5-6), before using the second reference to
+    resize the vector, which forces its backing store to be reallocated in
+    memory (line 15). Later, when we try to access an element through the first
+    reference, it no longer points to valid memory (line 15).
+    } \label{lst:bronze_unsound}
+\end{figure}
 
 \end{document}
