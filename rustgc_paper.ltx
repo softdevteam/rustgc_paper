@@ -1145,7 +1145,7 @@ drop method that caused an FSA error.
 \midrule
   \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark \\
   \grmtools & \grmtoolsversion  & Lexer / parser library \\
-  \minimoka & \minimokaversion  & Concurrent cache library \\
+  % \minimoka & \minimokaversion  & Concurrent cache library \\
   \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching \\
   \sws & \swsversion  & Web server\\
   \midrule
@@ -1185,14 +1185,14 @@ In order to understand the performance of \ourgc we ran four experiments:
 \vspace{10pt}
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
-may not have been suitable for our experiment because in experiment \Egcrc we
+may not have been suitable for our purposes because in experiment \Egcrc we
 want to compare programs using existing shared ownership approaches such as \lstinline{Rc<T>} against
-\lstinline{Gc<T>}. We searched through tens of the most popular
+\lstinline{Gc<T>}. We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates. Many that use
 shared ownership strategies do not use them in performance
 critical areas (\laurie{give two examples}): any resulting benchmark would be
-unlikely to show anything of interest to this paper . Some relied on
+unlikely to show anything of interest to this paper. Some relied on
 unusual and/or unsafe features of their memory strategy that were too difficult
 or time-consuming to adapt (e.g.~\emph{RustPython}, \emph{Rkyv}).
 
@@ -1201,26 +1201,27 @@ using the following shared ownership strategies: \lstinline{Arc<T>}, \lstinline{
 Rust), and \typedarena (an arena library). \binarytrees and \regexredux
 are well-known microbenchmarks. \binarytrees is both allocation intensive
 and sufficiently simple that we could port it to a variety of shared ownership strategies.
-The remaining benchmarks are `real' libraries and programs that we
-ported from their existing shared ownership strategy to \lstinline{Gc<T>}: \grmtools is a
-parsing library which uses \lstinline{Rc<T>} extensively; \minimoka
-\laurie{uses what?}; \sws is built on top of the \emph{Hyper} HTTP library,
-which itself uses the \emph{tokio} async runtime and uses \lstinline{Arc<T>}
-extensively.
+\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively:
+the core library is around 18KLoC, excluding dependencies.
+%\minimoka \laurie{uses what?};
+\sws is built on top of the \emph{Hyper} HTTP library, which itself uses the
+\emph{tokio} async runtime and uses \lstinline{Arc<T>} extensively: the
+core server is around 16KLoC, with \emph{Hyper} around 27KLoC, and
+tokio around 90KLoC (though \sws uses only a subset of each library).
 
 Our suite also includes three SOM VMs. SOM is a small, but complete,
-Smalltalk-esque language with a wide variety of implementations. \somrsast and
-\somrsbc are existing implementations, both relatively faithful ports of a Java
+language in the Smalltalk mould, which has a wide variety of implementations. \somrsast and
+\somrsbc are existing implementations and both relatively faithful ports of a Java
 SOM VMs into Rust that use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
-for this paper that is designed to be more idiomatic and higher performance.
-Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
+for this paper that is designed to be more idiomatic Rust code. Each SOM VM is
+around 5KLoC. Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
 benchmark suite~\cite{marr16cross}, turning what appears to be 1 benchmark into 26
 (mostly micro) benchmarks.
 
 One confounding factor we have controlled for is the underlying memory
 allocator. \boehm's core dates to the 1980s and allocators have made
 many advances since. A quick experiment showed us that modern system
-allocators are much faster than \boehm: comparing \ourgc with \boehm
+allocators are noticeably faster than \boehm: comparing \ourgc with \boehm
 to \rustc with a modern system allocator would be uncomfortably
 close to apples and oranges. We therefore use \boehm as the allocator
 for both \ourgc and \rustc.
