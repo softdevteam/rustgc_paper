@@ -1507,12 +1507,13 @@ finalization on a separate thread.
 
 \section{Conclusions}
 
-In this paper we have introduced a novel design for GC in Rust, and shown how
-it solves some classical GC finalizer problems. We implemented our design in a
-fork of \rustc, and showed that it has a fairly small performance overhead. We
-do not claim that \ourgc is the best, final, design for GC in Rust, but it does
+We introduced a novel design for GC in Rust that, by taking advantage of Rust's
+unusual static guarantees, also some classical GC finalizer problems. We
+implemented our design in a fork of \rustc, and showed that it has a fairly
+small performance overhead. We do not claim that \ourgc is the ultimate design
+for GC in Rust, but it does
 show how much can be achieved if one is willing to adjust and extend the
-language design and, in particular, \rustc.
+language's design and \rustc.
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
