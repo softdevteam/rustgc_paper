@@ -763,6 +763,7 @@ impl<T: ?Sized> Drop for Gc<T> {
 
 
 \subsection{Optimising premature finalizer prevention}
+\label{sec:optimising_prem}
 
 The drop method we add to \lstinline{Gc<T>} fully prevents premature
 finalization. It also naturally solves a performance problem with the suggested solution
@@ -1173,14 +1174,13 @@ our methodology and our experimental results.
 
 \subsection{Methodology}
 
-In order to understand the performance of \ourgc we ran four experiments:
+In order to understand the performance of \ourgc we ran three experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
   \Egcrc & the relative performance of \texttt{Gc<T>} over other allocation strategies (e.g.~\texttt{Rc<T>}) \\
   \Eelision & the performance gains of finalizer elision \\
-  \Eprem & the costs of premature finalizer prevention \\
-  \Epremopt & the performance gains from optimising premature finalizer prevention
+  \Eprem & the costs of premature finalizer prevention and its optimisation \\
 \end{tabular}
 \vspace{10pt}
 
@@ -1247,7 +1247,76 @@ Our experiment is fully repeatable and downloadable from
 \scalebox{0.7}{%
   \input{table_overview}
 }
-  \vspace{5pt} \caption{Overview of results across all benchmarks. \jake{TODO:
+  \vspace{5pt}
+  \caption{Results for the \Egcrc experiment, comparing
+  benchmarks running on \ourgc against other shared ownership approaches. With
+  the exception of \binarytrees, which we ported to several approaches, most
+  compare \ourgc with one other shared ownership approach. \laurie{``yksom was
+  built specifically with \ourgc in mind, and cannot realistically be ported to
+  the other shared ownership approaches above; we include it in this table as
+  context for latter comparisons with \somrsast and \somrsbc.''} All benchmarks
+  were run 30 times with wall-clock times reported. The top half of the table
+  shows traditional 99\% confidence intervals for ; the bottom half of the
+  table shows the geomean and 99\% (asymmetric) confidence intervals. Overview
+  of results across all benchmarks.
+  }
+  \label{table:Ercgc}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=.6\textwidth]{plots/elision.pdf}
+    \caption{\laurie{are these non-symmetric CIs as in table 2?}
+    Summary results of \Eelision (the detailed breakdown for each SOM
+    benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
+    off finaliser elision. As these results clearly show, all three SOM VMs run
+    significantly faster with finaliser elision turned on.}
+\label{fig:elision}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=.6\textwidth]{plots/barriers_mem.pdf}
+    \caption{\laurie{are these non-symmetric CIs as in table 2?}
+    Summary results of \Eprem (the detailed breakdown for each SOM benchmark
+    can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows premature
+    finaliser prevention turned on for all types; \emph{Opt} shows optimised
+    premature finaliser prevention (see \cref{sec:optimising_prem}); and
+    \emph{None} shows premature finaliser prevention turned off. \emph{None} is
+    unsound, but provides the ultimate ceiling for \emph{Opt}'s performance.
+    Note that we turned finaliser elision off in this experiment \laurie{because}.
+    }
+\label{fig:Eprem}
+\end{figure}
+
+\cref{table:Ercgc} shows the results for \Egcrc. \ourgc is often marginally
+slower than other shared ownership approaches, but, with two exceptions, never
+by more than 8\%. The first exception is \binarytrees, whose batch approach to
+allocation is perfectly suited to \typedarena: it waits until the end of the
+benchmark to deallocate all memory in one go. Interestingly, despite being
+4$\times$ slower than \typedarena, \ourgc is 5.5$\times$ faster than \rustgc
+and 1.5$\times$ faster than \lstinline{Rc<T>} on \binarytrees. The second
+exceptions \somrsast where \laurie{\ourgc is over 2$\times$ slower -- why?!}.
+While such a sparse comparison can never be fully satisfying, a reasonable
+interpretation of this data is that \ourgc does not appear to be prohibitively
+slow.
+
+\cref{fig:Eelision} shows the summary results for \Eelision
+(\cref{fig:Eelision_breakdown} in the appendix shows each SOM benchmark).
+Finaliser elision improves the performance of each VM, though by varying
+amounts. Perhaps because it was built with \ourgc in mind, \yksom benefits the
+most from finaliser elision.
+
+\cref{fig:Eprem} shows the summary results for \Eprem. Unsurprisingly, turning
+on premature finalisation prevention everywhere slows performance noticeably
+relative to removing some or all premature finalisation prevention drop
+methods. However, to our surprise, it is often difficult to distinguish
+`optimised' premature finaliser prevention from no premature finaliser
+prevention at all. Although we do think this shows that premature finaliser
+prevention optimisation is highly effective, we suspect that some inevitable
+noise in benchmark results might slightly flatter the optimisation.
+
+   \jake{TODO:
   mini-moka}. For \binarytrees, typed-arena performs the best, however, it
   allocates the most amount of memory (\jake{percent more than \ourgc}) because
   it removes it all in one go at the end. \rustgc performs the worst and
@@ -1268,19 +1337,7 @@ Our experiment is fully repeatable and downloadable from
   performance differences between \ourgc and \rc for \somrsast. This is because
   (unlike for \somrsbc) we are only able to elide \jake{perc elided}
   finalisers, (compared to \somrsbc's \jake{input}). Each benchmark is run for
-  30 process executions, and we report 99\% confidence intervals.}
-  \label{table:overview}
-\end{table}
-
-\autoref{table:overview} shows the results for this experiment. The results
-shows that for \binarytrees (an allocation heavy benchmark)
-\textsc{Typed-arena} was the fastest as it never performs any deallocation
-during the benchmark run, it simply deallocates all memory at the end.
-
-\rustgc performs poorly for two reasons. First, it uses a form of reference
-counting to track the roots for each garbage collected object. Second, it has a
-naive implementation of the mark-sweep algorithm and does not use parallel
-collector threads.
+  30 process executions, and we report 99\% confidence intervals.
 
 % \begin{figure}[t!]
 %     \centering
@@ -1290,51 +1347,6 @@ collector threads.
 %     executions, where the error bars represent 99\% confidence intervals.}
 % \label{graph:som_rs_finalizers}
 % \end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \begin{subfigure}{0.49\textwidth}
-    \includegraphics[width=1\textwidth]{plots/elision.pdf}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.49\textwidth}
-    \includegraphics[width=\textwidth]{plots/elision_mem.pdf}
-    \end{subfigure}
-    \caption{Performance (left) and memory (right) results of the \Eelision
-    experiment. For all three SOM VMs, we use the same SOM version of the `Are
-    We Fast Yet?' benchmark suite and take the geometric mean of all 26
-    benchmarks. \emph{Elision} shows the results after \ourgc's finalizer
-    elision optimisation (\cref{sec:elision}) and \emph{Naive} is with no
-    optimisation applied. Each benchmark is run for 30 process executions,
-    where the error bars represent 99\% confidence intervals.}
-\label{fig:elision}
-\end{figure}
-
-\begin{figure}[t!]
-    \centering
-    \begin{subfigure}{0.49\textwidth}
-    \includegraphics[width=\textwidth]{plots/barriers.pdf}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.49\textwidth}
-    \includegraphics[width=\textwidth]{plots/barriers_mem.pdf}
-    \end{subfigure}
-    \caption{Performance (left) and memory (right) results of the \Epremopt
-    experiment. For all three SOM VMs, we use the same SOM version of the `Are
-    We Fast Yet?' benchmark suite and take the geometric mean of all 26
-    benchmarks. \emph{None} shows the results where there are no compiler
-    barriers (which is unsound); \emph{All}, where every single \lstinline{Gc}
-    reference has a corresponding barrier; and \emph{None}, where barriers can
-    be optimised away where \ourgc is certain they are unnecessary. Each
-    benchmark is run for 30 process executions, where the error bars represent
-    99\% confidence intervals. We have disabled finaliser elision for this
-    experiment.\jake{Todo: put the numbers in like this}\protect\somrsastbarriers{bnaive}{worstperf}{percent} \jake{It's difficult to draw conclusions about this because of
-    a) overlapping CIs b) the non-determinism in how barriers affect the
-    optimiser and when GCs are scheduled c) how long things will be kept alive
-    for finalisation}A more
-    detailed breakdown is available in Appendix \cref{fig:barriers_breakdown}}
-\label{fig:barriers}
-\end{figure}
 
 
 \section{Threats to validity}
@@ -1603,7 +1615,7 @@ interested readers may find that they help flesh out some details.
     elision optimisation (where finalizers which are used only to deallocate
     memory are removed). Each benchmark is run for \benchmarkpexecs process executions, where
     the error bars represent 99\% confidence intervals.}
-\label{plot:elision_breakdown}
+\label{fig:Eelision_breakdown}
 \end{figure}
 
 \begin{figure}[t!]
@@ -1627,7 +1639,7 @@ interested readers may find that they help flesh out some details.
      where barriers are optimised away using \ourgc's optimisation (section
      \jake{XYZ}) Each benchmark is run for \benchmarkpexecs process executions, where
     the error bars represent 99\% confidence intervals.}
-\label{plot:barriers_breakdown}
+\label{fig:Eprem_breakdown}
 \end{figure}
 
 \begin{figure}[!t]
