@@ -538,7 +538,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \label{sec:elision}
 
 Finalizers are much slower to run than destructors --- running every Rust destructor
-as a GC finalizer in \ourgc causes a \somrselision{felide}{all}{percent} slowdown
+as a GC finalizer in \ourgc causes a \jake{worst case} slowdown
 in our benchmark suite. In this section we show how to sidestep much of this overhead.
 
 A variety of factors contribute to the performance overhead of finalizers, such as:
@@ -788,7 +788,7 @@ solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
 optimise values of other types as it so wishes. However, our approach still
 imposes a performance overhead on code that uses
 \lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
-\somrsbarriers{bnaive}{fibonacci}{speedup} \laurie{this figure seems wrong}.
+\somrsastbarriers{bnaive}{worstperf}{percent} \laurie{this figure seems wrong}.
 
 Fortunately, we can optimise premature finalizer prevention further by
 piggy-backing on finalizer elision: if a finalizer can be
@@ -1336,10 +1336,12 @@ collector threads.
     reference has a corresponding barrier; and \emph{None}, where barriers can
     be optimised away where \ourgc is certain they are unnecessary. Each
     benchmark is run for 30 process executions, where the error bars represent
-    99\% confidence intervals. We have disabled finaliser elision for this experiment. \jake{It's difficult to draw conclusions about this
-    because of a) overlapping CIs b) the non-determinism in how barriers affect the optimiser and
-    when GCs are scheduled c) how long things will be kept alive for
-    finalisation} \jake{show the difference in finalisable objects run} A more detailed breakdown is available in Appendix \cref{fig:barriers_breakdown}}
+    99\% confidence intervals. We have disabled finaliser elision for this
+    experiment.\jake{Todo: put the numbers in like this}\protect\somrsastbarriers{bnaive}{worstperf}{percent} \jake{It's difficult to draw conclusions about this because of
+    a) overlapping CIs b) the non-determinism in how barriers affect the
+    optimiser and when GCs are scheduled c) how long things will be kept alive
+    for finalisation}A more
+    detailed breakdown is available in Appendix \cref{fig:barriers_breakdown}}
 \label{fig:barriers}
 \end{figure}
 
@@ -1623,11 +1625,11 @@ of the paper for those who may benefit from them.
     \centering
     \begin{subfigure}{\textwidth}
     \includegraphics[width=1\textwidth]{plots/som_rs_ast_barriers.pdf}
-    \caption{\somrsast}
+    \caption{\somrsast Worst one is \protect\somrsastbarriers{bopt}{worstperf}{name}}
     \end{subfigure}
     \begin{subfigure}{\textwidth}
     \includegraphics[width=1\textwidth]{plots/som_rs_bc_barriers.pdf}
-    \caption{\somrsbc}
+      \caption{\somrsbc Worst one is \protect\somrsbcbarriers{bopt}{worstperf}{name}}
     \end{subfigure}
     \begin{subfigure}{\textwidth}
     \includegraphics[width=1\textwidth]{plots/yksom_barriers.pdf}
