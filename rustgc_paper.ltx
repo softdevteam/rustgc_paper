@@ -235,7 +235,7 @@ subset might benefit from GC.
 
 GC is a venerable field and has accumulated terminology that can seem
 unfamiliar or unintuitive. We mostly use the same terminology
-as~\cite{jones16garbage}, the major parts of which we define here.
+as~\cite{jones23garbage}, the major parts of which we define here.
 
 A program which uses GC is split between the \emph{mutator} (the user's program) and
 the \emph{collector} (the GC itself). At any given point in time, a particular thread is either
@@ -914,7 +914,7 @@ or wholly `finalized'.
 
 Most languages and systems we are aware of assume that users either don't run into
 this problem (finalization cycles are considered rare in GCed
-languages~\citep[p.~229]{jones16garbage}) or know how to deal
+languages~\citep[p.~229]{jones23garbage}) or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalization~\cite[p.~11]{boehm03destructors}). There is no fully
 automatic solution to this problem, with the closest solution being those GCs
