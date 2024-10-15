@@ -4,7 +4,10 @@ use std::cell::RefCell;
 
 struct GcNode { value: u8, nbr: Option<Gc<RefCell<GcNode>>> }
 impl Drop for GcNode {
-  fn drop(&mut self) { self.value = 0; println!("{}", self.nbr.unwrap().borrow().value); }
+  fn drop(&mut self) {
+    self.value = 0;
+    println!("{}", self.nbr.unwrap().borrow().value);
+  }
 }
 fn f()  {
   let mut gc1 = Gc::new(RefCell::new(GcNode{value: 1, nbr: None}));
