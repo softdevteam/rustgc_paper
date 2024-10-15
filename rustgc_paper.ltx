@@ -1192,9 +1192,13 @@ to \rustc with a modern system allocator would be uncomfortably
 close to apples and oranges. We therefore use \boehm as the allocator
 for both \ourgc and \rustc.
 
-We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
-intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wall clock time of a pexec or ...)}\jake{yes, wall clock time of a pexec, measured by \lstinline{/usr/bin/time}}
+We ran each benchmark in our suite 30 times reporting 99\% confidence intervals
+\laurie{what about the memory benchmarks --- those don't have CIs?}. For those
+benchmarks reporting timings, we measured wall-clock time of a process using
+the standard Unix \lstinline{time} command. \laurie{how did we measure memory?}
+
 \jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
+\laurie{why don't we use \lstinline{time} for binarytrees and regexredux?}
 
 
 \subsection{Results}
@@ -1249,11 +1253,11 @@ collector threads.
 
 \begin{figure}[t!]
     \centering
-    \begin{subfigure}{0.48\textwidth}
+    \begin{subfigure}{0.49\textwidth}
     \includegraphics[width=1\textwidth]{plots/elision.pdf}
     \end{subfigure}
     \hfill
-    \begin{subfigure}{0.48\textwidth}
+    \begin{subfigure}{0.49\textwidth}
     \includegraphics[width=\textwidth]{plots/elision_mem.pdf}
     \end{subfigure}
     \caption{Performance (left) and memory (right) results of the \Eelision
@@ -1268,11 +1272,11 @@ collector threads.
 
 \begin{figure}[t!]
     \centering
-    \begin{subfigure}{0.48\textwidth}
+    \begin{subfigure}{0.49\textwidth}
     \includegraphics[width=\textwidth]{plots/barriers.pdf}
     \end{subfigure}
     \hfill
-    \begin{subfigure}{0.48\textwidth}
+    \begin{subfigure}{0.49\textwidth}
     \includegraphics[width=\textwidth]{plots/barriers_mem.pdf}
     \end{subfigure}
     \caption{Performance (left) and memory (right) results of the \Epremopt
@@ -1539,7 +1543,7 @@ of the paper for those who may benefit from them.
     error bars represent 99\% confidence intervals.\jake{Parsing all java
     source files of 4 of the biggest open source java repos.}\jake{Number of
     .java source files processed: jenkins (1804), hadoop(12092), eclipse(5394),
-    spring(8757)}}
+    spring(8757)} \laurie{i'm surprised by the memory benchmarks: how can alloy be using so much less memory than Rc given that, by definition, alloy must be keeping memory alive for longer?}}
 \label{fig:grmtools}
 \end{figure}
 
