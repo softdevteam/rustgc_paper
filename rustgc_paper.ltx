@@ -385,6 +385,7 @@ variable.
 In many GCed languages, `destructor' and `finalizer' are used as synonyms, as
 both terms refer to code run when a value's lifetime has ended. In existing GCs
 for Rust, these two terms tend to refer to highly related, but irritatingly
+\edd{"subtly" better?}
 different, concepts; and, as we will see later, in \ourgc, finalizers are best
 thought of as a subset of destructors.
 
@@ -405,6 +406,11 @@ are released. A casual perusal of Rust code will quickly show that
 drop methods are used frequently and that users fairly often
 implement their own drop methods.
 
+\edd{The description of a destructor is now good. Do you need just one or two
+sentences describing what (traditionally) a finalizer is in a language like
+Java before talking about how they've evolved to Rust GCs? My understanding is
+that it's just a destructor (with additional requirements) that is run by the
+GC, instead of the "core language runtime"}
 Most existing GCs for Rust are forced to have separate notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
@@ -481,7 +487,8 @@ Finally, finalization and cycles are not happy bedfellows: finalizers
 can reference other GCed values that are partly, or wholly, `finalized' and may
 even have had their backing memory reused. A related, but
 distinct, problem is the ability of finalizers to `resurrect' values by
-copying the reference passed to the finalizer and storing it somewhere.
+copying the reference passed to the finalizer and storing it somewhere\edd{what
+do the existing rust GCs do about this?}.
 
 
 \subsection{The Challenge of Finalizers for \ourgc}
