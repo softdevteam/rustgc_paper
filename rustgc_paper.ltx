@@ -1193,7 +1193,7 @@ close to apples and oranges. We therefore use \boehm as the allocator
 for both \ourgc and \rustc.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
-intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wall clock time of a pexec or ...)}
+intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wall clock time of a pexec or ...)}\jake{yes, wall clock time of a pexec, measured by \lstinline{/usr/bin/time}}
 \jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
 
 
@@ -1203,9 +1203,28 @@ intervals. \laurie{we need to say what time measurement(s) we're using (e.g.~wal
 \scalebox{0.7}{%
   \input{table_overview}
 }
-  \vspace{5pt}
-  \caption{Overview of results across all benchmarks \jake{TODO: grmtools and
-  mini-moka}}
+  \vspace{5pt} \caption{Overview of results across all benchmarks. \jake{TODO:
+  mini-moka}. For \binarytrees, typed-arena performs the best, however, it
+  allocates the most amount of memory (\jake{percent more than \ourgc}) because
+  it removes it all in one go at the end. \rustgc performs the worst and
+  looking at the perf report this is because most of the time is spent in its
+  cycle-tracing code (which is not very well optimised at all). \grmtools is an
+  allocation heavy benchmark, and while \rc is \jake{percent} faster over the
+  entire suite of Java programs, it uses far more memory than \ourgc
+  (\jake{percent}on average). (see \cref{fig:grmtools} in the Appendix for a
+  breakdown of this over the individual Java projects). \sws is a production
+  static http server which we converted to use \ourgc in it and its
+  \emph{hyper} request library. We use the standard \emph{wrk} http
+  benchmarking tool to fire as many requests as possible to \sws in one minute.
+  This benchmark measures the number of http requests per second which
+  \emph{wrk} received responses to and shows the number of requests per second.
+  For the SOM VMs, we report the geometric mean across all 26 benchmarks. We
+  are unable to report a comparison for \yksom as it was infeasible to port
+  this to use \rc (or another shared memory strategy). Note the stark
+  performance differences between \ourgc and \rc for \somrsast. This is because
+  (unlike for \somrsbc) we are only able to elide \jake{perc elided}
+  finalisers, (compared to \somrsbc's \jake{input}). Each benchmark is run for
+  30 process executions, and we report 99\% confidence intervals.}
   \label{table:overview}
 \end{table}
 
@@ -1235,16 +1254,16 @@ collector threads.
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.48\textwidth}
-    \includegraphics[width=\textwidth]{plots/elision.pdf}
+    \includegraphics[width=\textwidth]{plots/elision_mem.pdf}
     \end{subfigure}
-    \caption{Performance (left) and memory (right) \laurie{these is the same graph?} results of the \Eelision
+    \caption{Performance (left) and memory (right) results of the \Eelision
     experiment. For all three SOM VMs, we use the same SOM version of the `Are
     We Fast Yet?' benchmark suite and take the geometric mean of all 26
     benchmarks. \emph{Elision} shows the results after \ourgc's finalizer
     elision optimisation (\cref{sec:elision}) and \emph{Naive} is with no
     optimisation applied. Each benchmark is run for 30 process executions,
     where the error bars represent 99\% confidence intervals.}
-\label{graph:elision}
+\label{fig:elision}
 \end{figure}
 
 \begin{figure}[t!]
@@ -1254,9 +1273,9 @@ collector threads.
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.48\textwidth}
-    \includegraphics[width=\textwidth]{plots/barriers.pdf}
+    \includegraphics[width=\textwidth]{plots/barriers_mem.pdf}
     \end{subfigure}
-    \caption{Performance (left) and memory (right) \jake{TODO replace graph}results of the \Epremopt
+    \caption{Performance (left) and memory (right) results of the \Epremopt
     experiment. For all three SOM VMs, we use the same SOM version of the `Are
     We Fast Yet?' benchmark suite and take the geometric mean of all 26
     benchmarks. \emph{None} shows the results where there are no compiler
@@ -1264,8 +1283,11 @@ collector threads.
     reference has a corresponding barrier; and \emph{None}, where barriers can
     be optimised away where \ourgc is certain they are unnecessary. Each
     benchmark is run for 30 process executions, where the error bars represent
-    99\% confidence intervals.}
-\label{graph:elision}
+    99\% confidence intervals. We have disabled finaliser elision for this experiment. \jake{It's difficult to draw conclusions about this
+    because of a) overlapping CIs b) the non-determinism in how barriers affect the optimiser and
+    when GCs are scheduled c) how long things will be kept alive for
+    finalisation} \jake{show the difference in finalisable objects run} A more detailed breakdown is available in Appendix \cref{fig:barriers_breakdown}}
+\label{fig:barriers}
 \end{figure}
 
 
@@ -1336,7 +1358,7 @@ progress beyond reference counting. This support was removed\footnote{In commit
 around a year before the first stable release of Rust. This was not the end
 of the story for `GC as a core part of Rust', with core Rust developers exploring
 the problem space in more detail~\citep{felix15specifying, felix16roots,
-manish16gc}. However, efforts in this direction seem to have petered out,
+manish16gc}. However, efforts in this direction seem to have petered out,\jake{Though manishearth did a survey in 2021 \cite{manish21arena}}
 at which point those interested in GC for Rust largely moved from anticipating
 \rustc support to expecting to have to do everything in user-level libraries.
 
@@ -1354,16 +1376,16 @@ bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictiv
 than \ourgc's \lstinline{Gc<T>}. However, unlike our approach in
 \cref{sec:cycles_and_finalization}, it does not prevent finalizers accessing
 shared data, and so seemingly safe destructors can undermined soundness (see
-\laurie{let's put an example in the appendix}). Unlike most other GCs for
+\laurie{let's put an example in the appendix}\jake{It will panic at runtime. I'm not sure if this is technically a soundness problem, because you can't do memory unsafety.}). Unlike most other GCs for
 Rust, destruction in \textsc{BaconRajanGC} can be
 seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
-0; GCed values inside cycles cycles at the end of the \lstinline{collect_cycles} function.
+0; GCed values inside cycles at the end of the \lstinline{collect_cycles} function.
 
 Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
 covered in \cref{sec:destructor challenges}). \rustgc provides an API closer to
 \ourgc's \lstinline{Gc<T>}, with the notable exception that its \lstinline{Gc}
 is not, and indeed cannot be, copyable, thus always requiring calls to
-\lstinline{Gc::clone} \laurie{does it have into\_raw?}. Similarly to
+\lstinline{Gc::clone} \laurie{does it have into\_raw?}\jake{no}. Similarly to
 \textsc{BaconRajanGC}, GCed values are reference counted, with occasional
 tracing sweeps to identify cycles, though \rustgc performs cycle detection
 automatically (i.e.~it doesn't require manual calls to a function such as
@@ -1514,8 +1536,11 @@ of the paper for those who may benefit from them.
     \end{subfigure}
     \caption{Performance (left) and memory (right) results of the \grmtools
     experiment. Each benchmark is run for 30 process executions, where the
-    error bars represent 99\% confidence intervals.}
-\label{graph:barriers}
+    error bars represent 99\% confidence intervals.\jake{Parsing all java
+    source files of 4 of the biggest open source java repos.}\jake{Number of
+    .java source files processed: jenkins (1804), hadoop(12092), eclipse(5394),
+    spring(8757)}}
+\label{fig:grmtools}
 \end{figure}
 
 \begin{figure}[t!]
@@ -1563,17 +1588,6 @@ of the paper for those who may benefit from them.
     the error bars represent 99\% confidence intervals.}
 \label{plot:barriers_breakdown}
 \end{figure}
-
-% \begin{figure}[t!]
-%     \centering
-%     \includegraphics[width=1\textwidth]{plots/yksom_finalizers.pdf}
-%     \caption{Results of a performance of \yksom using two configurations: naive
-%     finalization (where no optimisation is performed); and \ourgc's finalizer
-%     elision optimisation (where finalizers which are used only to deallocate
-%     memory are removed). Each benchmark is run for 30 process executions, where
-%     the error bars represent 99\% confidence intervals.}
-% \label{graph:yksom_finalizers}
-
 
 \begin{figure}[!t]
 \begin{lstrustsmall}
