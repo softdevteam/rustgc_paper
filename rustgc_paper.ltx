@@ -1535,12 +1535,14 @@ a separate download of the particular data our run of the experiment produced.
 
 \appendix
 
-\section{Algorithms}
+\section*{Further details}
 
-In this appendix, we show more formal versions of the algorithm descriptions
-from the main body of the paper for those who may benefit from them.
+In this appendix, we show additional formal algorithms and additional plots.
+None of these are necessary to understand the main part of the paper, but
+interested readers may find that they help flesh out some details.
 
-\begin{figure}[b]
+\begin{algorithm}[h]
+\caption{Removing elidable drops}
 \begin{algorithmic}
 \Function{RemoveElidableDrops}{$func$}
       \ForEach {$basic\_block \in func$}
@@ -1560,35 +1562,16 @@ from the main body of the paper for those who may benefit from them.
     \State $block.terminator \gets last\_block.terminator$
 \EndFunction
 \end{algorithmic}
-% \end{algorithm}
-  \captionof{algorithm}{The MIR pass for removing premature finalizer barriers
-  for types with elided finalizers. This pass is registered inside \rustc,
-  where it is invoked on all \textit{func}s in the program. The
-  \textit{RemoveElidableDrops} iterates each basic block in a function in order
-  to inspect whether the terminator is a call to a drop method as these are the
-  only terminators of interest in this pass. If a ``drop terminator'' is found,
-  then we check the type of the value being dropped. If the type of the value
-  being dropped is a \lstinline{Gc<T>}, and its finalizer can be elided, then
-  the drop terminator can be replaced. We can then replace these terminators by
-  ``leaping over'' the drop method and patching it to the next basic block in
-  the control flow.}
   \label{alg:barrier_removal}
-\end{figure}
+\end{algorithm}
 
-\clearpage
-
-\section{Detailed Plots}
-
-In this appendix, we show detailed plots for the experiments from the main body
-of the paper for those who may benefit from them.
-
-\begin{figure}[t!]
+\begin{figure}[h]
     \centering
-    \begin{subfigure}{0.45\textwidth}
+    \begin{subfigure}{0.48\textwidth}
     \includegraphics[width=1\textwidth]{plots/grmtools.pdf}
     \end{subfigure}
     \hfill
-    \begin{subfigure}{0.45\textwidth}
+    \begin{subfigure}{0.48\textwidth}
     \includegraphics[width=1\textwidth]{plots/grmtools_mem.pdf}
     \end{subfigure}
     \caption{Performance (left) and memory (right) results of the \grmtools
