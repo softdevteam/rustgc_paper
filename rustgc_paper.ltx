@@ -880,7 +880,7 @@ Thus, thanks to auto traits, any type \lstinline{T} which implements
 program contains a \lstinline{Gc<T>} type, \ourgc checks whether it has a
 finalizer: if it does,
 and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
-raised.
+raised\edd{show the error?}.
 
 
 \subsection{Cycles and Finalization}
@@ -899,7 +899,8 @@ raised.
   The `seemingly expected' output of \lstinline{1 2} or \lstinline{2 1} would
   never be printed: whichever GCed value is finalized first changes what the
   other GCed value sees in its finalizer. As that implies, this example is
-  unsound: whichever finalizer runs second leads to undefined behaviour.},
+  unsound: whichever finalizer runs second leads to undefined behaviour.\edd{is
+  it UB or just non-determinism?}},
   label={fig:finalizer_cycle}
 ]{listings/finalization_cycle.rs}
 \end{figure}
