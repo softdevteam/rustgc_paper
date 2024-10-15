@@ -392,10 +392,11 @@ variable.
 
 In many GCed languages, `destructor' and `finalizer' are used as synonyms, as
 both terms refer to code run when a value's lifetime has ended. In existing GCs
-for Rust, these two terms tend to refer to highly related, but irritatingly
-\edd{"subtly" better?}
-different, concepts; and, as we will see later, in \ourgc, finalizers are best
-thought of as a subset of destructors.
+for Rust, these two terms tend to refer to related, but definitely distinct,
+concepts. As we will see later, in \ourgc, finalizers are best
+thought of as a subset of destructors. In this section we gradually pick apart
+these differences, before describing the challenges of using destructors as
+finalizers.
 
 When a value in Rust is \emph{dropped} (i.e.~the value's owner went out of lexical
 scope) its destructor is automatically run. Rust destructors are formed of two
@@ -414,12 +415,8 @@ are released. A casual perusal of Rust code will quickly show that
 drop methods are used frequently and that users fairly often
 implement their own drop methods.
 
-\edd{The description of a destructor is now good. Do you need just one or two
-sentences describing what (traditionally) a finalizer is in a language like
-Java before talking about how they've evolved to Rust GCs? My understanding is
-that it's just a destructor (with additional requirements) that is run by the
-GC, instead of the "core language runtime"}
-Most existing GCs for Rust are forced to have separate notions of destructors and finalizers.
+Finalizers are an important concept for most GCs, subsuming the notion of destructors.
+However, most existing GCs for Rust are forced to have separate notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait for that type.
@@ -451,17 +448,14 @@ tempting to have the \lstinline{finalize} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
 glue to be run afterwards.
 
-In summary: destruction is a core part of Rust; a GC for Rust ideally needs to
-maintain most if not all of those properties for finalization; but some parts
-cannot be replicated in normal user code.
-
 
 \subsection{General Challenges When Using Destructors as Finalizers}
 \label{sec:general_challenges}
 
-Even if there were no Rust-specific challenges to using destructors as
-finalizers, we would still face the problem that finalizers and destructors
-have different, and sometimes incompatible, properties. The best overall
+We have stated our aim that \ourgc should use destructors as finalisers.
+Above we explained some Rust-specific challenges --- but there are several
+non-Rust-specific challenges too! Fundamentally, finalizers and destructors
+have different, and sometimes incompatible, properties. The best
 guide to these differences, and the resulting problems, is~\cite{boehm03destructors},
 supplemented by later work by some of the same authors on support
 for GC in the C++ specification~\cite{boehm09garbage}\footnote{These features
@@ -495,16 +489,14 @@ Finally, finalization and cycles are not happy bedfellows: finalizers
 can reference other GCed values that are partly, or wholly, `finalized' and may
 even have had their backing memory reused. A related, but
 distinct, problem is the ability of finalizers to `resurrect' values by
-copying the reference passed to the finalizer and storing it somewhere\edd{what
-do the existing rust GCs do about this?}.
+copying the reference passed to the finalizer and storing it somewhere.
 
 
 \subsection{The Challenge of Finalizers for \ourgc}
 
 At this point we hope to have convinced the reader of two general points: a
 viable GC for Rust needs to be able to use existing destructors as finalizers
-whenever possible\edd{Make the "In summary" sentence of Sec 4 say this more
-explicitely?}; and that finalizers, even in existing GCs, cause
+whenever possible; and that finalizers, even in existing GCs, cause
 various problems.
 
 Over time, finalizers have come to be viewed with increasing suspicion. Java,
@@ -517,10 +509,8 @@ to make finalizers less problematic; existing \lstinline{Finalize} traits
 do not impose any such restrictions.
 
 Our desire that \ourgc should use existing Rust destructors as finalizers whenever
-possible may seem out of reach. Indeed, in the nearest
-context \edd{closest relative?}to our work GC for C++ \edd{put commas around
-"GC for C++"?}this solution was explicitly ruled out for GC for
-C++\edd{duplicate "GC for C++"} as the
+possible may seem out of reach. As alluded to above, in a proposal for GC
+for C++, the desire was ruled out as the
 problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
 problems down into four:
 (1) finalizers are prohibitively slower than destructors;
@@ -551,9 +541,8 @@ not suggest that it is missing optimisations which would reduce most of this ove
 
 Instead, whenever possible, \ourgc \emph{elides} finalizers so that they do not need to be run at all.
 We are able to do this because many Rust destructors
-exclusively do \edd{the same} work that a GC will \edd{would} do anyway --- when used as finalizers,
-such destructors are unnecessary\edd{that sounds like destructor elision, but I
-was expecting finaliser elision}.
+only do work that a GC would do anyway --- there is thus no need to
+run such destructors as finalizers.
 
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
@@ -569,9 +558,7 @@ cannot elide the destructors themselves, as they are still necessary to ensure
 predictable destruction in non-\lstinline{Gc<T>} Rust code.}, as the underlying memory will
 naturally be freed by \boehm anyway. Indeed, since the drop method only
 calls \lstinline{free}, any resulting finalizer would cause the underlying
-allocation to live longer than if the finalizer was not present!\edd{So are we
-saying that unless elided, all drop methods are converted to finalisers? Even
-those not wrapped in a GC box?}
+allocation to live longer than if the finalizer was not present!
 
 This means that there is no need to run a finalizer for a type such as
 \lstinline{Gc<Box<u8>>} and we can statically elide it. However, we can not
@@ -590,11 +577,11 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \label{alg:elision}
 \begin{algorithmic}
 \Function{RequiresFinalizer}{$T$}
-    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, $DropMethodFinalizerElidable$}}
+    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, \textit{DropMethodFinalizerElidable}}}
         \State \Return{true}
     \EndIf
-\ForEach {$field \in type$}\edd{s/type/T?}
-    \If{\Call{RequiresFinalizer}{$field$}}
+  \ForEach {\textit{field} $\in T$}
+    \If{\Call{RequiresFinalizer}{\textit{field}}}
         \State \Return{true}
     \EndIf
 \EndFor
@@ -602,10 +589,6 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \EndFunction
 \end{algorithmic}
 \end{algorithm}
-
-\edd{the kerning is wrong for variables like "field" in the algorithm. Tex is
-formatting it as though it's a mathematical product of the consituent letters!
-Wrap the word in textrm or similar?}
 
 \label{requires_finalizer_intrinsic}
 The aim of finalizer elision is to statically determine which type's destructors do
@@ -618,15 +601,16 @@ new \lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
 trait without methods). This trait and can be
 used by a programmer to signify that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. The `Drop'
-part of the trait name is deliberate: it allows the programmer to reason
+part of the trait name is deliberate (i.e.~it is not a simplification of
+`destructor'): it allows the programmer to reason
 only about the `top-level' type. If the type has a transitively reachable field
-has a type which implements\edd{something doesn't parse near here} the \lstinline{Drop} trait but not the
+whose type implements the \lstinline{Drop} trait but not the
 \lstinline{DropMethodFinalizerElidable} trait, then then the top-level type
 still requires finalization. This not only checks drop glue, but allows the
 programmer to safely reason about types with type parameters without knowing
 the concrete types passed to those parameters.
 
-Even though neither normal Rust destructors or\edd{nor?} \ourgc finalizers are guaranteed
+Even though neither normal Rust destructors or \ourgc finalizers are guaranteed
 to run, a program whose destructors or finalizers never run would probably not
 be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We
 therefore make \lstinline{DropMethodFinalizerElidable} an unsafe
@@ -880,7 +864,7 @@ Thus, thanks to auto traits, any type \lstinline{T} which implements
 program contains a \lstinline{Gc<T>} type, \ourgc checks whether it has a
 finalizer: if it does,
 and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
-raised\edd{show the error?}.
+raised.
 
 
 \subsection{Cycles and Finalization}
@@ -894,13 +878,12 @@ raised\edd{show the error?}.
   caption={An example of the problems that come from mixing cycles
   and finalization. The salient difference from~\cref{fig:first_example} is that
   the drop method sets the value of a field inside \lstinline{nbr} (line 4). Running this
-  program on a strong memory model machine would non-deterministically print \lstinline{2 0} or \lstinline{1 0}
+  program on a strong memory model machine is likely to print either \lstinline{2 0} or \lstinline{1 0}
   depending on whether \lstinline{gc1} or \lstinline{gc2} is finalized first.
   The `seemingly expected' output of \lstinline{1 2} or \lstinline{2 1} would
   never be printed: whichever GCed value is finalized first changes what the
   other GCed value sees in its finalizer. As that implies, this example is
-  unsound: whichever finalizer runs second leads to undefined behaviour.\edd{is
-  it UB or just non-determinism?}},
+  unsound: whichever finalizer runs second leads to undefined behaviour.},
   label={fig:finalizer_cycle}
 ]{listings/finalization_cycle.rs}
 \end{figure}
@@ -1028,10 +1011,8 @@ FSA is deliberately conservative. In particular, when checking whether drop
 methods satisfy certain properties, FSA naturally checks whether code
 reachable from those drop methods satisfies those properties. Currently,
 function calls which are inlined are checked in detail, but all other function
-calls are assumed it fails to meet the stated
-property\edd{wording a bit clumsy here. how about "but for all other function
-calls, it is assumed that the required properties are not satisfied"}. Calls to
-non-lined \edd{non-inlined?}normal Rust functions are not checked due to
+calls are considered \emph{opaque} and fail FSA's checks. Calls to
+non-inlined normal Rust functions are not checked due to
 a minor limitation inside \ourgc. Other kinds of function call are fundamentally
 hard or impossible to check, specifically: calls to externally linked (e.g.~an FFI
 call to C) function; or dynamic dispatch calls in \emph{trait objects}, where we can't
@@ -1192,7 +1173,7 @@ our methodology and our experimental results.
 
 \subsection{Methodology}
 
-We ran four main experiments:
+In order to understand the performance of \ourgc we ran four experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
