@@ -1029,7 +1029,9 @@ methods satisfy certain properties, FSA naturally checks whether code
 reachable from those drop methods satisfies those properties. Currently,
 function calls which are inlined are checked in detail, but all other function
 calls are assumed it fails to meet the stated
-property. Calls to non-lined normal Rust functions are not checked due to
+property\edd{wording a bit clumsy here. how about "but for all other function
+calls, it is assumed that the required properties are not satisfied"}. Calls to
+non-lined \edd{non-inlined?}normal Rust functions are not checked due to
 a minor limitation inside \ourgc. Other kinds of function call are fundamentally
 hard or impossible to check, specifically: calls to externally linked (e.g.~an FFI
 call to C) function; or dynamic dispatch calls in \emph{trait objects}, where we can't
