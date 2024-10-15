@@ -20,27 +20,31 @@ each of these problems.
 \section{Introduction}
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=6, basicstyle=\footnotesize\ttfamily]{listings/first_example.rs}
-\captionof{lstlisting}{An \ourgc example, showing use of the \lstinline{Gc<T>}
-  type and destructors as finalizers. We create a type \lstinline{GcNode} which
-  models a graph: it stores an 8 bit integer value and a reference (possibly
-  \lstinline{None} (i.e.~`null'), via Rust's standard \lstinline{Option} type) to a neighbouring node
-  (line 1). We add a normal Rust destructor which \ourgc is able to use as a
-  finalizer when \lstinline{GcNode} is used inside \lstinline{Gc<T>} (line 2).
-  Inside \lstinline{main} we create the first GCed node in the graph (line 5).
-  We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
-  (using the \lstinline{RefCell::borrow\_mut} method to dynamically detect mutation that
-  would undermine Rust's static borrow checker rules)
-  and a cycle created directly back to itself (line 6). We then create a second cyclic graph (lines 7
-  and 8), immediately assigning it to the \lstinline{gc1} variable (line 9):
-  note this copies, rather than moves, the \lstinline{Gc<T>}.
-  Doing so means that the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
-  is no longer reachable, so when we force a collection (line 10) that node
-  can be recognised as collectable. Its finalizer is then scheduled to be run, causing
-  \lstinline{drop 1} to be printed out at a later point; when it has completed the GC
-  heap memory can be reclaimed. The print statement outputs \lstinline{2 2} (line
-  11).}
-\label{fig:first_example}
+\lstinputlisting[
+  language=Rust,
+  firstline=6,
+  basicstyle=\footnotesize\ttfamily,
+  caption={An \ourgc example, showing use of the \lstinline{Gc<T>}
+    type and destructors as finalizers. We create a type \lstinline{GcNode} which
+    models a graph: it stores an 8 bit integer value and a reference (possibly
+    \lstinline{None} (i.e.~`null'), via Rust's standard \lstinline{Option} type) to a neighbouring node
+    (line 1). We add a normal Rust destructor which \ourgc is able to use as a
+    finalizer when \lstinline{GcNode} is used inside \lstinline{Gc<T>} (line 2).
+    Inside \lstinline{main} we create the first GCed node in the graph (line 5).
+    We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
+    (using the \lstinline{RefCell::borrow\_mut} method to dynamically detect mutation that
+    would undermine Rust's static borrow checker rules)
+    and a cycle created directly back to itself (line 6). We then create a second cyclic graph (lines 7
+    and 8), immediately assigning it to the \lstinline{gc1} variable (line 9):
+    note this copies, rather than moves, the \lstinline{Gc<T>}.
+    Doing so means that the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
+    is no longer reachable, so when we force a collection (line 10) that node
+    can be recognised as collectable. Its finalizer is then scheduled to be run, causing
+    \lstinline{drop 1} to be printed out at a later point; when it has completed the GC
+    heap memory can be reclaimed. The print statement outputs \lstinline{2 2} (line
+    11).},
+  label={fig:first_example}
+]{listings/first_example.rs}
 \end{figure}
 
 Amongst the ways one can classify programming languages are whether they
@@ -138,23 +142,27 @@ readers to skip material they are already comfortable with.
 \subsection{Does Rust need a GC?}
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust, firstline=5, basicstyle=\footnotesize\ttfamily]{listings/rc_example.rs}
-\captionof{lstlisting}{
-  A version of~\cref{fig:first_example} using Rust's standard reference
-  counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
-  references between nodes (line 1). We again create two cyclic graphs (lines
-  6--9) using \lstinline{Rc::downgrade} to create weak references (lines 7 and
-  0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
-  \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
-  variables point to the same cyclic graph (line 10). Accessing a neighbour
-  node becomes a delicate dance requiring upgrading the weak reference (line 11).
-  The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
-  (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
-  creates significant extra complexity relative to~\cref{fig:first_example}: compare
-  line 11 in \cref{fig:first_example} to (the much more complex) lines 10-12
-  in this \lstinline{Rc} example.
-}
-\label{fig:rc_example}
+\lstinputlisting[
+  language=Rust,
+  firstline=5,
+  basicstyle=\footnotesize\ttfamily,
+  caption={
+    A version of~\cref{fig:first_example} using Rust's standard reference
+    counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
+    references between nodes (line 1). We again create two cyclic graphs (lines
+    6--9) using \lstinline{Rc::downgrade} to create weak references (lines 7 and
+    0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
+    \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
+    variables point to the same cyclic graph (line 10). Accessing a neighbour
+    node becomes a delicate dance requiring upgrading the weak reference (line 11).
+    The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
+    (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
+    creates significant extra complexity relative to~\cref{fig:first_example}: compare
+    line 11 in \cref{fig:first_example} to (the much more complex) lines 10-12
+    in this \lstinline{Rc} example.
+  },
+  label={fig:rc_example}
+]{listings/rc_example.rs}
 \end{figure}
 
 Rust uses affine types and \emph{ownership}
@@ -628,8 +636,12 @@ but they are extensively used in real Rust code: as we shall see in \cref{sec:ev
 they are an important part of allowing us to elide significant numbers of finalizers in real code.
 
 \begin{figure}[t]
-  \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily,
-    label={listing:elision_in_rustc}, caption={
+  \begin{lstlisting}[
+    language=Rust,
+    numbers=none,
+    basicstyle=\footnotesize\ttfamily,
+    label={listing:elision_in_rustc},
+    caption={
       A simplified view of how finalizers are elided inside \ourgc. The new compiler intrinsic
       \lstinline{requires_finalizer} returns true if a finalizer is required for a
       type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
@@ -665,7 +677,8 @@ finalizer?' checks have no run-time cost at all.
 
 \begin{figure}[tb]
 \begin{lstlisting}[
-  language=Rust, basicstyle=\footnotesize\ttfamily,
+  language=Rust,
+  basicstyle=\footnotesize\ttfamily,
   caption={An example of code that, when fully optimised, can cause premature
     finalization. We create a new struct \lstinline{S} that wraps an integer
     (line 1) with a drop method that sets the integer to zero (line 2). In the
@@ -680,6 +693,7 @@ finalizer?' checks have no run-time cost at all.
     label={fig:premature_finalization}]
 struct S { value: u8 }
 impl Drop for S { fn drop(&mut self) { self.value = 0; } }
+
 fn main()  {
   let root = Gc::new(Box::new(S{ value: 1 }));
   let inner: &u8 = &**root.value;
@@ -863,9 +877,11 @@ raised.
 \label{sec:cycles_and_finalization}
 
 \begin{figure}[tb]
-\lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
-  firstline=5]{listings/finalization_cycle.rs}
-\captionof{lstlisting}{An example of the problems that come from mixing cycles
+\lstinputlisting[
+  language=Rust,
+  basicstyle=\footnotesize\ttfamily,
+  firstline=5,
+  caption={An example of the problems that come from mixing cycles
   and finalization. The salient difference from~\cref{fig:first_example} is that
   the drop method sets the value of a field inside \lstinline{nbr} (line 4). Running this
   program on a strong memory model machine would non-deterministically print \lstinline{2 0} or \lstinline{1 0}
@@ -873,8 +889,9 @@ raised.
   The `seemingly expected' output of \lstinline{1 2} or \lstinline{2 1} would
   never be printed: whichever GCed value is finalized first changes what the
   other GCed value sees in its finalizer. As that implies, this example is
-  unsound: whichever finalizer runs second leads to undefined behaviour.}
-\label{fig:finalizer_cycle}
+  unsound: whichever finalizer runs second leads to undefined behaviour.},
+  label={fig:finalizer_cycle}
+]{listings/finalization_cycle.rs}
 \end{figure}
 
 One of the main motivations for GCs is that they solve problems with cyclic
@@ -923,17 +940,20 @@ check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 \label{sec:fsa_finalizer_thread}
 
 \begin{figure}[t]
-\lstinputlisting[language=Rust, basicstyle=\footnotesize\ttfamily,
- firstline=10]{listings/finalizer_deadlock.rs}
-\captionof{lstlisting}{How destructors can cause deadlocks when used as
+\lstinputlisting[
+  language=Rust,
+  basicstyle=\footnotesize\ttfamily,
+  firstline=10,
+  caption={How destructors can cause deadlocks when used as
   finalizers. The mutator creates a reference-counted mutex (line 6),
   placing a copy in a \lstinline{GcNode} that immediately goes out of scope
   (line 7). The mutator then acquires the lock (line 8) but before it
   can release the lock a GC cycle occurs and the \lstinline{GcNode}'s
   finalizer run (line 9). If the finalizer is run on the same thread
   as the mutator, then it will fail to grab the lock (line 2) and cause
-  a deadlock as the mutator cannot continue and release the lock.}
-\label{fig:finalizer_deadlock}
+  a deadlock as the mutator cannot continue and release the lock.},
+  label={fig:finalizer_deadlock}
+]{listings/finalizer_deadlock.rs}
 \end{figure}
 
 Virtually all destructors access state, whether that is in the GCed value they are
@@ -1099,13 +1119,25 @@ pinpoints precisely which field or line in a drop method caused FSA to fail.
 is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}).
 \lstinline{EmitFinalizerUnsafeError} informs the user when a drop method
 contains code which is unsafe (e.g.~references a \lstinline{Gc<T>} type, an
-opaque function, etc.).
+opaque function, etc.). \cref{fig:finalizer_cycle_err} shows an example of
+the errors reported by \ourgc: note that it pinpoints the line within a
+drop method that caused an FSA error.
 
 \begin{figure}[tb]
-
-\lstinputlisting[language={}, basicstyle=\footnotesize\ttfamily, numbers=none]{listings/finalization_cycle.stderr}
-           \captionof{lstlisting}{The compiler error produced by FSA for the example in \cref{fig:finalizer_cycle.}}
-\label{fig:finalizer_cycle_err}
+  \begin{center}
+\lstinputlisting[
+  language={},
+    basicstyle=\fontsize{7.6pt}{7pt}\ttfamily,
+    xleftmargin=6pt,
+    numbers=none,
+    caption={The compiler error produced by \ourgc for the example
+    in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
+    note that both the use of a type with a FSA-incompatible drop method (`has
+    a drop method') and the line in the drop method (`caused by the
+    expression') are highlighted to the user.},
+    label={fig:finalizer_cycle_err}
+]{listings/finalization_cycle.stderr}
+  \end{center}
 \end{figure}
 
 \section{Performance Evaluation}
@@ -1601,33 +1633,37 @@ of the paper for those who may benefit from them.
 \end{figure}
 
 \begin{figure}[!t]
-\begin{lstrustsmall}
-fn main() {
-    let mut gr1 = GcRef::new(vec![1u16,2,3]);
-    let mut gr2 = gr1.clone();
-
-    let ref1 = gr1.as_mut();
-    let ref2 = gr2.as_mut();
-
-    // ref1 and ref2 now reference the same object:
-    ref1.push(4);
-    ref2.push(5);
-    ref1.push(6);
-
-    let ref1elem0 = ref1.get_mut(0).unwrap();
-    // Force reallocation of the underlying vec
-    ref2.resize(1024, 0);
-    // Now this writes to deallocated memory
-    *ref1elem0 = 42;
-}
-\end{lstrustsmall}
-    \caption{An example of unsoundness in Bronze based on its ability to allow
+\begin{lstlisting}[
+  language=Rust,
+  basicstyle=\footnotesize\ttfamily,
+  caption={An example of unsoundness in Bronze based on its ability to allow
     aliased mutable references. Here, we obtain two mutable references to the
     same underlying vector (lines 5-6), before using the second reference to
     resize the vector, which forces its backing store to be reallocated in
     memory (line 15). Later, when we try to access an element through the first
     reference, it no longer points to valid memory (line 15).
-    } \label{lst:bronze_unsound}
+    },
+  label={lst:bronze_unsound}
+]
+fn main() {
+  let mut gr1 = GcRef::new(vec![1u16,2,3]);
+  let mut gr2 = gr1.clone();
+
+  let ref1 = gr1.as_mut();
+  let ref2 = gr2.as_mut();
+
+  // ref1 and ref2 now reference the same object:
+  ref1.push(4);
+  ref2.push(5);
+  ref1.push(6);
+
+  let ref1elem0 = ref1.get_mut(0).unwrap();
+  // Force reallocation of the underlying vec
+  ref2.resize(1024, 0);
+  // Now this writes to deallocated memory
+  *ref1elem0 = 42;
+}
+\end{lstlisting}
 \end{figure}
 
 \end{document}

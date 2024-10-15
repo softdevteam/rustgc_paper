@@ -9,7 +9,8 @@ impl Drop for GcNode {
     println!("{}", self.nbr.unwrap().borrow().value);
   }
 }
-fn f()  {
+
+fn main()  {
   let mut gc1 = Gc::new(RefCell::new(GcNode{value: 1, nbr: None}));
   let gc2 = Gc::new(RefCell::new(GcNode{value: 2, nbr: None}));
   gc1.borrow_mut().nbr = Some(gc2);
