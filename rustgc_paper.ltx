@@ -1415,7 +1415,7 @@ are used as finalizers: to avoid the problems with Rust references we solved in
 bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictive
 than \ourgc's \lstinline{Gc<T>}. However, unlike our approach to the access
 of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
-such accesses to at runtime, leading to a (safe) Rust \lstinline{panic}) Unlike most other GCs for
+such accesses at runtime, leading to a (safe) Rust \lstinline{panic}) Unlike most other GCs for
 Rust, destruction in \rustbacon can be
 seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
 0; GCed values inside cycles at the end of the \lstinline{collect_cycles} function.
@@ -1436,7 +1436,7 @@ finalizer is required, a manual implementation of the \lstinline{Finalize} trait
 must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by use of the provided
 \lstinline{Trace} macro. \rustgc detects accesses to already-finalized values
-dynamic at run-time, panicking if they occur. Unlike \rustbacon, these accesses
+dynamically at run-time, panicking if they occur. Unlike \rustbacon, these accesses
 are detected by recording per-state what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
 panic. We have not yet verified whether cross-thread collection / sweeping can
@@ -1454,15 +1454,15 @@ requires explicitly having access to a \lstinline{Root<'root>} whenever a
 to manually implement a \lstinline{Finalize} trait, though \shifgrethor's is
 more restrictive: not only can other GCed values not be accessed (implicitly
 solving the same problem as \cref{sec:cycles_and_finalization}) but any other
-type type without the same \lstinline{'root} lifetime as the GCed value is
+type without the same \lstinline{'root} lifetime as the GCed value is
 forbidden. This means that many seemingly safe finalizers require
 implementing the unsafe \lstinline{UnsafeFinalize} trait. We view
 \shifgrethor as proof that accurately tracking GC roots
-in normal Rust without reference counting is possible, though not yet easy.
+in normal Rust without reference counting is possible, though not yet easy.\jake{In the intro we say conservative GC is necessary. This seems to contradict that}
 
 A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena},
 which uses branding in a similar way to
-\lstinline{GhostCell}s (see \cref{sec:background}. In essence, users provide
+\lstinline{GhostCell}s (see \cref{sec:background}). In essence, users provide
 a special `root' type which is the only place where roots can be stored.
 Mutating the heap can only be done in the context of functions that are
 passed a branded reference to the GCed heap. Once such function have finished,
@@ -1479,7 +1479,7 @@ to the GCed heap, but this is not true of many other GCed programs.
 One of several extensions of \rustgc is \bronze, which aims to improve
 upon \rustgc in two ways~\citep{coblenz21bronze}. First, \bronze tries
 to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
-at function entries to generate stackmaps (a run-time mechanism for accurately
+at function entries to generate stack-maps (a run-time mechanism for accurately
 tracking active pointers). Unlike \ourgc, \bronze cannot accidentally
 keep objects alive due to false positive `pointers'. However, \bronze
 does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it will not
@@ -1497,7 +1497,7 @@ they can only reference parts of a GCed value. To mitigate this,
 `pre-finalizers' are run by the collector on the same thread
 as soon as an object as recognised as unused, and can
 access all of a GCed value. Pre-finalizers are necessary, but not encouraged, because they
-introduce pauses. This reflects the fact that latency is a fundamental concern
+introduce pauses \jake{Or rather, increase the STW pause time}. This reflects the fact that latency is a fundamental concern
 for a rendering engine: \ourgc currently makes no pretences to being low latency.
 
 
