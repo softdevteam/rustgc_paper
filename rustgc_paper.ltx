@@ -450,7 +450,7 @@ glue to be run afterwards.
 \subsection{General Challenges When Using Destructors as Finalizers}
 \label{sec:general_challenges}
 
-We have stated our aim that \ourgc should use destructors as finalisers.
+We have stated our aim that \ourgc should use destructors as finalizers.
 Above we explained some Rust-specific challenges --- but there are several
 non-Rust-specific challenges too! Fundamentally, finalizers and destructors
 have different, and sometimes incompatible, properties. The best
@@ -503,8 +503,8 @@ finalizers: instead it has introduced deliberately less flexible per-object `cle
 prevents problems such as object resurrection~\cite{goetz21deprecated}. It
 is important to differentiate such mechanisms from the \lstinline{Finalize} trait that many existing GCs for
 Rust force users to manually implement: cleaners impose restrictions
-to make finalizers less problematic; existing \lstinline{Finalize} traits
-do not impose any such restrictions.
+to make finalizers less problematic where existing \lstinline{Finalize} traits
+mostly do not.
 
 Our desire that \ourgc should use existing Rust destructors as finalizers whenever
 possible may seem out of reach. As alluded to above, in a proposal for GC
@@ -545,9 +545,8 @@ run such destructors as finalizers.
 Consider the type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
 by \lstinline{Box}'s drop method. We can then make two observations. First,
-\lstinline{Box<T>}'s drop method solely consists of a call to \lstinline{free}\footnote{The
-function in the Rust API is actually called \lstinline{deallocate}, but that
-jars with the terminology we use elsewhere.}. Second, while we informally say
+\lstinline{Box<T>}'s drop method solely consists of a \lstinline{deallocate}
+call. Second, while we informally say
 that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
 on the `GC heap', all allocations are made through \boehm and stored in
 a single heap. Thus, when used as a finalizer,
@@ -555,7 +554,7 @@ a single heap. Thus, when used as a finalizer,
 cannot elide the destructors themselves, as they are still necessary to ensure
 predictable destruction in non-\lstinline{Gc<T>} Rust code.}, as the underlying memory will
 naturally be freed by \boehm anyway. Indeed, since the drop method only
-calls \lstinline{free}, any resulting finalizer would cause the underlying
+calls \lstinline{deallocate}, any resulting finalizer would cause the underlying
 allocation to live longer than if the finalizer was not present!
 
 This means that there is no need to run a finalizer for a type such as
@@ -589,15 +588,15 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \end{algorithm}
 
 \label{requires_finalizer_intrinsic}
-The aim of finalizer elision is to statically determine which type's destructors do
-not require corresponding finalizers and elide them. Our approach is conservative,
+Finalizer elision statically determines which type's destructors do
+not require corresponding finalizers and elides them. It does so conservatively,
 and deals correctly with drop glue.
 
 \label{dropmethodfinalizerelidable}
 The high-level \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalization unless it also implements the
 new \lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
-trait without methods). This trait and can be
+trait without methods). This trait can be
 used by a programmer to signify that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. The `Drop'
 part of the trait name is deliberate (i.e.~it is not a simplification of
@@ -606,12 +605,12 @@ only about the `top-level' type. If the type has a transitively reachable field
 whose type implements the \lstinline{Drop} trait but not the
 \lstinline{DropMethodFinalizerElidable} trait, then then the top-level type
 still requires finalization. This not only checks drop glue, but allows the
-programmer to safely reason about types with type parameters without knowing
+programmer to reason about type parameters without knowing
 the concrete types passed to those parameters.
 
 Even though neither normal Rust destructors or \ourgc finalizers are guaranteed
 to run, a program whose destructors or finalizers never run would probably not
-be usable (e.g.~leaking resources such as memory, deadlocking, etc.). We
+be usable (leaking resources such as memory, deadlocking, and so on). We
 therefore make \lstinline{DropMethodFinalizerElidable} an unsafe
 trait, because implementing it inappropriately is likely to lead undesired
 (though not incorrect!) behaviour at run-time. To implement it one therefore
@@ -723,14 +722,14 @@ lifetime of a GC pointer matches, or exceeds, the static lifetime of the
 
 Our solution relies on using \lstinline{Gc<T>}'s drop method to \emph{keep
 alive} GCed value for the static lifetime of the \lstinline{Gc<T>} itself. In
-other words, we ensure that the conservative GC cannot observe the GCed value
-being unused until all of its normal Rust owners of type \lstinline{Gc<T>} have
-gone out of scope.
+other words, we ensure that the conservative GC will always see a pointer
+to a GCed value while its normal Rust owners of type \lstinline{Gc<T>}
+are in-scope.
 
 However, there is one major problem to overcome: copyable types such as
 \lstinline{Gc<T>} are forbidden from having destructors. The fundamental
 challenge we have to solve is that each copied value will have a destructor
-called on it, which has the potential for an underlying value to be destructed
+called on it, which has the potential for any shared underlying value to be destructed
 more than once. \ourgc explicitly allows \lstinline{Gc<T>} -- but no other
 copyable type -- to have a destructor, but to ensure it doesn't cause surprises
 in the face of arbitrary numbers of copies, the destructor must be idempotent.
@@ -741,7 +740,7 @@ system \lstinline{Gc<T>} is simply a wrapper around a pointer type.
 We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
 is idempotent. Fortunately, this is sufficient for our purposes: we want the drop
 method to inhibit finalization but that does not require run-time side effects.
-We therefore use a memory fence in the form of a keep-alive
+To achieve this, we use a memory fence in the form of a keep-alive
 function. Simplifying somewhat, memory fences can be thought of as having both
 compile-time and run-time effects:
 they prevent compilers from reordering computations around a given address;
@@ -772,7 +771,7 @@ solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
 optimise values of other types as it so wishes. However, our approach still
 imposes a performance overhead on code that uses
 \lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
-\somrsastbarriers{bnaive}{worstperf}{percent} \laurie{this figure seems wrong}.
+\somrsastbarriers{bnaive}{worstperf}{percent}.
 
 Fortunately, we can optimise premature finalizer prevention further by
 piggy-backing on finalizer elision: if a finalizer can be
@@ -824,19 +823,20 @@ is not provably safe to be used as a finalizer in a \lstinline{Gc<T>}.
 \lstinline{Gc<T>} can store, directly or indirectly, normal Rust
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
-However, finalizers can dynamically extend the lifetime of a GCed value,
-including any stored reference: if a finalizer accesses a reference stored in a
-\lstinline{Gc<T>} it implicitly undermines Rust's borrow checking rules.
+However, finalizers implicitly extend the lifetime of a GCed value,
+including any stored reference: if a finalizer then accesses a reference stored in a
+\lstinline{Gc<T>} Rust's borrow checking rules are undermined.
 
 The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
 from storing, directly or indirectly, references. This might seem to be
 no great loss: storing references in a \lstinline{Gc<T>} largely nullifies
-the `GCness' of \lstinline{Gc<T>}. We have found, however, that when refactoring
+the `GCness' of \lstinline{Gc<T>}. We have however found that when refactoring
 or experimenting with existing code, it is useful to be able to store references
 in \lstinline{Gc<T>}. FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finalizer (i.e.~\lstinline{T}
 has no destructor, or finalizer elision has removed the \lstinline{Gc<T>}'s
-finalizer).
+finalizer). This is safe, because Rust's semantics allow references / pointers
+to survive arbitrarily long dynamically so long as they are not dereferenced.
 
 To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref},
 which can be thought of as marker traits that the compiler recognises and
@@ -850,7 +850,7 @@ say that a negative implementation of an auto-trait \emph{pollutes} containing
 types.
 
 We therefore introduce a new auto trait \lstinline{ReferenceFree}, which
-denotes a type which does not contain a reference. Crucially, \ourgc defines
+denotes a type which does not contain a reference. \ourgc then defines
 two negative (`\lstinline{!}') implementations of \lstinline{ReferenceFree} for
 reference types:
 
@@ -901,8 +901,8 @@ this problem (finalization cycles are considered rare in GCed
 languages~\citep[p.~229]{jones23garbage}) or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalization~\cite[p.~11]{boehm03destructors}). There is no fully
-automatic solution to this problem, with the closest solution being those GCs
-which offer weak references, allowing users to detect when finalization cycles
+automatic solution to this problem, though some GCs
+offer weak references, which at least allow users to detect when finalization cycles
 have been broken, though they still have to deal with the consequences
 manually.
 
@@ -930,7 +930,7 @@ This naturally handles transitively reachable code, allowing FSA itself to only
 check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
 
-\subsection{Destructors need to be runnable on the finalizer thread}
+\subsection{Destructors need to be runnable on a finalizer thread}
 \label{sec:fsa_finalizer_thread}
 
 \begin{figure}[t]
@@ -1274,8 +1274,8 @@ Our experiment is fully repeatable and downloadable from
     \caption{
     Summary results of \Eelision (the detailed breakdown for each SOM
     benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
-    off finaliser elision. As these results clearly show, all three SOM VMs run
-    significantly faster with finaliser elision turned on.}
+    off finalizer elision. As these results clearly show, all three SOM VMs run
+    significantly faster with finalizer elision turned on.}
 \label{fig:Eelision}
 \end{figure}
 
@@ -1285,11 +1285,11 @@ Our experiment is fully repeatable and downloadable from
     \caption{
     Summary results of \Eprem (the detailed breakdown for each SOM benchmark
     can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows premature
-    finaliser prevention turned on for all types; \emph{Opt} shows optimised
-    premature finaliser prevention (see \cref{sec:optimising_prem}); and
-    \emph{None} shows premature finaliser prevention turned off. \emph{None} is
+    finalizer prevention turned on for all types; \emph{Opt} shows optimised
+    premature finalizer prevention (see \cref{sec:optimising_prem}); and
+    \emph{None} shows premature finalizer prevention turned off. \emph{None} is
     unsound, but provides the ultimate ceiling for \emph{Opt}'s performance.
-    Note that we turned finaliser elision off in this experiment \laurie{because}.
+    Note that we turned finalizer elision off in this experiment \laurie{because}.
     }
 \label{fig:Eprem}
 \end{figure}
@@ -1310,16 +1310,16 @@ slow.
 
 \cref{fig:Eelision} shows the summary results for \Eelision
 (\cref{fig:Eelision_breakdown} in the appendix shows each SOM benchmark).
-Finaliser elision improves the performance of each VM, though by varying
+Finalizer elision improves the performance of each VM, though by varying
 amounts. Perhaps because it was built with \ourgc in mind, \yksom benefits the
-most from finaliser elision.
+most from finalizer elision.
 
 \cref{fig:Eprem} shows the summary results for \Eprem. Unsurprisingly, turning
-on premature finalisation prevention everywhere slows performance noticeably
-relative to removing some or all premature finalisation prevention drop
+on premature finalization prevention everywhere slows performance noticeably
+relative to removing some or all premature finalization prevention drop
 methods. However, to our surprise, it is often difficult to distinguish
-`optimised' premature finaliser prevention from no premature finaliser
-prevention at all. Although we do think this shows that premature finaliser
+`optimised' premature finalizer prevention from no premature finalizer
+prevention at all. Although we do think this shows that premature finalizer
 prevention optimisation is highly effective, we suspect that some inevitable
 noise in benchmark results might slightly flatter the optimisation.
 
