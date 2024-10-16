@@ -593,6 +593,7 @@ The aim of finalizer elision is to statically determine which type's destructors
 not require corresponding finalizers and elide them. Our approach is conservative,
 and deals correctly with drop glue.
 
+\label{dropmethodfinalizerelidable}
 The high-level \cref{alg:elision} says that any type which implements
 the \lstinline{Drop} trait requires finalization unless it also implements the
 new \lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
@@ -1235,18 +1236,14 @@ to \rustc with a modern system allocator would be uncomfortably
 close to apples and oranges. We therefore use \boehm as the allocator
 for both \ourgc and \rustc.
 
-We ran each benchmark in our suite 30 times reporting 99\% confidence intervals
-\laurie{what about the memory benchmarks --- those don't have CIs?}. For those
-benchmarks reporting timings, we measured wall-clock time of a process using
-the standard Unix \lstinline{time} command. \laurie{how did we measure memory?}
-We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
+We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
+For the non-SOM benchmarks reporting timings we measured wall-clock time of a process using
+the standard Unix \lstinline{time}. We ran SOM benchmarks using
+the conventional \emph{rebench} tool~\cite{rebench18marr}, which internally
+measures wall-clock time using \lstinline{time}.
+We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can interfere with the kind of benchmarking we wish to perform.
-
-\jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
-\laurie{why don't we use \lstinline{time} for binarytrees and regexredux?}
-\jake{We do use \lstinline{time}, rebench is a wrapper which starts a fresh shell (with no parentenvironment variables) and then records the result of \lstinline{/usr/bin/time benchmark}, each one of those counts as a process execution}
-
 
 Our experiment is fully repeatable and downloadable from
 \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
@@ -1262,15 +1259,11 @@ Our experiment is fully repeatable and downloadable from
   \caption{Results for the \Egcrc experiment, comparing
   benchmarks running on \ourgc against other shared ownership approaches. With
   the exception of \binarytrees, which we ported to several approaches, most
-  compare \ourgc with one other shared ownership approach. \laurie{``yksom was
-  built specifically with \ourgc in mind, and cannot realistically be ported to
-  the other shared ownership approaches above; we include it in this table as
-  context for latter comparisons with \somrsast and \somrsbc.''} All benchmarks
+  compare \ourgc with one other shared ownership approach. All benchmarks
   were run 30 times with wall-clock times reported, except \sws which reports
-  requests per second. The top half of the table
-  shows traditional 99\% confidence intervals for ; the bottom half of the
-  table shows the geomean and 99\% (asymmetric) confidence intervals. Overview
-  of results across all benchmarks.
+  requests per second. Individual benchmarks have symmetric 99\% confidence
+  intervals notated with $\pm$; summary benchmarks have asymmetric 99\%
+  confidence intervals notated with square brackets.
   }
   \label{table:Ercgc}
 \end{table}
@@ -1278,7 +1271,7 @@ Our experiment is fully repeatable and downloadable from
 \begin{figure}[t]
     \centering
     \includegraphics[width=.6\textwidth]{plots/elision.pdf}
-    \caption{\laurie{are these non-symmetric CIs as in table 2?}
+    \caption{
     Summary results of \Eelision (the detailed breakdown for each SOM
     benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
     off finaliser elision. As these results clearly show, all three SOM VMs run
@@ -1289,7 +1282,7 @@ Our experiment is fully repeatable and downloadable from
 \begin{figure}[t]
     \centering
     \includegraphics[width=.6\textwidth]{plots/barriers.pdf}
-    \caption{\laurie{are these non-symmetric CIs as in table 2?}
+    \caption{
     Summary results of \Eprem (the detailed breakdown for each SOM benchmark
     can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows premature
     finaliser prevention turned on for all types; \emph{Opt} shows optimised
@@ -1308,8 +1301,10 @@ allocation is perfectly suited to \typedarena: it waits until the end of the
 benchmark to deallocate all memory in one go. Interestingly, despite being
 4$\times$ slower than \typedarena, \ourgc is 5.5$\times$ faster than \rustgc
 and 1.5$\times$ faster than \lstinline{Rc<T>} on \binarytrees. The second
-exceptions \somrsast where \laurie{\ourgc is over 2$\times$ slower -- why?!}.
-While such a sparse comparison can never be fully satisfying, a reasonable
+exception is \somrsast where \ourgc is over 2$\times$ slower, because
+one destructor is not elidable. We could safely mark this destructor as \lstinline{DropMethodFinalizerElidable}
+(see \cref{dropmethodfinalizerelidable}), but feel that would unduly
+bias our results in \ourgc's favour. Overall, while such a sparse comparison can never be fully satisfying, a reasonable
 interpretation of this data is that \ourgc does not appear to be prohibitively
 slow.
 
