@@ -57,7 +57,7 @@ Most portions of most Rust programs are as
 succinct as a GCed equivalent, but ownership is too inflexible to express
 \emph{shared ownership} for data-structures that require multiple owners
 (e.g.~doubly linked lists).
-Workarounds (e.g.~reference counting) impose an extra burden on the programmer,
+Workarounds such as reference counting impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
@@ -68,20 +68,20 @@ a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~dupli
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} wrappers pointing to a value on the GC heap
 can be found, indirectly or directly, from the
-program's \emph{roots} (e.g.~variables on the stack, etc.),
-then the GC heap memory can be reclaimed.
+program's \emph{roots} (e.g.~variables on the stack),
+then that values' GC heap memory can be reclaimed.
 
 It has proven hard to find a satisfying design and implementation for a GC for
 Rust, as perhaps suggested by the number of different attempts to do so.
 We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
-API; and how to make \emph{finalization} (i.e.~the code that is run just before a
+API; and how to make \emph{finalizers} (i.e.~the code that is run just before a
 value is collected by the GC) safe, performant, and ergonomic. We show that
 \emph{conservative} GC (i.e.~treating each reachable machine word as
 a potential pointer) is necessary and sufficient to solve the API challenge,
 but the finalization challenge is more difficult.
 
-In existing GCs for Rust, if a user needs values of type \lstinline{T} to cause a
+In most GCs for Rust, if a user needs values of type \lstinline{T} to cause a
 finalizer to run, then the user must manually implement a finalizer.
 Not only do most finalizers end up duplicating
 existing \emph{destructors} (i.e.~code which is run just before a value is
@@ -92,8 +92,8 @@ The obvious solution to this problem is to allow existing Rust destructors to
 be automatically used as finalizers. However, no existing GC for Rust does
 this; in a close cousin of our work,
 a GC proposal for C++, this approach was ruled out due to
-seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We place these problems into four
-categories:
+seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We divide these
+problems into four categories:
 (1) finalizers are prohibitively slower than destructors;
 (2) finalizers can be run prematurely;
 (3) running finalizers on the same thread as a paused mutator can cause race conditions and deadlocks;
@@ -122,17 +122,17 @@ Although \ourgc is not production ready, it has good enough performance
 (across a number of benchmarks, its performance is \jake{geomean over whole suite}) and
 other polish (e.g.~good quality error messages) that we believe it shows
 a plausible path forwards for those who may wish to follow it. Furthermore,
-although \ourgc is necessarily tied to Rust, we believe that most of the
+although \ourgc is necessarily tied to Rust, we suspect that most of the
 techniques in this paper, particularly those related to finalization, are
 likely to generalise to other ownership-based languages.
 
-This paper's high-level structure is: background (\cref{sec:background});
-\ourgc's design (\cref{sec:alloy_design}); destructor and finalizer challenges
+This paper's is divided into four main parts: background (\cref{sec:background});
+\ourgc's basic design (\cref{sec:alloy_design}); destructor and finalizer challenges
 and solutions (\cref{sec:destructor challenges,sec:elision,sec:premature_finalize_prevention,sec:fsa}); and evaluation
 (\cref{sec:evaluation}). The first three parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
 tried to provide sufficient material for readers expert in one of these
-areas to gain adequate familiarity with the other, but we explicitly encourage
+areas to gain adequate familiarity with the other, without boing either, but we explicitly encourage
 readers to skip material they are already comfortable with.
 
 
@@ -180,16 +180,13 @@ in GCed languages, since no explicit memory management is required. This
 suggests that the search for a good GC for Rust may be quixotic:
 intellectually stimulating, but of no practical value.
 
-However, there are many programs which need to express data structures which
-are sound but which do not fit into the restrictions of affine types and
+However, there are many programs which need to express data structures
+which do not fit into the restrictions of affine types and
 ownerships. These are often described as `cyclic data-structures', though
 that sometimes gives the incorrect impression that only data structures
 such as linked lists are of interest. In reality, programs as diverse as
 interpreters for dynamically typed languages have need to use such types,
 so we prefer the slightly more abstract term `shared ownership'.
-(e.g.~interpreters for dynamically typed languages
-Rust cannot directly express
-such programs, forcing programmers to use various workarounds.
 
 Probably the most common workaround is the reference counting type \lstinline{Rc<T>} in Rust's
 standard library. For many data-structures, reference counting is a reasonable
@@ -222,13 +219,11 @@ pointers, that are not fully statically checked by the compiler). It is reasonab
 to assume that widely used code, even if technically unsafe, has been pored
 over sufficiently that it is mostly, perhaps even wholly, reliable in practise. It
 is less reasonable to assume that `new' solutions that a programmer implements using
-unsafe Rust will immediately reach the same level of reliability. Our experience
-is that most Rust programmers will avoid writing new unsafe code if they can, even
-if doing so might in the long-term lead to a better system.
+unsafe Rust will immediately reach the same level of reliability.
 
 While we do not believe that every Rust program would be improved by GC, the
-variety of workarounds already present in Rust code suggests that a substantial
-subset might benefit from GC.
+variety of workarounds already present in Rust code, and the difficultly
+of creating new ones, suggests that a substantial subset might benefit from GC.
 
 
 \subsection{GC terminology}
@@ -242,14 +237,15 @@ the \emph{collector} (the GC itself). At any given point in time, a particular t
 running as a mutator or a collector. In our context, all threads
 run as a collector at least sometimes, with some threads always running as a collector.
 Tracing and reclamation is performed during a \emph{collection} phase. In the context of
-this paper, collections are \emph{stop-the-world}, where all mutator threads
-are paused while collection occurs.
+this paper, collections are \emph{stop-the-world}, where all threads running
+mutator code are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
 from the roots can then be \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
-in most GC literature, henceforth we use `GC' to mean `tracing GC'.
+in most GC literature, henceforth we use `GC' to mean `tracing GC' unless we
+explicitly say otherwise.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}. We use the term `GC value' to refer both to the pointer wrapped in a
@@ -284,7 +280,7 @@ When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
 simple wrapper around a pointer to \lstinline{v}'s new address. \lstinline{Gc<T>}
 can dereferenced at will to \lstinline{T}. The same underlying GCed value
-may thus have multiple partly overlapping references active at any point.
+may thus have multiple, partly overlapping, references active at any point.
 To avoid undermining
 Rust's ownership system, this means that dereferencing a \lstinline{Gc<T>} must
 produce an immutable (i.e.~`\lstinline{&}') reference to the underlying value.
@@ -294,8 +290,10 @@ types that enable \emph{interior mutability} (e.g.~\lstinline{RefCell<T>} or
 
 One feature that \ourgc explicitly adopts is \lstinline{Rc<T>}'s
 ability to be transformed into a raw pointer (\lstinline{into_raw}) and
-back (\lstinline{from_raw}). Though many programmers do not directly
-encounter these functions, they are a crucial part of the link between Rust's high and
+back (\lstinline{from_raw}). Crucially, transforming a \lstinline{Rc<T>} / \lstinline{Gc<T>}
+into a pointer consumes the high-level wrapper, breaking the link between
+the high-level wrapper and pointer's lifetime. Though many programmers do not directly
+encounter these functions, they are a vital part of the link between Rust's high and
 low-level features (e.g.~being used for the C Foreign Function Interface
 (FFI) alongside the ability to cast Rust references to pointer types and back).
 We believe that a viable GC for Rust must include this same
@@ -314,7 +312,7 @@ inevitable that \ourgc must be a conservative GC: if a machine word's integer
 value, when considered as a pointer, falls within a GCed block of memory,
 then that block itself is considered reachable (and is thus transitively scanned).
 Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
-bits that happens to look like a valid pointer, this over-approximates the
+bits that looks like a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
 most extensive study we know of suggests the false detection rate in Java
 programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
@@ -341,7 +339,8 @@ so requires executing arbitrary user code. To make the possible run-time cost of
 no direct syntax for cloning: users must explicitly call \lstinline{Rc::clone(&x)}
 to duplicate a value \lstinline{x}. In contrast, since \ourgc's \lstinline{Gc<T>} is just a wrapper around a pointer it
 is not just cloneable but also \emph{copyable}: duplication only requires copying
-bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment,
+bytes (i.e.~no arbitrary user code need be executed). Copying is implied by assignment
+(i.e. \lstinline{x = y}),
 reducing the need for a function call that cloning requires entirely\footnote{The lengthier
 syntax \lstinline{y = Gc::clone(&x)} is available, since every copyable type is
 also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
@@ -392,9 +391,9 @@ variable.
 
 In many GCed languages, `destructor' and `finalizer' are used as synonyms, as
 both terms refer to code run when a value's lifetime has ended. In existing GCs
-for Rust, these two terms tend to refer to related, but definitely distinct,
-concepts. As we will see later, in \ourgc, finalizers are best
-thought of as a subset of destructors. In this section we gradually pick apart
+for Rust, these two terms refer to different hierarchies of code (i.e.~destructors
+and finalizers are fundamentally different). As we will see later, in \ourgc, finalizers are best
+thought of as a subset of destructors. In this section we pick apart
 these differences, before describing the challenges of using destructors as
 finalizers.
 
@@ -415,7 +414,7 @@ are released. A casual perusal of Rust code will quickly show that
 drop methods are used frequently and that users fairly often
 implement their own drop methods.
 
-Finalizers are an important concept for most GCs, subsuming the notion of destructors.
+Finalizers are an important concept for most non-Rust GCs, subsuming the notion of destructors.
 However, most existing GCs for Rust are forced to have separate notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
@@ -436,8 +435,7 @@ and implement finalizers on those instead~\cite[Section~19.3]{klabnik18rust}.
 Doing so is tedious but not conceptually difficult.
 
 Problem \#3 has partial solutions: for example, ~\cite{manish15rustgc} uses the
-\lstinline{Trace} macro to generate \emph{finalizer glue} (our term for
-the finalizer equivalent of drop glue) for
+\lstinline{Trace} macro to generate \emph{finalizer glue} (the finalizer equivalent of drop glue) for
 \lstinline{struct} fields. This runs into an unsolvable variant of problem \#2:
 types in external libraries will not implement this trait and cannot be
 recursively scanned for finalizer glue.
@@ -474,7 +472,7 @@ destructor~\cite[section~3.4]{boehm03destructors}.
 A less obvious difference relates to where destructors and finalizers are run.
 Destructors run in the same thread as the last owner of a value.
 However, running finalizers in the same thread as the last owner of the value
-ran in can cause race conditions and deadlocks if one or more finalizers tries to access a resource that the mutator
+can cause race conditions and deadlocks if a finalize tries to access a resource that the mutator
 expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
 When such problems affect destructors in normal Rust code, it is the clear result of programmer error, since they should
 have taken into account the predictable execution point of destructors. However, since
@@ -488,7 +486,7 @@ are safe to run on another thread.
 Finally, finalization and cycles are not happy bedfellows: finalizers
 can reference other GCed values that are partly, or wholly, `finalized' and may
 even have had their backing memory reused. A related, but
-distinct, problem is the ability of finalizers to `resurrect' values by
+distinct, problem is the ability of finalizers to \emph{resurrect} values by
 copying the reference passed to the finalizer and storing it somewhere.
 
 
@@ -528,7 +526,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \label{sec:elision}
 
 Finalizers are much slower to run than destructors --- running every Rust destructor
-as a GC finalizer in \ourgc causes a \jake{worst case} slowdown
+as a GC finalizer in \ourgc causes a noticeable slowdown
 in our benchmark suite. In this section we show how to sidestep much of this overhead.
 
 A variety of factors contribute to the performance overhead of finalizers, such as:
@@ -1426,9 +1424,12 @@ seen as deterministic: GCed values outside cycles have their destructors run as 
 
 Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
 covered in \cref{sec:destructor challenges}). \rustgc's \lstinline{Gc<T>} provides
-a similar to \ourgc, with the notable exception that its \lstinline{Gc<T>}
+a similar API to \ourgc, with the notable exception that its \lstinline{Gc<T>}
 is not, and cannot be, copyable, thus always requiring calls to
-\lstinline{Gc::clone}. Similarly to \rustbacon,
+\lstinline{Gc::clone}. Although, like \ourgc, \rustgc allows \lstinline{Gc<T>} values to
+be converted into pointers, its lack of conservative GC means that users
+must ensure that a \lstinline{Gc<T>} wrapper is kept alive for the entire
+lifetime of pointers derived from it. Similarly to \rustbacon,
 GCed values are reference counted, with occasional
 tracing sweeps to identify cycles, though \rustgc performs cycle detection
 automatically (i.e.~it doesn't require manual calls to a function such as
@@ -1436,7 +1437,7 @@ automatically (i.e.~it doesn't require manual calls to a function such as
 finalizer is required, a manual implementation of the \lstinline{Finalize} trait
 must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by use of the provided
-\lstinline{trace} macro. \rustgc detects accesses to already-finalized values
+\lstinline{Trace} macro. \rustgc detects accesses to already-finalized values
 dynamic at run-time, panicking if they occur. Unlike \rustbacon, these accesses
 are detected by recording per-state what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
