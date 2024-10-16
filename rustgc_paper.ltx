@@ -1458,7 +1458,8 @@ type without the same \lstinline{'root} lifetime as the GCed value is
 forbidden. This means that many seemingly safe finalizers require
 implementing the unsafe \lstinline{UnsafeFinalize} trait. We view
 \shifgrethor as proof that accurately tracking GC roots
-in normal Rust without reference counting is possible, though not yet easy.\jake{In the intro we say conservative GC is necessary. This seems to contradict that}
+in normal Rust without reference counting is possible, though it cannot
+deal with references being converted into pointers and \lstinline{usize}s.
 
 A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena},
 which uses branding in a similar way to
@@ -1497,7 +1498,8 @@ they can only reference parts of a GCed value. To mitigate this,
 `pre-finalizers' are run by the collector on the same thread
 as soon as an object as recognised as unused, and can
 access all of a GCed value. Pre-finalizers are necessary, but not encouraged, because they
-introduce pauses \jake{Or rather, increase the STW pause time}. This reflects the fact that latency is a fundamental concern
+implicitly pause the stop-the-world phase of the collector.
+This reflects the fact that latency is a fundamental concern
 for a rendering engine: \ourgc currently makes no pretences to being low latency.
 
 
