@@ -1239,8 +1239,8 @@ We ran each benchmark in our suite 30 times reporting 99\% confidence intervals
 \laurie{what about the memory benchmarks --- those don't have CIs?}. For those
 benchmarks reporting timings, we measured wall-clock time of a process using
 the standard Unix \lstinline{time} command. \laurie{how did we measure memory?}
-We ran all benchmarks on an \laurie{Intel Xeon XXX} with \laurie{XYZ}GiB RAM,
-running Debian \laurie{version}. We turned off turbo boost and hyper-threading,
+We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
+running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can interfere with the kind of benchmarking we wish to perform.
 
 \jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
