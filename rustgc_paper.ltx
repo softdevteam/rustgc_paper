@@ -1393,7 +1393,7 @@ We then briefly mention some relevant non-Rust GC work not covered elsewhere.
 
 Early versions of Rust had `managed pointers' (using the \lstinline{@T} syntax)
 which were intended to represent GC types, though whose implementation did not
-progress beyond reference counting~\cite{manish21arena}. This support was removed\footnote{In commit
+progress beyond reference counting~\cite{manish21arena}. \jake{Though earlier commits do suggest experimentation with tracing \url{https://github.com/rust-lang/rust/blob/ac822a52be47579ffa59d5ca3e125680a79545d0/src/rt/rust_cc.cpp}} This support was removed\footnote{In commit
 \url{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}.}
 around a year before the first stable release of Rust. This was not the end
 of the story for `GC as a core part of Rust', with core Rust developers exploring
