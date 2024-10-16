@@ -210,7 +210,7 @@ can no longer be reclaimed too early, but, equally, individual values cannot be
 reclaimed until all values are determined to be unneeded.
 
 A type-based approach is
-\lstinline{GhostCell}~\cite{yanovski21ghostcell}, which uses `branding' to
+\lstinline{GhostCell}~\cite{yanovski21ghostcell}, which uses \emph{branding} to
 statically ensure that only one part of a program can access a
 shared ownership data-structure at a time.
 However, this implicitly prevents multiple owners (e.g.~in different threads)
@@ -1224,8 +1224,9 @@ benchmark suite~\cite{marr16cross}, turning what appears to be 1 benchmark into 
 We compare \ourgc against three other shared ownership approaches: for most
 experiments against \lstinline{Rc<T>} and \lstinline{Arc<T>} (the two being
 very similar to oneanother); and for \binarytrees against \rustgc (a user
-library for GC for Rust~\cite{manish15rustgc}) and \typedarena (a memory
-arena~\cite{gcarena}). We used the other shared ownership approaches in their
+library for GC for Rust~\cite{manish15rustgc}) and \typedarena (a non-GC memory
+arena~\laurie{is this \url{https://github.com/thomcc/rust-typed-arena}?}).
+We used the other shared ownership approaches in their
 standard configurations.
 
 One confounding factor we have controlled for is the underlying memory
@@ -1389,27 +1390,24 @@ conservative GC.
 \label{sec:related_work}
 
 In this paper we have, we hope, given sufficient background on GC and the use
-of destructors and finalizers in general. In this section we first survey the major
+of destructors and finalizers in general. In this section we mostly survey the major
 parts of the GC for Rust landscape more widely, though our survey is
-necessarily incomplete, in part because this is a rapidly evolving field, before
-briefly mentioning some non-Rust GC work that may give useful pointers.
+necessarily incomplete, in part because this is a large and rapidly evolving field
+(the most recent equivalent survey we are aware of is~\cite{manish21arena}).
+We then briefly mention some relevant non-Rust GC work not covered elsewhere.
 
-
-\subsection{GCs for Rust}
-
-Early versions of Rust had managed pointers (using the \lstinline{@T} syntax)
-which were intended to model `full' GC, though whose implementation did not
-progress beyond reference counting. This support was removed\footnote{In commit
+Early versions of Rust had `managed pointers' (using the \lstinline{@T} syntax)
+which were intended to represent GC types, though whose implementation did not
+progress beyond reference counting~\cite{manish21arena}. This support was removed\footnote{In commit
 \url{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}.}
 around a year before the first stable release of Rust. This was not the end
 of the story for `GC as a core part of Rust', with core Rust developers exploring
 the problem space in more detail~\citep{felix15specifying, felix16roots,
-manish16gc}. However, efforts in this direction seem to have petered out,\jake{Though manishearth did a survey in 2021 \cite{manish21arena}}
-at which point those interested in GC for Rust largely moved from anticipating
+manish16gc}. Over time these efforts dwindled, and those interested in GC for Rust largely moved from anticipating
 \rustc support to expecting to have to do everything in user-level libraries.
 
 One of the earliest user-level GC for Rust libraries is
-\textsc{BaconRajanGC}~\citep{rustbacon}, an implementation of the well-known GC
+\rustbacon~\citep{rustbacon}, an implementation of the well-known GC
 algorithm~\citep{bacon01concurrent}. This provides a type \lstinline{Cc<T>}
 which is similar in intention to \ourgc's \lstinline{Gc<T>}, though using
 reference counting and manually invoked cycle detection via the
@@ -1417,36 +1415,40 @@ reference counting and manually invoked cycle detection via the
 trace fields, users must manually implement a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
-\cref{sec:fsa_rust_references}, \textsc{BaconRajanGC} imposes a \lstinline{T: Static}
+\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T: Static}
 bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictive
-than \ourgc's \lstinline{Gc<T>}. However, unlike our approach in
-\cref{sec:cycles_and_finalization}, it does not prevent finalizers accessing
-shared data, and so seemingly safe destructors can undermined soundness (see
-\laurie{let's put an example in the appendix}\jake{It will panic at runtime. I'm not sure if this is technically a soundness problem, because you can't do memory unsafety.}). Unlike most other GCs for
-Rust, destruction in \textsc{BaconRajanGC} can be
+than \ourgc's \lstinline{Gc<T>}. However, unlike our approach to the access
+of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
+such accesses to at runtime, leading to a (safe) Rust \lstinline{panic}) Unlike most other GCs for
+Rust, destruction in \rustbacon can be
 seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
 0; GCed values inside cycles at the end of the \lstinline{collect_cycles} function.
 
 Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
-covered in \cref{sec:destructor challenges}). \rustgc provides an API closer to
-\ourgc's \lstinline{Gc<T>}, with the notable exception that its \lstinline{Gc}
-is not, and indeed cannot be, copyable, thus always requiring calls to
-\lstinline{Gc::clone} \laurie{does it have into\_raw?}\jake{no}. Similarly to
-\textsc{BaconRajanGC}, GCed values are reference counted, with occasional
+covered in \cref{sec:destructor challenges}). \rustgc's \lstinline{Gc<T>} provides
+a similar to \ourgc, with the notable exception that its \lstinline{Gc<T>}
+is not, and cannot be, copyable, thus always requiring calls to
+\lstinline{Gc::clone}. Similarly to \rustbacon,
+GCed values are reference counted, with occasional
 tracing sweeps to identify cycles, though \rustgc performs cycle detection
 automatically (i.e.~it doesn't require manual calls to a function such as
 \lstinline{collect_cycles}). Drop methods are not used as finalizers: if a
 finalizer is required, a manual implementation of the \lstinline{Finalize} trait
 must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by use of the provided
-\lstinline{trace} macro . \laurie{does \rustgc solve the `finalizers mustn't do
-things with cycles' problem?}
+\lstinline{trace} macro. \rustgc detects accesses to already-finalized values
+dynamic at run-time, panicking if they occur. Unlike \rustbacon, these accesses
+are detected by recording per-state what the collector's state is in: if the
+collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
+panic. We have not yet verified whether cross-thread collection / sweeping can
+evade this check.
 
 To move beyond reference counting as an aspect of GC for Rust, some
 libraries have experimented with alternative mechanisms for finding roots.
 \shifgrethor~\cite{shifgrethor} requires \lstinline{Gc} values to
-be created by a \lstinline{Root<'root>} value; the former become references of
-the latter, implicitly tying the lifetime of a \lstinline{Gc<'root, T>} to a
+be created by a \lstinline{Root<'root>} value where \lstinline{'root}
+represents a manually accessible \emph{lifetime}; the former become references of
+the latter, tying the lifetime of a \lstinline{Gc<'root, T>} to the
 \lstinline{Root<'root>}. This allows roots to be precisely identified, but
 requires explicitly having access to a \lstinline{Root<'root>} whenever a
 \lstinline{Gc<'root, T>} is used. As with \rustgc, \shifgrethor requires users
@@ -1454,58 +1456,50 @@ to manually implement a \lstinline{Finalize} trait, though \shifgrethor's is
 more restrictive: not only can other GCed values not be accessed (implicitly
 solving the same problem as \cref{sec:cycles_and_finalization}) but any other
 type type without the same \lstinline{'root} lifetime as the GCed value is
-forbidden. In practise, this means that many finalizers require
+forbidden. This means that many seemingly safe finalizers require
 implementing the unsafe \lstinline{UnsafeFinalize} trait. We view
 \shifgrethor as proof that accurately tracking GC roots
-in normal Rust is possible, though not yet easy.
+in normal Rust without reference counting is possible, though not yet easy.
 
-A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena}. In
-essence, \textsc{GcArena} uses `branding' in a similar way to
-\lstinline{GhostCell}s (see \cref{sec:background}), executing a function
-within the context of an arena: when that function finishes, the arena can be
-freed. Not only does this solve the problem of finding roots, but it is able to
-implicitly free cycles. However, it is possible for code to keep executing in
+A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena},
+which uses branding in a similar way to
+\lstinline{GhostCell}s (see \cref{sec:background}. In essence, users provide
+a special `root' type which is the only place where roots can be stored.
+Mutating the heap can only be done in the context of functions that are
+passed a branded reference to the GCed heap. Once such function have finished,
+\textsc{GcArena} is in full control of the GC heap, and knows that
+only the root type needs to be scanned for roots. This provides strong
+guarantees about when GC references are available but it is possible for code to keep executing in
 an arena for too long, at which point the system can be starved of resources
 even if much of the arena is no longer used. \textsc{GcArena} was originally
 part of the \emph{Piccolo} VM  (which was itself previously called
-\emph{Luster}), a Lua VM written in Rust. Such VMs have a main loop which is a
-natural point for an arena-using function, but this is not true of many other
-GC-using programs.
+\emph{Luster}), a Lua VM written in Rust. Such VMs have a frequently executed
+main loop which is a natural point for a program to relinquish references
+to the GCed heap, but this is not true of many other GCed programs.
 
-One of several extensions of \rustgc is \textsc{Bronze}, which aims to improve
-upon \rustgc in two ways~\citep{coblenz21bronze}. First, \textsc{Bronze} tries
+One of several extensions of \rustgc is \bronze, which aims to improve
+upon \rustgc in two ways~\citep{coblenz21bronze}. First, \bronze tries
 to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stackmaps (a run-time mechanism for accurately
-tracking active pointers). Unlike \ourgc, \textsc{Bronze} cannot accidentally
-keep objects alive due to false positive `pointers'. However, \textsc{Bronze}
+tracking active pointers). Unlike \ourgc, \bronze cannot accidentally
+keep objects alive due to false positive `pointers'. However, \bronze
 does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it will not
-be tracked for GC purposes, leading to crashes. Second, \textsc{Bronze} tries to give GC in
+be tracked for GC purposes, leading to undefined behaviour. Second, \bronze tries to give GC in
 Rust similar semantics to non-ownership languages such as Java. It does this by
-allowing shared mutation, undermining Rust's borrow checker, and undermining
-the soundness of seemingly safe Rust code (see \cref{lst:bronze_unsound} for an
-example of a program which has undefined behaviour).
-
-
-\subsection{Other relevant work}
-
-\laurie{i'm not sure this tells us much? is there something else useful we can say about D?}
-The D programming language uses a conservative mark-sweep GC for heap
-allocations by default with support for opt-in explicit deallocation. Like \ourgc, D does
-not specify an order for finalizers. Users can specify their own allocators for
-RAII-based heap allocation using standard \lstinline{malloc}/\lstinline{free}
-calls.
+allowing shared mutation, undermining Rust's borrow checker, and leading
+to undefined behaviour. See \cref{lst:bronze_unsound} for an
+example of a program which has undefined behaviour in \bronze.
 
 Chrome's rendering engine \emph{Blink} uses a conservative GC called
 \textsc{Oilpan}. It has the interesting property that it has two classes of
 finalizers. `Full finalizers' are similar to finalizers in \ourgc, running on a
-finalizer thread at an indeterminate future point, but with the difference that
+finalizer thread at an indeterminate future point on a separate collector thread, but with the difference that
 they can only reference parts of a GCed value. To mitigate this,
-`pre-finalizers' are run as soon as an object as recognised as unused, and can
-access all of a GCed value. Pre-finalizers are not encouraged, because they
-hold up the GC. This reflects very different needs for \textsc{Oilpan} and
-\ourgc: latency is a significant issue for \emph{Blink} but not something we
-consider vital for \ourgc; instead we worry about the performance overhead of
-finalization on a separate thread.
+`pre-finalizers' are run by the collector on the same thread
+as soon as an object as recognised as unused, and can
+access all of a GCed value. Pre-finalizers are necessary, but not encouraged, because they
+introduce pauses. This reflects the fact that latency is a fundamental concern
+for a rendering engine: \ourgc currently makes no pretences to being low latency.
 
 
 \section{Conclusions}
