@@ -1245,6 +1245,8 @@ as both can interfere with the kind of benchmarking we wish to perform.
 
 \jake{\binarytrees, \regexredux and the SOM VMs all use rebench\cite{rebench18marr}}
 \laurie{why don't we use \lstinline{time} for binarytrees and regexredux?}
+\jake{We do use \lstinline{time}, rebench is a wrapper which starts a fresh shell (with no parentenvironment variables) and then records the result of \lstinline{/usr/bin/time benchmark}, each one of those counts as a process execution}
+
 
 Our experiment is fully repeatable and downloadable from
 \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
