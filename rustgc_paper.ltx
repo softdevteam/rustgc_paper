@@ -182,11 +182,11 @@ intellectually stimulating, but of no practical value.
 
 However, there are many programs which need to express data structures
 which do not fit into the restrictions of affine types and
-ownerships. These are often described as `cyclic data-structures', though
+ownership. These are often described as `cyclic data-structures', though
 that sometimes gives the incorrect impression that only data structures
 such as linked lists are of interest. In reality, programs as diverse as
 interpreters for dynamically typed languages have need to use such types,
-so we prefer the slightly more abstract term `shared ownership'.
+so we prefer the slightly more abstract term `shared ownership'.\jake{I think the bit about equating shared ownership with cyclic data structures is not correct here. Shared ownership can include DAGs, and those do not require juggling strong and weak counts as described below. I think cycles should be described as a specific instance of shared ownership which is even harder to represent in Rust.}
 
 Probably the most common workaround is the reference counting type \lstinline{Rc<T>} in Rust's
 standard library. For many data-structures, reference counting is a reasonable
