@@ -536,14 +536,14 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \label{sec:elision}
 
 Finalizers are much slower to run than destructors --- running every Rust destructor
-as a GC finalizer in \ourgc causes a noticeable slowdown
+as a GC finalizer in \ourgc causes a significant slowdown \laurie{this is a case where a `worse of' might make sense, and i think it's 4x or similar?}
 in our benchmark suite. In this section we show how to sidestep much of this overhead.
 
-A variety of factors contribute to the performance overhead of finalizers, such as:
+A variety of factors contribute to the performance overhead of finalizers, including:
 a queue of finalizers
-must be maintained, whereas destructors can be run immediately; since finalizers run
+must be maintained, whereas destructors can be run immediately; and since finalizers run
 some time after the last access of a value, running them is more likely to involve
-cache misses; and so on. Most of these factors are inherent to any GC and
+cache misses. Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that it is missing optimisations which would reduce most of this overhead.
 
@@ -552,21 +552,20 @@ We are able to do this because many Rust destructors
 only do work that a GC would do anyway --- there is thus no need to
 run such destructors as finalizers.
 
-Consider the type \lstinline{Box<T>} which heap allocates space for a value;
+Consider the standard Rust type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
 by \lstinline{Box}'s drop method. We can then make two observations. First,
 \lstinline{Box<T>}'s drop method solely consists of a \lstinline{deallocate}
 call. Second, while we informally say
 that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
-on the `GC heap', all allocations are made through \boehm and stored in
-a single heap. Thus, when used as a finalizer,
-\lstinline{Box<T>}'s drop method is unneeded\footnote{There is a subtle asymmetry here: we
-cannot elide the destructors themselves, as they are still necessary to ensure
-predictable destruction in non-\lstinline{Gc<T>} Rust code.}, as the underlying memory will
-naturally be freed by \boehm anyway. Indeed, since the drop method only
-calls \lstinline{deallocate}, any resulting finalizer would cause the underlying
-allocation to live longer than if the finalizer was not present!
+on the `GC heap', all allocations in \ourgc are made through \boehm and stored in
+a single heap.
 
+When used as a finalizer,
+\lstinline{Box<T>}'s drop method is thus unneeded, as the underlying memory will
+naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
+calls \lstinline{deallocate}, any resulting finalizer would cause the underlying
+allocation to live longer than if the finalizer was not present!}
 This means that there is no need to run a finalizer for a type such as
 \lstinline{Gc<Box<u8>>} and we can statically elide it. However, we can not
 elide every \lstinline{Gc<Box<T>>} finalizer: for example, \lstinline{Gc<Box<Arc<u8>>}
@@ -622,8 +621,8 @@ Even though neither normal Rust destructors or \ourgc finalizers are guaranteed
 to run, a program whose destructors or finalizers never run would probably not
 be usable (leaking resources such as memory, deadlocking, and so on). We
 therefore make \lstinline{DropMethodFinalizerElidable} an unsafe
-trait, because implementing it inappropriately is likely to lead undesired
-(though not incorrect!) behaviour at run-time. To implement it one therefore
+trait, because implementing it inappropriately is likely to lead to undesired
+-- though not incorrect! -- behaviour at run-time. To implement it one therefore
 needs to opt in to unsafe Rust:
 
 \begin{lstrustsmall}
@@ -633,9 +632,9 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
-not only are these types' drop methods compatible as-is with \lstinline{DropMethodFinalizerElidable},
-but they are extensively used in real Rust code: as we shall see in \cref{sec:evaluation},
-they are an important part of allowing us to elide significant numbers of finalizers in real code.
+not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
+but they are extensively used in real Rust code: they enable significant numbers of
+finalizers to be elided.
 
 \begin{figure}[t]
   \begin{lstlisting}[
@@ -662,9 +661,9 @@ impl<T> Gc<T> {
 \end{lstlisting}
 \end{figure}
 
-\cref{listing:elision_in_rustc} shows how we use the \lstinline{const} compiler intrinsinc
-\lstinline{requires_finalizer} to turn \cref{alg:elision} into reality in our
-\rustc fork. \lstinline{Gc::new} uses this intrinsic to decide
+\cref{listing:elision_in_rustc} shows how we use \ourgc's \lstinline{const} compiler intrinsinc
+\lstinline{requires_finalizer} to turn \cref{alg:elision} into reality.
+\lstinline{Gc::new} uses this intrinsic to decide
 whether a finalizer must be registered or not. Although this looks like
 a dynamic check, in fully optimised builds it turns into a static
 check: \lstinline{requires_finalizer} is
@@ -705,10 +704,11 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-Most of us assume that finalizers are always run after the
+Most of us assume that finalizers are always run at the same point,
+or later than, the
 equivalent destructor would have run, but they can sometimes run
-prematurely~\cite[section~3.4]{boehm03destructors}.
-As described thus far, premature finalization is also possible in \ourgc
+before~\cite[section~3.4]{boehm03destructors}, undermining soundness.
+Such premature finalization is also possible in \ourgc as described thus far
 (see~\cref{fig:premature_finalization}). In this section we
 show how we can turn a seemingly inefficient
 approach to premature finalization prevention into a viable solution.
@@ -727,16 +727,15 @@ In our context, it is trivial to define premature finalization as a (dynamic) fi
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
 has gone out of scope. Similar to the high-level proposal mooted
 in~\cite[Solution~1]{boehm07optimization}, we must therefore ensure that the dynamic
-lifetime of a GC pointer matches, or exceeds, the static lifetime of the
-\lstinline{Gc<T>} owner.
+lifetime of a reference derived from a \lstinline{Gc<T>} matches or
+exceeds the lifetime of the \lstinline{Gc<T>} itself.
 
 Our solution relies on using \lstinline{Gc<T>}'s drop method to \emph{keep
 alive} GCed value for the static lifetime of the \lstinline{Gc<T>} itself. In
 other words, we ensure that the conservative GC will always see a pointer
-to a GCed value while its normal Rust owners of type \lstinline{Gc<T>}
-are in-scope.
+to a GCed value while the corresponding \lstinline{Gc<T>} is in-scope.
 
-However, there is one major problem to overcome: copyable types such as
+However, there is a major problem to overcome: copyable types such as
 \lstinline{Gc<T>} are forbidden from having destructors. The fundamental
 challenge we have to solve is that each copied value will have a destructor
 called on it, which has the potential for any shared underlying value to be destructed
@@ -818,13 +817,11 @@ as a paused mutator can cause race conditions and deadlocks; and some safe destr
 safe finalizers. Addressing the former problem is conceptually simple --
 finalizers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the latter problem,
-treating all equally in this section.
+treating both equally in this section.
 
-In this section we introduce the three main factors that constitute
-Finalizer Safety Analysis (FSA).
-We extend Rust's static analyses, and alter the relevant parts
-of \rustc, to reject a type \lstinline{T}'s destructor if it
-is not provably safe to be used as a finalizer in a \lstinline{Gc<T>}.
+In this section we introduce Finalizer Safety Analysis (FSA), which prevents
+a type \lstinline{T}'s destructor being used as a finalizer if it is not provably
+safe to do so.
 
 
 \subsection{Rust references}
