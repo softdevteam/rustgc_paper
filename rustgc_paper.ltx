@@ -6,7 +6,7 @@
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
 makes expressing data-structures that require shared ownership awkward,
-inefficient, or both. In this paper we explore a new design for, and implementation of GC in
+inefficient, or both. In this paper we explore a new design for, and implementation of, GC in
 Rust, called \ourgc. Unlike previous
 approaches to GC in Rust, \ourgc maps existing Rust destructors to
 finalizers: this makes GC in Rust natural to use but introduces surprising
@@ -62,17 +62,18 @@ make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
 (e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
-introduce a user-visible type \lstinline{Gc<T>} which takes a value
-of type \lstinline{T}, moves that value to the GC heap, and returns a wrapper around
-a pointer to the moved value. \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
+introduce a user-visible type \lstinline{Gc<T>} which takes a value \emph{v}
+of type \lstinline{T} and moves \emph{v} to the `GC heap'. The \lstinline{Gc<T>}
+value itself is a wrapper around a pointer to \emph{v} on the GC heap.
+\lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
-\lstinline{Gc<T>} wrappers pointing to a value on the GC heap
+\lstinline{Gc<T>} wrappers pointing to \emph{v}
 can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack),
-then that values' GC heap memory can be reclaimed.
+then the GC heap memory for \emph{v} can be reclaimed.
 
 It has proven hard to find a satisfying design and implementation for a GC for
-Rust, as perhaps suggested by the number of different attempts to do so.
+Rust, as perhaps suggested by the number of attempts to do so.
 We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} a familiar, idiomatic, complete
 API; and how to make \emph{finalizers} (i.e.~the code that is run just before a
@@ -81,19 +82,24 @@ value is collected by the GC) safe, performant, and ergonomic. We show that
 a potential pointer) is necessary and sufficient to solve the API challenge,
 but the finalization challenge is more difficult.
 
-In most GCs for Rust, if a user needs values of type \lstinline{T} to cause a
-finalizer to run, then the user must manually implement a finalizer.
-Not only do most finalizers end up duplicating
-existing \emph{destructors} (i.e.~code which is run just before a value is
-reclaimed by Rust's implicit memory management) but this makes it impossible to
-provide finalizers for types in external libraries.
+Normal Rust code uses \emph{destructors} (i.e.~code which is run just before a
+value is reclaimed by Rust's implicit memory management) extensively. Although
+finalizers and destructors may seem to be two different names for the same
+concept, existing GCs for Rust do not use destructors as finalizers. If a user
+needs a finalizer to be run for a \lstinline{Gc<T>}, they must implement that
+finalizer themselves. Unfortunately, finalizers is existing GCs for Rust come
+with some surprising caveats: it is not possible to implement a finalizer for
+\lstinline{Gc<T>} if \lstinline{T} is an external library; some parts of
+destructors are automatically created by the Rust compiler, but that cannot be
+done for finalizers, so users must manually reimplement those parts; and users
+can accidentally cause a type's finalizer to be run more than once. In
+short, finalization in existing GCs for Rust is unpalatable.
 
-The obvious solution to this problem is to allow existing Rust destructors to
-be automatically used as finalizers. However, no existing GC for Rust does
-this; in a close cousin of our work,
+GCs for Rust are not alone in not allowing destructors to be used as
+finalizers. In a close cousin of our work,
 a GC proposal for C++, this approach was ruled out due to
-seemingly insoluble problems~\cite[p.~32]{boehm09garbage}. We divide these
-problems into four categories:
+seemingly insoluble problems~\cite[p.~32]{boehm09garbage}, which we divide
+into four categories:
 (1) finalizers are prohibitively slower than destructors;
 (2) finalizers can be run prematurely;
 (3) running finalizers on the same thread as a paused mutator can cause race conditions and deadlocks;
@@ -102,12 +108,13 @@ All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of (2), has
 existing solutions.
 
-We introduce novel solutions to
-these problems by making use of some of Rust's unusual static guarantees
-We thus gain not just a better GC for
-Rust, but also solutions to open GC problems. Our solutions, in order, are:
+In this paper we show that it is possible and desirable to reuse most
+Rust destructors as finalizers. We introduce novel solutions to the
+long-standing problems this implies by making use of some of Rust's unusual
+static guarantees We thus gain a better GC for
+Rust and solutions to open GC problems. Our solutions, in order, are:
 (1) \emph{finalizer elision} statically optimises away finalizers if the
-underlying destructor duplicates work the GC does anyway.
+underlying destructor duplicates work the GC does anyway;
 (2) \emph{premature finalizer prevention} automatically inserts barriers to prevent
 optimisations or register allocation from `tricking'
 the GC into collecting values before they are dead;
@@ -126,7 +133,7 @@ although \ourgc is necessarily tied to Rust, we suspect that most of the
 techniques in this paper, particularly those related to finalization, are
 likely to generalise to other ownership-based languages.
 
-This paper's is divided into four main parts: background (\cref{sec:background});
+This paper is divided into four main parts: background (\cref{sec:background});
 \ourgc's basic design (\cref{sec:alloy_design}); destructor and finalizer challenges
 and solutions (\cref{sec:destructor challenges,sec:elision,sec:premature_finalize_prevention,sec:fsa}); and evaluation
 (\cref{sec:evaluation}). The first three parts have the challenge that our work
