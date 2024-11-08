@@ -62,15 +62,15 @@ make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
 (e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
-introduce a user-visible type \lstinline{Gc<T>} which takes a value \emph{v}
-of type \lstinline{T} and moves \emph{v} to the `GC heap'. The \lstinline{Gc<T>}
-value itself is a wrapper around a pointer to \emph{v} on the GC heap.
+introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
+of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
+value itself is a wrapper around a pointer to $v$ on the GC heap.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
 \emph{dereferenced} to \lstinline{T} at will by the user. When no
-\lstinline{Gc<T>} wrappers pointing to \emph{v}
+\lstinline{Gc<T>} wrappers pointing to $v$
 can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack),
-then the GC heap memory for \emph{v} can be reclaimed.
+then the GC heap memory for $v$ can be reclaimed.
 
 It has proven hard to find a satisfying design and implementation for a GC for
 Rust, as perhaps suggested by the number of attempts to do so.
@@ -173,7 +173,7 @@ readers to skip material they are already comfortable with.
 \end{figure}
 
 Rust uses affine types and \emph{ownership}
-to statically guarantee that: a \emph{value} (i.e.~an instance of a type) has a
+to statically guarantee that: a value has a
 single owner (e.g.~a variable); an owner can \emph{move} (i.e.~permanently
 transfer the ownership of) a value to another owner; and
 when a value's owner goes out of scope, the value's destructor
