@@ -842,13 +842,13 @@ or experimenting with existing code, it is useful to be able to store references
 in \lstinline{Gc<T>}. FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finalizer (i.e.~\lstinline{T}
 has no destructor, or finalizer elision has removed the \lstinline{Gc<T>}'s
-finalizer). This is safe, because Rust's semantics allow references / pointers
-to survive arbitrarily long dynamically so long as they are not dereferenced.
+finalizer). This is safe, because the lifetime of a Rust references / pointers
+only becomes a safety issue if it is dereferenced.
 
-To implement this aspect of FSA, \ourgc uses auto traits~\cite[Section.~11]{rustlangref},
-which can be thought of as marker traits that the compiler recognises and
-handles in a special way. Since we use auto traits repeatedly in FSA,
-it is worth understanding how they work. In essence, an auto trait \lstinline{A}
+To implement this aspect of FSA, \ourgc uses auto
+traits~\cite[Section.~11]{rustlangref}, which we will use repeatedly in FSA. In
+essence, auto traits are a category of marker traits that the compiler
+recognises and propagates automatically. An auto trait \lstinline{A}
 will be automatically implemented for a type \lstinline{T} unless
 one of the following is true: there is an explicit \emph{negative
 implementation} of \lstinline{A} for \texttt{T}; or \texttt{T}
@@ -866,7 +866,7 @@ impl<T> !ReferenceFree for &T {}
 impl<T> !ReferenceFree for &mut T {}
 \end{lstlisting}
 
-Thus, thanks to auto traits, any type \lstinline{T} which implements
+Thanks to auto traits, any type \lstinline{T} which implements
 \lstinline{ReferenceFree} is guaranteed to be free of references. When a
 program contains a \lstinline{Gc<T>} type, \ourgc checks whether it has a
 finalizer: if it does,
@@ -909,12 +909,13 @@ languages~\citep[p.~229]{jones23garbage}) or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalization~\cite[p.~11]{boehm03destructors}). There is no fully
 automatic solution to this problem, though some GCs
-offer weak references, which at least allow users to detect when finalization cycles
+offer weak references, which allow users to detect when finalization cycles
 have been broken, though they still have to deal with the consequences
 manually.
 
-In \ourgc, we wanted to ensure that users cannot accidentally find themselves
-making such a mistake. A first attempt at enforcing such a property might
+We wanted to provide users with static guarantees that their destructors will
+not behave unexpectedly when used as finalizers in a cycle. A first attempt at
+enforcing such a property might
 seem to be that a \lstinline{Gc<T>} cannot have, directly or indirectly, fields of type
 \lstinline{Gc<T>}. This would indeed prevent the mistakes we want to catch but
 at the cost of not allowing \lstinline{Gc<T>} with a finalizer to specify shared ownership!
@@ -977,7 +978,7 @@ We must therefore ensure that it is safe to run a type's destructor on the
 finalizer thread. A conservative definition is that \lstinline{Gc<T>} is
 is safe to use if \lstinline{T} implements both of Rust's existing \lstinline{Send} (is a type safe to be
 moved permanently from one thread to another?) and \lstinline{Sync} (is a type
-safe to be accessed from more than one thread?) auto traits.
+safe to be accessed from more than one thread simultaneously?) auto traits.
 Note that it is not sufficient for \lstinline{T} to implement
 \lstinline{Send} alone, because a finalizer may access
 state (e.g.~stored in an \lstinline{Arc}) shared between a GCed value and
@@ -1027,13 +1028,15 @@ tell which of many possible implementations of a method will actually be
 called.
 
 In some cases, users are able to prove to their satisfaction that the resulting
-false positives are unnecessary (e.g.~because the C function they are calling
+false positives are incorrect (e.g.~because the C function they are calling
 has no side effects). Depending on the error they receive, they can then
 implement the unsafe traits \lstinline{FinalizerSafe}, \lstinline{Send}, or
-\lstinline{Sync} appropriately. A challenge in all three cases is that
+\lstinline{Sync} appropriately.
+
+\laurie{is this still relevant?}
+A challenge in all three cases is that
 implementing a trait implicitly guarantees that all dynamic values
 satisfy the static trait implementation.
-
 One way to sidestep this problem is to provide a newtype that allows only a
 subset of values to be declared as safe to use in a finalizer: the newtype
 implements the \lstinline{FinalizerSafe}, \lstinline{Send}, and \lstinline{Sync}
@@ -1381,11 +1384,10 @@ Using \boehm as the allocator for all benchmarks has the advantage of removing
 of the performance characteristics of benchmarks will be changed (e.g.~the
 impact on CPU caches). A generic, modern conservative GC, using the insights of
 recent non-GC allocators, would probably give a better idea of the true
-performance of \ourgc relative to other shared ownership strategies.
-Unfortunately, we are not aware of work on a modern, generic conservative GC.
-Based on the work that modern allocators require, we suspect it would take
-several person years to develop a truly competitive generic, modern
-conservative GC.
+performance of \ourgc relative to other shared ownership strategies. We are
+not aware of a production quality modern, generic conservative GC being
+available right now, though we hope one does become available: it would
+be interesting to rerun our experiments if and when that occurs.
 
 
 \section{Related work}
@@ -1393,9 +1395,10 @@ conservative GC.
 
 In this paper we have, we hope, given sufficient background on GC and the use
 of destructors and finalizers in general. In this section we mostly survey the major
-parts of the GC for Rust landscape more widely, though our survey is
-necessarily incomplete, in part because this is a large and rapidly evolving field
-(the most recent equivalent survey we are aware of is~\cite{manish21arena}).
+parts of the GC for Rust landscape more widely. Our survey is
+inevitably incomplete, in part because this is a large and rapidly evolving field
+(a number of notable changes have occurred since the most recent equivalent
+survey we are aware of is~\cite{manish21arena}).
 We then briefly mention some relevant non-Rust GC work not covered elsewhere.
 
 Early versions of Rust had `managed pointers' (using the \lstinline{@T} syntax)
@@ -1418,11 +1421,12 @@ reference counting and manually invoked cycle detection via the
 trace fields, users must manually implement a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
-\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T: Static}
-bound on the type parameter passed to \lstinline{Cc<T>}. This is more restrictive
-than \ourgc's \lstinline{Gc<T>}. However, unlike our approach to the access
+\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T: 'Static}
+lifetime bound on the type parameter passed to \lstinline{Cc<T>}. Simplifying
+slightly, this means that any references in such a type must be valid for the
+remaining lifetime of the program, a severe restriction. Unlike our approach to the access
 of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
-such accesses at runtime, leading to a (safe) Rust \lstinline{panic}) Unlike most other GCs for
+such accesses at runtime, leading to a (safe) Rust \lstinline{panic}. Unlike most other GCs for
 Rust, destruction in \rustbacon can be
 seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
 0; GCed values inside cycles at the end of the \lstinline{collect_cycles} function.
@@ -1441,10 +1445,10 @@ automatically (i.e.~it doesn't require manual calls to a function such as
 \lstinline{collect_cycles}). Drop methods are not used as finalizers: if a
 finalizer is required, a manual implementation of the \lstinline{Finalize} trait
 must be provided; finalizer glue can be largely, though not fully (see
-\cref{sec:destructor challenges}), automatically created by use of the provided
+\cref{sec:destructor challenges}), automatically created by the provided
 \lstinline{Trace} macro. \rustgc detects accesses to already-finalized values
 dynamically at run-time, panicking if they occur. Unlike \rustbacon, these accesses
-are detected by recording per-state what the collector's state is in: if the
+are detected by recording \laurie{the next bit doesn't make sense} per-state what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
 panic. We have not yet verified whether cross-thread collection / sweeping can
 evade this check.
@@ -1473,7 +1477,7 @@ which uses branding in a similar way to
 \lstinline{GhostCell}s (see \cref{sec:background}). In essence, users provide
 a special `root' type which is the only place where roots can be stored.
 Mutating the heap can only be done in the context of functions that are
-passed a branded reference to the GCed heap. Once such function have finished,
+passed a branded reference to the GCed heap. Once such a function has completed,
 \textsc{GcArena} is in full control of the GC heap, and knows that
 only the root type needs to be scanned for roots. This provides strong
 guarantees about when GC references are available but it is possible for code to keep executing in
@@ -1488,21 +1492,21 @@ One of several extensions of \rustgc is \bronze, which aims to improve
 upon \rustgc in two ways~\citep{coblenz21bronze}. First, \bronze tries
 to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stack-maps (a run-time mechanism for accurately
-tracking active pointers). Unlike \ourgc, \bronze cannot accidentally
-keep objects alive due to false positive `pointers'. However, \bronze
-does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it will not
-be tracked for GC purposes, leading to undefined behaviour. Second, \bronze tries to give GC in
+tracking active pointers). This rules out the false positives that are
+inevitable in conservative GC. However, \bronze
+does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it
+will not be tracked by the GC, leading to undefined behaviour. Second, \bronze tries to give GC in
 Rust similar semantics to non-ownership languages such as Java. It does this by
-allowing shared mutation, undermining Rust's borrow checker, and leading
+allowing shared mutation, undermining Rust's borrow checker, and also leading
 to undefined behaviour. See \cref{lst:bronze_unsound} for an
-example of a program which has undefined behaviour in \bronze.
+example of a problematic program in \bronze.
 
-Chrome's rendering engine \emph{Blink} uses a conservative GC called
+Chrome's rendering engine \emph{Blink} uses the conservative GC
 \textsc{Oilpan}. It has the interesting property that it has two classes of
 finalizers. `Full finalizers' are similar to finalizers in \ourgc, running on a
-finalizer thread at an indeterminate future point on a separate collector thread, but with the difference that
+finalizer thread at an indeterminate future point, but with the difference that
 they can only reference parts of a GCed value. To mitigate this,
-`pre-finalizers' are run by the collector on the same thread
+`pre-finalizers' are run by the collector on the same thread as mutator
 as soon as an object as recognised as unused, and can
 access all of a GCed value. Pre-finalizers are necessary, but not encouraged, because they
 implicitly pause the stop-the-world phase of the collector.
@@ -1513,7 +1517,7 @@ for a rendering engine: \ourgc currently makes no pretences to being low latency
 \section{Conclusions}
 
 We introduced a novel design for GC in Rust that, by taking advantage of Rust's
-unusual static guarantees, also some classical GC finalizer problems. We
+unusual static guarantees, also solves some classical GC finalizer problems. We
 implemented our design in a fork of \rustc, and showed that it has a fairly
 small performance overhead. We do not claim that \ourgc is the ultimate design
 for GC in Rust, but it does
