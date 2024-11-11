@@ -47,6 +47,8 @@ each of these problems.
 ]{listings/first_example.rs}
 \end{figure}
 
+\jake{PLDI allows numbered citations. We could switch back to them if you think this will help with the page limit?}
+
 Amongst the ways one can classify programming languages are whether they
 are Garbage Collected (GCed) or not: GCed languages enable implicit memory management;
 non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
@@ -66,7 +68,7 @@ introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
-\emph{dereferenced} to \lstinline{T} at will by the user. When no
+\emph{dereferenced} to \lstinline{T} \jake{nit-pick but it derefs to a $v$ of type \lstinline{T}}  at will by the user. When no
 \lstinline{Gc<T>} wrappers pointing to $v$
 can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack),
@@ -87,7 +89,7 @@ value is reclaimed by Rust's implicit memory management) extensively. Although
 finalizers and destructors may seem to be two different names for the same
 concept, existing GCs for Rust do not use destructors as finalizers. If a user
 needs a finalizer to be run for a \lstinline{Gc<T>}, they must implement that
-finalizer themselves. Unfortunately, finalizers is existing GCs for Rust come
+finalizer themselves. Unfortunately, finalizers in existing GCs for Rust come
 with some surprising caveats: it is not possible to implement a finalizer for
 \lstinline{Gc<T>} if \lstinline{T} is an external library; some parts of
 destructors are automatically created by the Rust compiler, but that cannot be
@@ -111,7 +113,7 @@ existing solutions.
 In this paper we show that it is possible and desirable to reuse most
 Rust destructors as finalizers. We introduce novel solutions to the
 long-standing problems this implies by making use of some of Rust's unusual
-static guarantees We thus gain a better GC for
+static guarantees. We thus gain a better GC for
 Rust and solutions to open GC problems. Our solutions, in order, are:
 (1) \emph{finalizer elision} statically optimises away finalizers if the
 underlying destructor duplicates work the GC does anyway;
@@ -191,7 +193,7 @@ However, there are many programs which need to express data structures
 which do not fit into the restrictions of affine types and
 ownership. These are often described as `cyclic data-structures', though
 that sometimes gives the incorrect impression that only data structures
-such as linked lists are of interest. In reality, programs as diverse as
+such as \jake{doubly?} linked lists are of interest. In reality, programs as diverse as
 interpreters for dynamically typed languages have need to use such types.
 In this paper we use the more abstract term `shared ownership', which includes,
 but is not limited to, include cyclic data-structures.
@@ -631,7 +633,7 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
-\lstinline{Vec<T>}, \lstinline{RawVec<T>}, and \lstinline{HashMap<T>}. Fortunately,
+\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>}, \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>}, \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>}, and \lstinline{BinaryHeap<T>}\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})}. Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
@@ -666,7 +668,7 @@ impl<T> Gc<T> {
 \lstinline{Gc::new} uses this intrinsic to decide
 whether a finalizer must be registered or not. Although this looks like
 a dynamic check, in fully optimised builds it turns into a static
-check: \lstinline{requires_finalizer} is
+check: \lstinline{requires_finalizer}\jake{In \ourgc, this is called \lstinline{needs_finalizer}, and I actually prefer the \ourgc version because it has a symmetry with the existing \lstinline{needs_drop} intrinsic in \rustc. Are you ok if we rename it in the paper?} is
 evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
@@ -793,7 +795,7 @@ are functionally equivalent, though ours
 does put an extra burden on dead-code elimination in the compiler tool-chain.
 
 We add a new pass
-\lstinline{remove_elidable_drops} to
+\lstinline{remove_elidable_drops}\jake{nit-pick: this is actually camel cased} to
 \rustc's Mid-Level Intermediate Representation (MIR) processing. MIR is best
 thought of as the main IR inside \rustc: it contains the complete set of
 functions in the program, where each function consists of a sequence of basic
