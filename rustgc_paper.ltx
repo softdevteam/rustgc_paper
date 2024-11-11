@@ -24,22 +24,22 @@ each of these problems.
   language=Rust,
   firstline=6,
   basicstyle=\footnotesize\ttfamily,
-  caption={An \ourgc example, showing use of the \lstinline{Gc<T>}
-    type and destructors as finalizers. We create a type \lstinline{GcNode} which
-    models a graph: it stores an 8 bit integer value and a reference (possibly
-    \lstinline{None} (i.e.~`null'), via Rust's standard \lstinline{Option} type) to a neighbouring node
+  caption={An \ourgc example, showing \lstinline{Gc<T>}
+    and destructors as finalizers. We create a type \lstinline{GcNode} which
+    models a graph: it stores an 8 bit integer value and a possibly-null
+    reference (via Rust's standard \lstinline{Option} type) to a neighbouring node
     (line 1). We add a normal Rust destructor which \ourgc is able to use as a
     finalizer when \lstinline{GcNode} is used inside \lstinline{Gc<T>} (line 2).
     Inside \lstinline{main} we create the first GCed node in the graph (line 5).
     We use Rust's normal \lstinline{RefCell} type to allow the node to be mutated
-    (using the \lstinline{RefCell::borrow\_mut} method to dynamically detect mutation that
-    would undermine Rust's static borrow checker rules)
+    (using the \lstinline{RefCell::borrow\_mut} method which dynamically checks
+    for mutation that would undermine Rust's static rules)
     and a cycle created directly back to itself (line 6). We then create a second cyclic graph (lines 7
     and 8), immediately assigning it to the \lstinline{gc1} variable (line 9):
-    note this copies, rather than moves, the \lstinline{Gc<T>}.
-    Doing so means that the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
-    is no longer reachable, so when we force a collection (line 10) that node
-    can be recognised as collectable. Its finalizer is then scheduled to be run, causing
+    this copies, rather than moves, the \lstinline{Gc<T>}.
+    This cause the first cyclic graph \lstinline{GcNode\{value: 1, ..\}}
+    to no longer be reachable, so after forcing a collection (line 10) that node
+    can be collected. Its finalizer is then scheduled to be run, causing
     \lstinline{drop 1} to be printed out at a later point; when it has completed the GC
     heap memory can be reclaimed. The print statement outputs \lstinline{2 2} (line
     11).},
@@ -680,17 +680,17 @@ finalizer?' checks have no run-time cost at all.
 \begin{lstlisting}[
   language=Rust,
   basicstyle=\footnotesize\ttfamily,
-  caption={An example of code that, when fully optimised, can cause premature
-    finalization. We create a new struct \lstinline{S} that wraps an integer
-    (line 1) with a drop method that sets the integer to zero (line 2). In the
-    main method, we first move an instance of the struct into a
-    \lstinline{Box<T>}, then move that into a \lstinline{Gc<T>} (line 4). We
-    then obtain a Rust reference to the inner integer (line 5), which at
-    run-time will be a pointer to the \lstinline{Box<T>} on the heap. At this
-    point, the compiler can realise that the \lstinline{Gc<T>} is no longer
+  caption={An example of possible premature
+    finalization. We create a new struct \lstinline{S}
+    (line 1) with a drop method that sets the wrapped integer to zero (line 2). In the
+    main method, we move an instance of the struct into a
+    \lstinline{Box<T>}, which we then move into a \lstinline{Gc<T>} (line 4). We
+    obtain a Rust reference to the inner integer (line 5), which at
+    run-time will be a pointer to the \lstinline{Box<T>}. At this
+    point, the compiler can determine that the \lstinline{Gc<T>} is no longer
     used and overwrite \lstinline{root}'s pointer (which may be in a register). If
-    a GC cycle then occurs, a finalizer might run \lstinline{S}'s drop method;
-    the program will then print `0' instead of the expected `1' (line 7).},
+    a collection then occurs, a finalizer can run \lstinline{S}'s drop method,
+    causing the program to print `0' instead of the expected `1' (line 7).},
     label={fig:premature_finalization}]
 struct S { value: u8 }
 impl Drop for S { fn drop(&mut self) { self.value = 0; } }
@@ -726,7 +726,7 @@ finalizable.
 In our context, it is trivial to define premature finalization as a (dynamic) finalizer
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
 has gone out of scope. Similar to the high-level proposal mooted
-in~\cite[Solution~1]{boehm07optimization}, we must therefore ensure that the dynamic
+in~\cite[Solution~1]{boehm07optimization}, we must ensure that the dynamic
 lifetime of a reference derived from a \lstinline{Gc<T>} matches or
 exceeds the lifetime of the \lstinline{Gc<T>} itself.
 
@@ -1031,9 +1031,7 @@ In some cases, users are able to prove to their satisfaction that the resulting
 false positives are incorrect (e.g.~because the C function they are calling
 has no side effects). Depending on the error they receive, they can then
 implement the unsafe traits \lstinline{FinalizerSafe}, \lstinline{Send}, or
-\lstinline{Sync} appropriately.
-
-\laurie{is this still relevant?}
+\lstinline{Sync} appropriately. \laurie{is this still relevant?}
 A challenge in all three cases is that
 implementing a trait implicitly guarantees that all dynamic values
 satisfy the static trait implementation.
@@ -1054,74 +1052,20 @@ unsafe.
 
 \subsection{Putting it all together}
 
-\begin{algorithm}[t]
-  \captionof{algorithm}{Finalizer safety analysis}
-  \label{alg:fsa}
-  \begin{algorithmic}[1]
-    \Function{FinalizerSafetyAnalysis}{\textit{func}}
-      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
-            \State $t \gets$ \textit{basic\_block.terminator}
-            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
-                \State \textbf{continue}
-            \EndIf
-            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
-            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
-              \State \textbf{continue}
-            \EndIf
-            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
-            \State \Call{EmitReferenceError}{}
-            \Else
-            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
-              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
-            \EndFor
-            \EndIf
-      \EndFor
-\EndFunction
-\State{}
-    \Function{CheckDropMethodSafety}{\textit{drop}}
-    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
-    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
-      \State \Return
-    \EndIf
-      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
-        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
-            \ForEach {$\textit{projection} \in \textit{statement}$}
-              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-            \EndFor
-        \EndFor
-      \EndFor
-
-\EndFunction
-\State{}
-  \Function{IsFinalizerSafe}{\textit{ty}}
-    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
-
-\cref{alg:fsa} puts all the parts of FSA together. In essence, it iterates over
+In essence, FSA integrates the seemingly separate parts presented above into one:
+as shown in \cref{alg:fsa} it iterates over
 every function in \rustc's MIR and checks whether types used in a
-\lstinline{Gc<T>} satisfy FSA. As the algorithm shows, the seemingly
-separate parts of FSA are able to use much of the same machinery (and reuse
-algorithms from earlier sections).
+\lstinline{Gc<T>} satisfy FSA. To simplify the presentation, we ignored
+caching in the algorithm though the actual implementation does perform
+caching (e.g.~the \lstinline{requires_finalizer} intrinsinc) .
 
-To simplify the presentation, the algorithm as presented performs no caching,
-so a type can be checked multiple times. The actual implementation of the
-implementation inside \ourgc performs caching. For example, the
-\lstinline{requires_finalizer} intrinsic caches results, and the MIR transform
-API naturally caches several other calculations as well.
-
-The \lstinline{Emit*Error} functions represent an important convenience. Rather
+The implementation of FSA also gives good quality error messages. Rather
 than just inform a user that `your drop method has not passed FSA', \ourgc
-pinpoints precisely which field or line in a drop method caused FSA to fail.
+pinpoints precisely which field or line in a drop method caused FSA to fail
+(via the \lstinline{Emit*Error} functions):
 \lstinline{EmitReferenceError} informs the user when a reference in a type
-is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}).
-\lstinline{EmitFinalizerUnsafeError} informs the user when a drop method
+is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}); and
+\lstinline{EmitFinalizerUnsafeError} when a drop method
 contains code which is unsafe (e.g.~references a \lstinline{Gc<T>} type, an
 opaque function, etc.). \cref{fig:finalizer_cycle_err} shows an example of
 the errors reported by \ourgc: note that it pinpoints the line within a
@@ -1393,13 +1337,13 @@ be interesting to rerun our experiments if and when that occurs.
 \section{Related work}
 \label{sec:related_work}
 
-In this paper we have, we hope, given sufficient background on GC and the use
+In this paper we hope to have given sufficient background on GC and the use
 of destructors and finalizers in general. In this section we mostly survey the major
 parts of the GC for Rust landscape more widely. Our survey is
-inevitably incomplete, in part because this is a large and rapidly evolving field
-(a number of notable changes have occurred since the most recent equivalent
+inevitably incomplete, in part because this is a rapidly evolving field
+(a number of changes have occurred since the most recent equivalent
 survey we are aware of is~\cite{manish21arena}).
-We then briefly mention some relevant non-Rust GC work not covered elsewhere.
+We also cover some relevant non-Rust GC work not mentioned elsewhere.
 
 Early versions of Rust had `managed pointers' (using the \lstinline{@T} syntax)
 which were intended to represent GC types~\cite{manish21arena}. The core
@@ -1453,12 +1397,10 @@ collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
 panic. We have not yet verified whether cross-thread collection / sweeping can
 evade this check.
 
-To move beyond reference counting as an aspect of GC for Rust, some
-libraries have experimented with alternative mechanisms for finding roots.
-\shifgrethor~\cite{shifgrethor} requires \lstinline{Gc} values to
-be created by a \lstinline{Root<'root>} value where \lstinline{'root}
-represents a manually accessible \emph{lifetime}; the former become references of
-the latter, tying the lifetime of a \lstinline{Gc<'root, T>} to the
+An example of moving beyond reference counting in a GC for Rust is
+\shifgrethor~\cite{shifgrethor}. It requires \lstinline{Gc} values to
+be created by a \lstinline{Root<'root>}: the resulting \lstinline{Gc<'root, T>}
+is then tied to the lifetime of the
 \lstinline{Root<'root>}. This allows roots to be precisely identified, but
 requires explicitly having access to a \lstinline{Root<'root>} whenever a
 \lstinline{Gc<'root, T>} is used. As with \rustgc, \shifgrethor requires users
@@ -1525,16 +1467,6 @@ show how much can be achieved if one is willing to adjust and extend the
 language's design and \rustc.
 
 
-\section*{Data-Availability Statement}
-
-Both \ourgc and our experiment are downloadable from GitHub. Both can be run on
-most modern Unix machines. Our experiment repository provides a
-\lstinline{Makefile} which automatically builds all the software used in our
-experiment (including the variants of \ourgc and the benchmarks), runs the
-experiments, and produces the plots you see in the paper. We will also provide
-a separate download of the particular data our run of the experiment produced.
-
-
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
@@ -1570,6 +1502,56 @@ interested readers may find that they help flesh out some details.
 \EndFunction
 \end{algorithmic}
   \label{alg:barrier_removal}
+\end{algorithm}
+
+\begin{algorithm}[t]
+  \captionof{algorithm}{Finalizer safety analysis}
+  \label{alg:fsa}
+  \begin{algorithmic}[1]
+    \Function{FinalizerSafetyAnalysis}{\textit{func}}
+      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
+            \State $t \gets$ \textit{basic\_block.terminator}
+            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
+                \State \textbf{continue}
+            \EndIf
+            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
+            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
+              \State \textbf{continue}
+            \EndIf
+            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
+            \State \Call{EmitReferenceError}{}
+            \Else
+            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
+              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
+            \EndFor
+            \EndIf
+      \EndFor
+\EndFunction
+\State{}
+    \Function{CheckDropMethodSafety}{\textit{drop}}
+    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
+    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
+      \State \Return
+    \EndIf
+      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
+        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
+            \ForEach {$\textit{projection} \in \textit{statement}$}
+              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+            \EndFor
+        \EndFor
+      \EndFor
+
+\EndFunction
+\State{}
+  \Function{IsFinalizerSafe}{\textit{ty}}
+    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
+\EndFunction
+\end{algorithmic}
 \end{algorithm}
 
 \begin{figure}[t!]
