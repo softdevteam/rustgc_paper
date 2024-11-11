@@ -841,7 +841,11 @@ from storing, directly or indirectly, references. This might seem to be
 no great loss: storing references in a \lstinline{Gc<T>} largely nullifies
 the `GCness' of \lstinline{Gc<T>}. We have however found that when refactoring
 or experimenting with existing code, it is useful to be able to store references
-in \lstinline{Gc<T>}. FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
+in \lstinline{Gc<T>}.
+
+\jake{Everything in this subsection after this comment is out of date}
+
+FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
 directly or indirectly, references if it has no finalizer (i.e.~\lstinline{T}
 has no destructor, or finalizer elision has removed the \lstinline{Gc<T>}'s
 finalizer). This is safe, because the lifetime of a Rust references / pointers
@@ -875,6 +879,70 @@ finalizer: if it does,
 and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
 raised.
 
+\jake{Below I have re-written the above out-of-date prose to reflect the new FSA semantics around references.}
+
+\jake{It's clear to me that now some re-jigging of order of when we introduce terms will need to change.}
+
+A \lstinline{Gc<T>} can in fact store, directly or indirectly, normal Rust
+references and still have a finalizer. We can allow this based on the following
+observation: all references used inside of \lstinline{T::drop} are safe to
+dereference provided that they never originated from one of \lstinline{T}'s
+fields (or indeed \lstinline{T} itself). This is because, short of using unsafe
+code, all other ways in which one can reify a reference inside a drop method
+will lead to a valid reference: you could create one which points to another
+element on drop's stack-frame; or you could create one to a global, in which
+case the reference would have a \lstinline{'static} lifetime, which is valid
+for the entire duration of the program. (Note that there is actually one
+notable exception to this, and that's references to thread-locals, but
+they are dealt with separately, which I will explain later).
+
+Armed with this information, we can simplify this rule to say: a finalizer must
+never contain a projection (i.e. to a struct/enum field or a vec/slice element)
+if that projection is to a reference type. Notice that I haven't qualified
+this: I really do mean that \emph{all projections to references are banned}, not just
+those obtained via \lstinline{&self}. Basically, what this means is that this is not allowed:
+
+\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
+struct T<'a> { t_ref: &'a u8 }
+impl<'a> Drop for T<'a> {
+   fn drop(&mut self) {
+     self.t_ref; // Banned! As it should be, this is unsound :)
+   }
+}
+\end{lstlisting}
+
+Which is good, because that's unsound. But also, our rule means that the
+perfectly sound projection below is also not allowed:
+
+\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
+struct T<'a> { t_ref: &'a u8 }
+struct U<'a> { u_ref: &'a u8 }
+impl<'a> Drop for T<'a> {
+  fn drop(&mut self) {
+    let u = U::new();
+    u.uref; // Banned! But sound :(
+  }
+}
+\end{lstlisting}
+
+Which is bad, because \lstinline{u.u_ref} never originated from the
+\lstinline{self} type, and FSA doesn't know that. Ideally, we'd have a looser
+rule that allows reference projections where FSA can prove it never originated
+from \lstinline{self}, but it was really hard to implement this correctly,
+because I wasn't confident I'd got the def-use stuff right, and that I might
+have inadvertently left in a backdoor to unsoundness. In practice, the current
+rule seems to work well for the benchmark suites we converted.
+
+There's another limitation to this approach: our FSA pass happens on MIR that
+has already been borrow-checked, and thus the lifetime information for
+references has been thrown away by \rustc. This is a shame, because it means we
+can't make an exception for projections to references with a
+\lstinline{'static} lifetime. However, one could make the argument that you
+don't actually want this: unsafe code can transmute lifetimes up to
+\lstinline{'static} in a way that FSA wouldn't be able to catch, so really, you
+couldn't trust the lifetime annotation anyway (but then it's your own fault for
+unsafe-ing it -- how'd you expect the compiler to catch that! Pro's and cons
+for both sides I guess).
 
 \subsection{Cycles and Finalization}
 \label{sec:cycles_and_finalization}
