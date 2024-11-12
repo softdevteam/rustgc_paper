@@ -701,21 +701,19 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-Most of us assume that finalizers are always run at the same point,
-or later than, the
+Most of us assume that finalizers are always run later than the
 equivalent destructor would have run, but they can sometimes run
 before~\cite[section~3.4]{boehm03destructors}, undermining soundness.
 Such premature finalization is also possible in \ourgc as described thus far
 (see~\cref{fig:premature_finalization}). In this section we
-show how we can turn a seemingly inefficient
-approach to premature finalization prevention into a viable solution.
+show how to prevent, and then optimise, premature finalization.
 
 There are two aspects to premature finalization. First, language
 specifications often do not define, or do not precisely define, when the earliest point that a value can
 be finalized is. While this means that, formally, there is no `premature' finalization,
 it seems unlikely that language designers anticipated some of the resulting
 implementation surprises (see e.g.~this example in
-Java~\cite{shipilev20local}). Second most compiler optimisations are
+Java~\cite{shipilev20local}). Second, most compiler optimisations are
 `GC unaware', so optimisations such as scalar
 replacement can change the point in a program when GCed values appear to be
 finalizable.
@@ -727,8 +725,8 @@ in~\cite[Solution~1]{boehm07optimization}, we must ensure that the dynamic
 lifetime of a reference derived from a \lstinline{Gc<T>} matches or
 exceeds the lifetime of the \lstinline{Gc<T>} itself.
 
-Our solution relies on using \lstinline{Gc<T>}'s drop method to \emph{keep
-alive} GCed value for the static lifetime of the \lstinline{Gc<T>} itself. In
+Our solution relies on adjusting \lstinline{Gc<T>}'s drop method to \emph{keep
+alive} a GCed value for at least the static lifetime of the \lstinline{Gc<T>} itself. In
 other words, we ensure that the conservative GC will always see a pointer
 to a GCed value while the corresponding \lstinline{Gc<T>} is in-scope.
 
@@ -739,9 +737,9 @@ called on it, which has the potential for any shared underlying value to be dest
 more than once. \ourgc explicitly allows \lstinline{Gc<T>} -- but no other
 copyable type -- to have a destructor, but to ensure it doesn't cause surprises
 in the face of arbitrary numbers of copies, the destructor must be idempotent.
-Our task is made easier because \lstinline{Gc<T>} has no drop glue: Rust does
-not add a destructor for pointer types, and from the perspective of the type
-system \lstinline{Gc<T>} is simply a wrapper around a pointer type.
+Our task is made easier because \lstinline{Gc<T>} naturally has no drop glue from
+Rust's perspective: \lstinline{Gc<T>} consists of a field with a pointer type,
+and such types are opaque from a destruction perspective.
 
 We therefore only need to make sure that \lstinline{Gc<T>}'s drop method
 is idempotent. Fortunately, this is sufficient for our purposes: we want the drop
@@ -782,7 +780,7 @@ imposes a performance overhead on code that uses
 Fortunately, we can optimise premature finalizer prevention further by
 piggy-backing on finalizer elision: if a finalizer can be
 elided, there is no finalizer to be called prematurely, and no need for
-resulting values to be kept alive. Intuitively, we want to avoid generating drop methods
+such values to be kept alive. Intuitively, we want to avoid generating drop methods
 for \lstinline{Gc<T>} types that do not require finalization,
 but this is difficult to do directly inside \rustc. Instead,
 we suppress calls to the drop methods of such types: the two approaches
