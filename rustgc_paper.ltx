@@ -823,6 +823,11 @@ In this section we introduce Finalizer Safety Analysis (FSA), which prevents
 a type \lstinline{T}'s destructor being used as a finalizer if it is not provably
 safe to do so.
 
+\jake{Now that FSA steps through function calls, maybe when explaining it we
+should say somewhere that really it's a form of abstract interpretation. We're
+creating a sound approximation over the CFG (MIR) of a Rust program to reason
+about finalization properties without actually executing it. It's probably then
+obvious to a PL audience that this must be imprecise in order to be decidable.}
 
 \subsection{Rust references}
 \label{sec:fsa_rust_references}
