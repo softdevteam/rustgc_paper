@@ -66,7 +66,7 @@ introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
-\emph{dereferenced} to \lstinline{T} \jake{nit-pick but it derefs to a $v$ of type \lstinline{T}}  at will by the user. When no
+\emph{dereferenced} to a value of type \lstinline{T} at will by the user. When no
 \lstinline{Gc<T>} wrappers pointing to $v$
 can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack),
@@ -191,7 +191,7 @@ However, there are many programs which need to express data structures
 which do not fit into the restrictions of affine types and
 ownership. These are often described as `cyclic data-structures', though
 that sometimes gives the incorrect impression that only data structures
-such as \jake{doubly?} linked lists are of interest. In reality, programs as diverse as
+such as doubly linked lists are of interest. In reality, programs as diverse as
 interpreters for dynamically typed languages have need to use such types.
 In this paper we use the more abstract term `shared ownership', which includes,
 but is not limited to, include cyclic data-structures.
@@ -596,7 +596,7 @@ causes \lstinline{Arc<T>}'s destructor to be run.
 \end{algorithmic}
 \end{algorithm}
 
-\label{requires_finalizer_intrinsic}
+\label{needs_finalizer_intrinsic}
 Finalizer elision statically determines which type's destructors do
 not require corresponding finalizers and elides them. It does so conservatively,
 and deals correctly with drop glue.
@@ -631,7 +631,8 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
-\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>}, \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>}, \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>}, and \lstinline{BinaryHeap<T>}\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})}. Fortunately,
+\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>}, \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>}, \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>}, and \lstinline{BinaryHeap<T>}.
+\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})} \laurie{why do we care about forking something for rustc? i suspect i'm missing out on something here!}. Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
@@ -644,16 +645,16 @@ finalizers to be elided.
     label={listing:elision_in_rustc},
     caption={
       A simplified view of how finalizers are elided inside \ourgc. The new compiler intrinsic
-      \lstinline{requires_finalizer} returns true if a finalizer is required for a
+      \lstinline{needs_finalizer} returns true if a finalizer is required for a
       type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
-      value is registered as requiring a finalizer. Because \lstinline{requires_finalizer}
+      value is registered as requiring a finalizer. Because \lstinline{needs_finalizer}
       is a \lstinline{const} function, with optimisations turned on, it is inlined
       and the branch optimised away. In other words, the seemingly dynamic, branching code
       in \lstinline{Gc::new} turns into static, branchless code.
     }]
 impl<T> Gc<T> {
   pub fn new(value: T) -> Self {
-    if requires_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
+    if needs_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
     else { Gc<T>::new_without_finalizer(value) }
     ...
   }
@@ -661,12 +662,12 @@ impl<T> Gc<T> {
 \end{lstlisting}
 \end{figure}
 
-\cref{listing:elision_in_rustc} shows how we use \ourgc's \lstinline{const} compiler intrinsinc
-\lstinline{requires_finalizer} to turn \cref{alg:elision} into reality.
+\cref{listing:elision_in_rustc} shows how we use \ourgc's \texttt{const} compiler intrinsinc
+\lstinline{needs_finalizer} to turn \cref{alg:elision} into reality.
 \lstinline{Gc::new} uses this intrinsic to decide
 whether a finalizer must be registered or not. Although this looks like
 a dynamic check, in fully optimised builds it turns into a static
-check: \lstinline{requires_finalizer}\jake{In \ourgc, this is called \lstinline{needs_finalizer}, and I actually prefer the \ourgc version because it has a symmetry with the existing \lstinline{needs_drop} intrinsic in \rustc. Are you ok if we rename it in the paper?} is
+check: \lstinline{needs_finalizer} is
 evaluated at compile-time and its result can be inlined into \lstinline{Gc::new};
 this then allows the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
@@ -793,7 +794,7 @@ are functionally equivalent, though ours
 does put an extra burden on dead-code elimination in the compiler tool-chain.
 
 We add a new pass
-\lstinline{remove_elidable_drops}\jake{nit-pick: this is actually camel cased} to
+\lstinline{RemoveElidableDrops} to
 \rustc's Mid-Level Intermediate Representation (MIR) processing. MIR is best
 thought of as the main IR inside \rustc: it contains the complete set of
 functions in the program, where each function consists of a sequence of basic
@@ -803,8 +804,8 @@ reference both a callee and a successor basic block.
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies drop method terminators which reference elidable finalizers (using
-the \lstinline{requires_finalizer} intrinsic from
-\cref{requires_finalizer_intrinsic}), and turns them into `goto' terminators
+the \lstinline{needs_finalizer} intrinsic from
+\cref{needs_finalizer_intrinsic}), and turns them into `goto' terminators
 to the successor basic basic block. \cref{alg:barrier_removal} in the appendix
 gives a more formal version of this algorithm.
 
@@ -836,116 +837,42 @@ obvious to a PL audience that this must be imprecise in order to be decidable.}
 references (i.e.~\lstinline{&} and \lstinline{&mut}), at which point it is
 subject to Rust's normal borrow checker rules and cannot outlive the reference.
 However, finalizers implicitly extend the lifetime of a GCed value,
-including any stored reference: if a finalizer then accesses a reference stored in a
-\lstinline{Gc<T>} Rust's borrow checking rules are undermined.
+including any stored reference: accessing a reference in a finalizer could
+undermine Rust's borrow checking rules.
 
 The simplest way of avoiding this problem would be to forbid \lstinline{Gc<T>}
 from storing, directly or indirectly, references. This might seem to be
 no great loss: storing references in a \lstinline{Gc<T>} largely nullifies
-the `GCness' of \lstinline{Gc<T>}. We have however found that when refactoring
-or experimenting with existing code, it is useful to be able to store references
-in \lstinline{Gc<T>}.
+the `GCness' of \lstinline{Gc<T>}. However, we found the result hard to use,
+making even simple tasks such as gradually refactoring existing code
+to use \lstinline{Gc<T>} painful.
 
-\jake{Everything in this subsection after this comment is out of date}
+A moderate relaxation -- indeed, how we first designed this -- is to recognise
+that only types that need a finalizer can possibly have problems with
+references, and to forbid such types from storing references in
+\lstinline{Gc<T>}. For example, if there is no drop method for
+\lstinline|struct S {x: &u8}| then its destructor is safe to use as a
+finalizer. We can relax matters further by recognising that \lstinline{S} could
+safely have a drop method provided it uses no references at all. However,
+these relaxations still proved frustrating to use with existing code.
 
-FSA therefore enforces a more relaxed rule: a \lstinline{Gc<T>} can only store,
-directly or indirectly, references if it has no finalizer (i.e.~\lstinline{T}
-has no destructor, or finalizer elision has removed the \lstinline{Gc<T>}'s
-finalizer). This is safe, because the lifetime of a Rust references / pointers
-only becomes a safety issue if it is dereferenced.
+The eventual rule we alighted upon for FSA is to allow a destructor for a type
+\lstinline{T} to be used as a finalizer provided the destructor's drop methods
+do not obtain references derived from \lstinline{T}'s fields (including fields
+reachable from its attributes). Using Rust's terminology, we
+forbid \emph{projections} (which include a struct's fields, indexes into a
+vector, and so on) to reference types. Any other references that are created
+in a drop method are by definition safe to use, as they either exist only
+for the duration of the drop method (references to variables on the stack)
+or will exist for the remainder of the program (references to global variables).
 
-To implement this aspect of FSA, \ourgc uses auto
-traits~\cite[Section.~11]{rustlangref}, which we will use repeatedly in FSA. In
-essence, auto traits are a category of marker traits that the compiler
-recognises and propagates automatically. An auto trait \lstinline{A}
-will be automatically implemented for a type \lstinline{T} unless
-one of the following is true: there is an explicit \emph{negative
-implementation} of \lstinline{A} for \texttt{T}; or \texttt{T}
-contains a field that is not itself \lstinline{A}. Informally, we
-say that a negative implementation of an auto-trait \emph{pollutes} containing
-types.
+Forbidding all projections in this way over-approximates the safe set of
+destructors. For example, if a drop method creates a new
+value and tries to obtain a reference to a field in that new value, then FSA will
+raise an error, even though that reference can only exist for the duration of
+the drop method. It may be possible to relax our rule further, but we found that it becomes
+rapidly harder to define and article what is safe, and to implement the resulting design in \rustc.
 
-We therefore introduce a new auto trait \lstinline{ReferenceFree}, which
-denotes a type which does not contain a reference. \ourgc then defines
-two negative (`\lstinline{!}') implementations of \lstinline{ReferenceFree} for
-reference types:
-
-\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
-impl<T> !ReferenceFree for &T {}
-impl<T> !ReferenceFree for &mut T {}
-\end{lstlisting}
-
-Thanks to auto traits, any type \lstinline{T} which implements
-\lstinline{ReferenceFree} is guaranteed to be free of references. When a
-program contains a \lstinline{Gc<T>} type, \ourgc checks whether it has a
-finalizer: if it does,
-and \lstinline{T} does not implement \lstinline{ReferenceFree}, an error is
-raised.
-
-\jake{Below I have re-written the above out-of-date prose to reflect the new FSA semantics around references.}
-
-\jake{It's clear to me that now some re-jigging of order of when we introduce terms will need to change.}
-
-A \lstinline{Gc<T>} can in fact store, directly or indirectly, normal Rust
-references and still have a finalizer. We can allow this based on the following
-observation: all references used inside of \lstinline{T::drop} are safe to
-dereference provided that they never originated from one of \lstinline{T}'s
-fields (or indeed \lstinline{T} itself). This is because, short of using unsafe
-code, all other ways in which one can reify a reference inside a drop method
-will lead to a valid reference: you could create one which points to another
-element on drop's stack-frame; or you could create one to a global, in which
-case the reference would have a \lstinline{'static} lifetime, which is valid
-for the entire duration of the program. (Note that there is actually one
-notable exception to this, and that's references to thread-locals, but
-they are dealt with separately, which I will explain later).
-
-Armed with this information, we can simplify this rule to say: a finalizer must
-never contain a projection (i.e. to a struct/enum field or a vec/slice element)
-if that projection is to a reference type. Notice that I haven't qualified
-this: I really do mean that \emph{all projections to references are banned}, not just
-those obtained via \lstinline{&self}. Basically, what this means is that this is not allowed:
-
-\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
-struct T<'a> { t_ref: &'a u8 }
-impl<'a> Drop for T<'a> {
-   fn drop(&mut self) {
-     self.t_ref; // Banned! As it should be, this is unsound :)
-   }
-}
-\end{lstlisting}
-
-Which is good, because that's unsound. But also, our rule means that the
-perfectly sound projection below is also not allowed:
-
-\begin{lstlisting}[language=Rust, basicstyle=\footnotesize\ttfamily]
-struct T<'a> { t_ref: &'a u8 }
-struct U<'a> { u_ref: &'a u8 }
-impl<'a> Drop for T<'a> {
-  fn drop(&mut self) {
-    let u = U::new();
-    u.uref; // Banned! But sound :(
-  }
-}
-\end{lstlisting}
-
-Which is bad, because \lstinline{u.u_ref} never originated from the
-\lstinline{self} type, and FSA doesn't know that. Ideally, we'd have a looser
-rule that allows reference projections where FSA can prove it never originated
-from \lstinline{self}, but it was really hard to implement this correctly,
-because I wasn't confident I'd got the def-use stuff right, and that I might
-have inadvertently left in a backdoor to unsoundness. In practice, the current
-rule seems to work well for the benchmark suites we converted.
-
-There's another limitation to this approach: our FSA pass happens on MIR that
-has already been borrow-checked, and thus the lifetime information for
-references has been thrown away by \rustc. This is a shame, because it means we
-can't make an exception for projections to references with a
-\lstinline{'static} lifetime. However, one could make the argument that you
-don't actually want this: unsafe code can transmute lifetimes up to
-\lstinline{'static} in a way that FSA wouldn't be able to catch, so really, you
-couldn't trust the lifetime annotation anyway (but then it's your own fault for
-unsafe-ing it -- how'd you expect the compiler to catch that! Pro's and cons
-for both sides I guess).
 
 \subsection{Cycles and Finalization}
 \label{sec:cycles_and_finalization}
@@ -1000,8 +927,18 @@ subset of the normal type check, allowing GCed types to express cycles so long
 as their destructor(s) do not access other GC types.
 
 To make this check easier to implement, we introduce
-another auto trait \lstinline{FinalizerSafe}, with a negative implementation on
-\lstinline{Gc<T>}:
+an \emph{auto trait}~\cite[Section.~11]{rustlangref},
+a kind of marker trait that the compiler propagates automatically.
+An auto trait \lstinline{A}
+will be automatically implemented for a type \lstinline{T} unless
+one of the following is true: there is an explicit \emph{negative
+implementation} of \lstinline{A} for \texttt{T}; or \texttt{T}
+contains a field that is not itself \lstinline{A}. Informally, we
+say that a negative implementation of an auto-trait \emph{pollutes} containing
+types.
+
+Our new auto trait is \lstinline{FinalizerSafe} with a single
+a negative implementation on \lstinline{Gc<T>}:
 
 \begin{lstrustsmall}
 impl<T> !FinalizerSafe for Gc<T> {}
@@ -1130,7 +1067,7 @@ as shown in \cref{alg:fsa} it iterates over
 every function in \rustc's MIR and checks whether types used in a
 \lstinline{Gc<T>} satisfy FSA. To simplify the presentation, we ignored
 caching in the algorithm though the actual implementation does perform
-caching (e.g.~the \lstinline{requires_finalizer} intrinsinc) .
+caching (e.g.~the \lstinline{needs_finalizer} intrinsinc) .
 
 The implementation of FSA also gives good quality error messages. Rather
 than just inform a user that `your drop method has not passed FSA', \ourgc
