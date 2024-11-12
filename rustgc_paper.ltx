@@ -66,7 +66,7 @@ introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
 \lstinline{Gc<T>} can be \emph{cloned} (i.e.~duplicated) and
-\emph{dereferenced} to a value of type \lstinline{T} at will by the user. When no
+\emph{dereferenced} to a value of type \lstinline{&T} at will by the user. When no
 \lstinline{Gc<T>} wrappers pointing to $v$
 can be found, indirectly or directly, from the
 program's \emph{roots} (e.g.~variables on the stack),
@@ -85,19 +85,19 @@ but the finalization challenge is more difficult.
 Normal Rust code uses \emph{destructors} (i.e.~code which is run just before a
 value is reclaimed by Rust's implicit memory management) extensively. Although
 finalizers and destructors may seem to be two different names for the same
-concept, existing GCs for Rust do not use destructors as finalizers. If a user
-needs a finalizer to be run for a \lstinline{Gc<T>}, they must implement that
-finalizer themselves. Unfortunately, finalizers in existing GCs for Rust come
-with some surprising caveats: it is not possible to implement a finalizer for
+concept, existing GCs for Rust cannot reuse destructors as finalizers:
+the latter must be manually implemented for each type that needs it.
+Unfortunately, even this is trickier than it appears:
+it is not possible to implement a finalizer for
 \lstinline{Gc<T>} if \lstinline{T} is an external library; some parts of
-destructors are automatically created by the Rust compiler, but that cannot be
-done for finalizers, so users must manually reimplement those parts; and users
+destructors are automatically created by the Rust compiler, but
+hand-written finalizers must duplicate those parts manually; and users
 can accidentally cause a type's finalizer to be run more than once. In
 short, finalization in existing GCs for Rust is unpalatable.
 
-GCs for Rust are not alone in not allowing destructors to be used as
-finalizers. In a close cousin of our work,
-a GC proposal for C++, this approach was ruled out due to
+GCs for Rust are not alone in requiring manually written finalizers.
+In a close cousin to our work,
+a GC proposal for C++, the reuse of destructors as finalizers was ruled out due to
 seemingly insoluble problems~\cite[p.~32]{boehm09garbage}, which we divide
 into four categories:
 (1) finalizers are prohibitively slower than destructors;
@@ -108,8 +108,8 @@ All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of (2), has
 existing solutions.
 
-In this paper we show that it is possible and desirable to reuse most
-Rust destructors as finalizers. We introduce novel solutions to the
+In this paper we show that it is possible to reuse most
+Rust destructors as finalizers in a satisfying way. We introduce novel solutions to the
 long-standing problems this implies by making use of some of Rust's unusual
 static guarantees. We thus gain a better GC for
 Rust and solutions to open GC problems. Our solutions, in order, are:
@@ -139,7 +139,7 @@ and solutions (\cref{sec:destructor challenges,sec:elision,sec:premature_finaliz
 (\cref{sec:evaluation}). The first three parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
 tried to provide sufficient material for readers expert in one of these
-areas to gain adequate familiarity with the other, without boing either, but we explicitly encourage
+areas to gain adequate familiarity with the other, without boring either, but we explicitly encourage
 readers to skip material they are already comfortable with.
 
 
@@ -181,11 +181,9 @@ is run and its backing memory reclaimed. An owner can pass \emph{references} to 
 to other code, subject to the following static restrictions: there can be
 multiple immutable references (`\lstinline{&}') to a value or a single
 mutable reference (`\lstinline{&mut}'); and references cannot outlast the owner.
-
-These basic rules mean that many Rust programs are as succinct as their equivalents
-in GCed languages, since no explicit memory management is required. This
-suggests that the search for a good GC for Rust may be quixotic ---
-intellectually stimulating, but of little practical value.
+These rules allow many Rust programs to be as succinct as their equivalents
+in GCed languages. This suggests that the search for a good GC for Rust may be
+intellectually stimulating but of little practical value.
 
 However, there are many programs which need to express data structures
 which do not fit into the restrictions of affine types and
@@ -194,26 +192,26 @@ that sometimes gives the incorrect impression that only data structures
 such as doubly linked lists are of interest. In reality, programs as diverse as
 interpreters for dynamically typed languages have need to use such types.
 In this paper we use the more abstract term `shared ownership', which includes,
-but is not limited to, include cyclic data-structures.
+but is not limited to, cyclic data-structures.
 
-Probably the most common way of working around the limitations of affine
-types and ownership is the reference counting type \lstinline{Rc<T>} in Rust's
-standard library. For many data-structures, reference counting is a reasonable
+A common way of working around these limitations
+is the reference counting type \lstinline{Rc<T>} in Rust's
+standard library. For many data-structures, this is a reasonable
 solution, but some forms of shared ownership require
 juggling strong and weak counts. This complicates the program
 (see~\cref{fig:rc_example}) and makes
-it easy for values to live for shorter or longer than intended.
+it easy for values to live shorter or longer than intended.
 
-Another common workaround is to store values in a vector and use
-integer indices into that vector. Such indices are then morally closer to
-machine level pointers than normal Rust references: the indices can become
+Another workaround is to store values in a vector and use
+integer indices into that vector. Such indices are morally closer to
+machine pointers than normal Rust references: the indices can become
 stale, dangle, or may never have been valid in the first place. The programmer
 must also manually deal with issues such as detecting unused values,
-compaction, and so on. In other words, such workarounds force the programmer
-to write a partial GC themselves. An important variant of this idea are
+compaction, and so on. In other words, the programmer
+ends up writing a partial GC themselves. An important variant of this idea are
 \emph{arenas}, which gradually accumulate multiple values but free all of them in one go: values
-can no longer be reclaimed too early, though the arena may cause many values
-to live unnecessarily long.
+can no longer be reclaimed too early, though arenas tend to unnecessarily
+increase the lifetime of objects.
 
 A type-based approach is
 \lstinline{GhostCell}~\cite{yanovski21ghostcell}, which uses \emph{branding} to
@@ -226,9 +224,9 @@ Although it is easily overlooked, some workarounds (e.g.~\lstinline{Rc<T>})
 rely on using \emph{unsafe} Rust (i.e.~parts of the language, often involving
 pointers, that are not fully statically checked by the compiler). Pragmatically,
 we assume that widely used code, even if technically unsafe, has been pored
-over sufficiently that it is reliable in practise. However,
-that `new' solutions that a programmer implements using
-unsafe Rust are unlikely to immediately be reliable.
+over sufficiently that it is trustworthy in practise. However,
+`new' solutions that a programmer implements using
+unsafe Rust are unlikely to immediately reach the same level of trustworthiness.
 
 While we do not believe that every Rust program would be improved by GC, the
 variety of workarounds already present in Rust code, and the difficultly
@@ -279,16 +277,15 @@ the rest of the paper then goes into detail on the more advanced aspects.
 \label{sec:basic design}
 
 \ourgc provides a \lstinline{Gc<T>} type that exposes an API modelled on the
-reference counting type \lstinline{Rc<T>} from Rust's standard library, because
+\lstinline{Rc<T>} type from Rust's standard library, because
 \lstinline{Rc<T>}: is conceptually
 similar to \lstinline{Gc<T>}; widely used in Rust code, and its API
 familiar; and that API reflects long-term experience about what Rust programmers
-need from such a type.
+need.
 
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
-simple wrapper around a pointer to \lstinline{v}'s new address. \lstinline{Gc<T>}
-can dereferenced at will to \lstinline{T}. The same underlying GCed value
+simple wrapper around a pointer to \lstinline{v}'s new address. The same underlying GCed value
 may thus have multiple, partly overlapping, references active at any point.
 To avoid undermining
 Rust's ownership system, this means that dereferencing a \lstinline{Gc<T>} must
@@ -303,7 +300,7 @@ back (\lstinline{from_raw}). Crucially, transforming a \lstinline{Rc<T>} / \lsti
 into a pointer consumes the high-level wrapper: the
 resulting pointer is thus not constrained by the wrapper's lifetime.
 Though many programmers do not directly
-encounter these functions, they are a vital part of the link between Rust's high and
+encounter these functions, they are a vital link between Rust's high and
 low-level features (e.g.~being used for the C Foreign Function Interface
 (FFI) alongside the ability to cast Rust references to pointer types and back).
 We believe that a viable GC for Rust must include this same
@@ -317,16 +314,15 @@ nudge users in this general direction, but the \lstinline{as}
 keyword still allows arbitrary conversions.}.
 
 \label{conservative_gc}
-Having acknowledged that pointers may end up disguised as integers, it is then
+Having acknowledged that pointers can be disguised as integers, it is then
 inevitable that \ourgc must be a conservative GC: if a machine word's integer
 value, when considered as a pointer, falls within a GCed block of memory,
-then that block itself is considered reachable (and is thus transitively scanned).
+then that block itself is considered reachable (and is transitively scanned).
 Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
-bits that looks like a valid pointer, this over-approximates the
-\emph{live set} (i.e.~the blocks that the GC will not reclaim). However, the
-most extensive study we know of suggests the false detection rate in Java
-programs is under 0.01\% of live objects~\cite{shahriyar14fast}, so it is
-unlikely to be a problem in practise.
+bits that look like a valid pointer, this over-approximates the
+\emph{live set} (i.e.~the blocks that the GC will not reclaim). Typically
+the false detection rate is too low to be a worry (see e.g.~a Java study which measures
+it at under 0.01\% of live objects~\cite{shahriyar14fast}).
 
 Conservative GC occupies a grey zone in programming language semantics: in most
 languages, and most compiler's internal semantics, conservative GC is, formally
@@ -355,14 +351,14 @@ reducing the need for a function call that cloning requires entirely\footnote{Th
 syntax \lstinline{y = Gc::clone(&v)} is available, since every copyable type is
 also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} in \ourgc is is a cheaper and simpler operation
-than in most other GCs for Rust, most of which rely in part on reference counting.
+than most other GCs for Rust which which tend to rely in part on reference counting.
 
 
 \subsection{Basic Implementation}
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion and have
-added or changed approximately 3,150 \laurie{needs updating?} Lines of Code (LoC). Users must opt-in
+added or changed approximately 3,150 \laurie{needs updating? also split apart the LoC for tests} Lines of Code (LoC). Users must opt-in
 to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
 
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
@@ -382,9 +378,9 @@ because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
 this ELF segment during each collection. Third,
-\boehm normally dynamically intercepts thread creation calls so that it can
+\boehm dynamically intercepts thread creation calls so that it can
 then can scan their stacks, but (for bootstrapping
-reasons) it is unable to do so in our context: we explicitly changed \ourgc
+reasons) is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm.
 
 We made one conceptually larger -- though only 60LoC -- change to \boehm,
@@ -421,12 +417,11 @@ we therefore use `destructor' as the umbrella term for both drop methods and dro
 Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
 Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
 value is dropped, the underlying resources it possesses (e.g.~file handles or heap memory)
-are released. A casual perusal of Rust code will quickly show that
-drop methods are used frequently and that users fairly often
+are released. Drop methods are not only used frequently, but programmers regularly
 implement their own drop methods.
 
 Finalizers are an important concept for most non-Rust GCs, subsuming the notion of destructors.
-However, most existing GCs for Rust are forced to have separate notions of destructors and finalizers.
+However, existing GCs for Rust are forced to have separate notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait for that type.
@@ -461,7 +456,7 @@ glue to be run afterwards.
 \subsection{General Challenges When Using Destructors as Finalizers}
 \label{sec:general_challenges}
 
-We have stated our aim that \ourgc should use destructors as finalizers.
+We have stated as our aim that \ourgc should use destructors as finalizers.
 Above we explained some Rust-specific challenges --- but there are several
 non-Rust-specific challenges too! Fundamentally, finalizers and destructors
 have different, and sometimes incompatible, properties. The best
@@ -483,7 +478,7 @@ destructor~\cite[section~3.4]{boehm03destructors}.
 A less obvious difference relates to where destructors and finalizers are run.
 Destructors run in the same thread as the last owner of a value.
 However, running finalizers in the same thread as the last owner of the value
-can nondeterministically cause race conditions and deadlocks if a finalize tries to access a resource that the mutator
+can lead to race conditions and deadlocks if a finalize tries to access a resource that the mutator
 expects to have exclusive access too~\cite[section~3.3]{boehm03destructors}.
 When such problems affect destructors in normal Rust code, it is the clear result of programmer error, since they should
 have taken into account the predictable execution point of destructors. However, since
