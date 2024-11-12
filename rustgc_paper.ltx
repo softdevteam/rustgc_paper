@@ -632,7 +632,7 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>}, \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>}, \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>}, and \lstinline{BinaryHeap<T>}.
-\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})} \laurie{why do we care about forking something for rustc? i suspect i'm missing out on something here!}. Fortunately,
+\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})} \laurie{why do we care about forking something for rustc? i suspect i'm missing out on something here!}\jake{hashbrown is implemented as an external rust crate but is included in \rustc as a dependency} . Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
