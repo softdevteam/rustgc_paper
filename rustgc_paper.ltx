@@ -534,22 +534,21 @@ Finalizers are much slower to run than destructors --- running every Rust destru
 as a GC finalizer in \ourgc causes a significant slowdown \laurie{this is a case where a `worse of' might make sense, and i think it's 4x or similar?}
 in our benchmark suite. In this section we show how to sidestep much of this overhead.
 
-A variety of factors contribute to the performance overhead of finalizers, including:
+A variety of factors contribute to the finalizer performance overhead, including:
 a queue of finalizers
-must be maintained, whereas destructors can be run immediately; and since finalizers run
-some time after the last access of a value, running them is more likely to involve
-cache misses. Most of these factors are inherent to any GC and
+must be maintained, whereas destructors can be run immediately; and finalizers run
+some time after the last access of a value making cache misses more likely.
+Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
-not suggest that it is missing optimisations which would reduce most of this overhead.
+not suggest that it is missing optimisations which would overcome all of this overhead.
 
 Instead, whenever possible, \ourgc \emph{elides} finalizers so that they do not need to be run at all.
 We are able to do this because many Rust destructors
-only do work that a GC would do anyway --- there is thus no need to
-run such destructors as finalizers.
+only do work that a GC would do anyway and have no meaningful effect when run as finalizers.
 
 Consider the standard Rust type \lstinline{Box<T>} which heap allocates space for a value;
-when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed
-by \lstinline{Box}'s drop method. We can then make two observations. First,
+when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed.
+We can then make two observations. First,
 \lstinline{Box<T>}'s drop method solely consists of a \lstinline{deallocate}
 call. Second, while we informally say
 that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
@@ -562,13 +561,12 @@ naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
 calls \lstinline{deallocate}, any resulting finalizer would cause the underlying
 allocation to live longer than if the finalizer was not present!}
 This means that there is no need to run a finalizer for a type such as
-\lstinline{Gc<Box<u8>>} and we can statically elide it. However, we can not
-elide every \lstinline{Gc<Box<T>>} finalizer: for example, \lstinline{Gc<Box<Arc<u8>>}
-(where \lstinline{Arc<T>} is the thread-safe version of \lstinline{Rc<T>})
-requires a finalizer because \lstinline{Arc<T>} needs to decrement a reference
-count. This may seem confusing, because in both cases \lstinline{Box<T>}'s drop
-method is the same: however, the drop glue added for \lstinline{Box<Arc<u8>>}
-causes \lstinline{Arc<T>}'s destructor to be run.
+\lstinline{Gc<Box<u8>>} and we can statically elide it. However,
+just because a `top-level''s drop method might be unnecessary does not
+mean that transitively reachable drop methods via drop glue are unnecessary. For example,
+\lstinline{Gc<Box<Arc<u8>>} (where \lstinline{Arc<T>} is the thread-safe
+version of \lstinline{Rc<T>}) requires a finalizer because
+\lstinline{Arc<T>}'s drop method needs to decrement a reference count.
 
 
 \subsection{Implementing finalizer elision}
@@ -604,8 +602,8 @@ trait without methods). This trait can be
 used by a programmer to signify that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. The `Drop'
 part of the trait name is deliberate (i.e.~it is not a simplification of
-`destructor'): it allows the programmer to reason
-only about the `top-level' type. If the type has a transitively reachable field
+`destructor'): it allows the programmer to reason about a type locally.
+If the type has a transitively reachable field
 whose type implements the \lstinline{Drop} trait but not the
 \lstinline{DropMethodFinalizerElidable} trait, then then the top-level type
 still requires finalization. This not only checks drop glue, but allows the
@@ -626,8 +624,11 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
-\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>}, \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>}, \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>}, and \lstinline{BinaryHeap<T>}.
-\jake{We have also forked the hashbrown crate -- \rustc's default HashMap backing implementation -- to implement this trait on the backing table (\lstinline{RawTable<K, V>})} \laurie{why do we care about forking something for rustc? i suspect i'm missing out on something here!}\jake{hashbrown is implemented as an external rust crate but is included in \rustc as a dependency} \laurie{right: but why do i care about rustc? programs don't embed rustc, so it doesn't seem like this will affect programs?}. Fortunately,
+\lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>},
+\lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>},
+\lstinline{HashMap<K, V>}, \lstinline{HashSet<T>},
+\lstinline{RawTable<K, V>}\footnote{This is contained in the separate \lstinline{hashbrown} crate,
+which is then included in Rust's standard library.}, and \lstinline{BinaryHeap<T>}. Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
