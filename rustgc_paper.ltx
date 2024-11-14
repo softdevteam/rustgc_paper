@@ -1625,6 +1625,19 @@ interested readers may find that they help flesh out some details.
 \label{fig:Eprem_breakdown}
 \end{figure}
 
+\begin{figure}[t!]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/alacritty_barriers.pdf}
+     \caption{Results showing the performance of \Epremopt on \alacritty, each
+     of which use three configurations: \textit{None} where there are no
+     compiler barriers (which is unsound); \textit{All}, where every single
+     \lstinline{Gc} reference has a corresponding barrier; and \textit{None},
+     where barriers are optimised away using \ourgc's optimisation (section
+     \jake{XYZ}) Each benchmark is run for \benchmarkpexecs process executions, where
+    the error bars represent 99\% confidence intervals.}
+\label{fig:alacritty_Eprem_breakdown}
+\end{figure}
+
 \begin{figure}[!t]
 \begin{lstlisting}[
   language=Rust,

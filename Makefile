@@ -11,7 +11,7 @@ PLOTS = plots/som_rs_bc_elision.pdf plots/som_rs_ast_elision.pdf \
 	 plots/yksom_elision.pdf plots/yksom_barriers.pdf \
 	 plots/elision.pdf plots/elision_mem.pdf \
 	 plots/barriers.pdf plots/barriers_mem.pdf \
-	 plots/grmtools.pdf plots/grmtools_mem.pdf
+	 plots/alacritty_barriers.pdf 
 
 all: rustgc_paper.pdf
 
