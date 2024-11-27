@@ -867,6 +867,163 @@ raise an error, even though that reference can only exist for the duration of
 the drop method. It may be possible to relax our rule further, but we found that it becomes
 rapidly harder to define and article what is safe, and to implement the resulting design in \rustc.
 
+\jake{FSA has changed quite a bit since the last write-up in this section, below I will detail the key differences from before}
+
+\subsection{New FSA rules}
+
+\subsubsection{Bypassing FSA}
+
+The \lstinline{FinalizerSafe} auto-trait no longer exists. This means there is
+now no user-implementable auto-trait that can be implemented on types to bypass
+FSA. The only way to now bypass FSA is to wrap a type inside
+\lstinline{FinalizerUnchecked}.
+
+The use of \lstinline{FinalizerUnchecked} works at both the top level, and
+indirectly when used in a field. For example, the following would be allowed in
+\ourgc:
+
+\begin{lstlisting}[language=Rust, numbers=none]
+struct S { x: *const u8 } // not Send + Sync because of the raw ptr
+impl Drop for S { fn drop(&mut self) { let _ = *self.x }; }
+
+Gc::new(unsafe { FinalizerUnchecked::new(S)});
+\end{lstlisting}
+
+\lstinline{S} is not safe to use in a finalizer because its drop method
+dereferences the non-Send non-Sync raw pointer field \lstinline{x}. However, by
+passing a wrapped \lstinline{FinalizerUnchecked} value of \lstinline{S} to
+\lstinline{Gc::new} we have explicitly disabled FSA for this value. Note that
+this is an unsafe operation because it could allow unsoundness.
+
+This also works indirectly. For example:
+
+\begin{lstlisting}[language=Rust, numbers=none]
+struct T { y: FinalizerUnchecked<S> }
+
+Gc::new(T { y: unsafe { FinalizerUnchecked::new(S)} });
+\end{lstlisting}
+
+Here, \lstinline{FinalizerUnchecked} is used to prevent FSA from checking the
+drop method of \lstinline{S} only. In the above example, \lstinline{T}'s
+finalizer will be allowed. However, if \lstinline{T} had an unsafe drop method.
+FSA would still throw an error. This is useful for making sure that where FSA
+is too conservative, it need only be disabled in the places it needs to be, and
+other errors can't accidentally sneak through.
+
+\lstinline{FinalizeUnchecked} has another benefit over the old approach of
+implementing \lstinline{FinalizerSafe} for a specific type: it only affects a
+particular instance of a type. In other words, implementing
+\lstinline{FinalizerSafe} (or indeed \lstinline{Send + Sync}) for types so that
+they can be finalized in GC means that users must be sure all uses of that type
+are safe. I personally found this very difficult to be confident with --
+especially over larger codebases (i.e. alacritty).
+
+\subsubsection{FSA Entry-points}
+
+Previously, we hard-coded \lstinline{Gc::new} to be the ``entry-point'' which
+FSA would use to check a type. This was fine at the time, because
+\lstinline{Gc::new<T>} was the only safe way to construct a Gcable object of
+type \lstinline{T}. However, we have since extended the GC API to support
+\lstinline{from/into} conversions, which are used extensively in some of the
+\lstinline{Rc}'d programs that we have retrofitted.
+
+We now define an internal rustc-only attribute
+(\lstinline{#[rustc_fsa_entry_point]}) to replace this. The first stage of FSA
+was to traverse the whole-program MIR looking for \lstinline{Gc::new}
+constructors. Instead, we now traverse the whole-program MIR looking for
+functions which have the \lstinline{#[rustc_fsa_entry_point]}. Constructor-like
+functions inside the GC standard library (such as \lstinline{Gc::new} /
+\lstinline{Gc::from}) are annotated with this attribute.
+
+\subsubsection{The ReferenceFree auto-trait is back}
+
+The viral properties of auto-traits are really useful for the kind of analyses
+we want to do in FSA. E.g. with Send and Sync, we can know for certain if
+\lstinline{T} is thread-safe provided it implements these autotraits -- we
+don't have to step into T's fields and also check those because if they don't
+the negative impl would bubble up and affect T too.
+
+For FSA, this means that if we construct a \lstinline{Gc<T>} where
+\lstinline{T} implements \lstinline{Send} + \lstinline{Sync} we don't need to
+check drop methods for thread-safety for any projection into \lstinline{T}'s
+fields.
+
+However, thread-safety is not the entire story. We would still need to check
+that drop methods do not project into fields of \lstinline{T} which are
+reference types. For reasons we have already explained, both regular Rust
+references and \lstinline{Gc} references cannot be used inside a finalizer. We
+provide negative impls of the \lstinline{ReferenceFree} auto trait for
+\lstinline{Gc<T>} and \lstinline{&/&mut T} types. This now lets us short-circuit
+checking all projections for finalizer safety in drop methods, provided that
+the top-level type implements all three auto-traits (\lstinline{Send + Sync + ReferenceFree}).
+
+\lstinline{ReferenceFree} is a standard library internal type, and, like
+\lstinline{Freeze}, must not be implemented by the user for their own types
+(though due to the way rustc re-exports standard library items, we can't
+actually prevent this, just as they can't prevent the same with
+\lstinline{Freeze}).
+
+\subsubsection{Traversing through function calls}
+
+
+FSA can now automatically look into functions which are called inside drop
+methods to also check that their implementation is finaliser safe. This greatly
+improves the ergonomics of FSA. First it means the number of FSA errors that we
+encounter is dramatically reduced. For alacritty and SWS, we go from 110 errors
+(though likely more, as this is the ceiling at which point rustc no longer
+emits any more errors) to 2 and 1 respectively. Almost all of those errors were
+because a finalizer called something benign (e.g. unwrap()) which FSA could not
+look into and therefore had to emit an error. This has a tangible impact on the
+safety of a program: in the remaining places where types do need user
+annotation, the user can cast a much narrower net, and the risk of them
+disabling FSA entirely because of error fatigue is reduced.
+
+Second, when an error is raised, it is more useful to the user. The error will
+now pinpoint the exact line of code from within whatever function where the
+problem arises, rather than the line of a function call which may or may not be
+safe. Of course, some function calls (e.g. function pointers or external calls
+where no MIR is available) still cannot be checked, so FSA emits an error at
+the call for these. However, these are now issues in their own right which do
+need user intervention, rather than spurious errors about potentially unsafe
+function calls which could trivially be allowed automatically.
+
+Function traversal in FSA is implemented iteratively using a queue. When
+visiting the MIR for a drop method, we check whether the terminator of each
+basic block is a call to a new function. If it is, we add that function to a
+queue of functions to be checked.
+
+Because functions in Rust can have generic type signatures, we must try to
+enqueue the concrete monomorphized function definition of a call. Unfortunately
+this is not always possible — for some functions, only the polymorphic function
+definition may be available at the point where we perform FSA. In such
+instances, we enqueue the polymorphic definition, however, this is more likely
+to emit a false-positive FSA error, because \lstinline{Send + Sync + ReferenceFree} auto
+trait bounds may not be present on the generic type, but are present on the
+concrete type which is actually used. This will never cause a false-negative.
+
+Functions in the queue are checked for the same potential misuses as the drop
+method itself and can be thought of as breadth-first-search over a subset of
+the call graph reachable from a drop method (though more natural, recursion is
+not used in favour of a queue-based iterative approach to prevent stack
+overflow and so that we can easily cache previously visited functions. This
+caching also prevents non-termination where recursive calls are used in the
+user program.)
+
+Sometimes when attempting to resolve the function definition for a particular
+callsite, the MIR for the function body is not available. This can happen for a
+number of reasons, but most commonly it’s because the call is to either: a) a
+function which is dynamically dispatched using Rusts trait object mechanism; b)
+an external function which is dynamically linked later on; or c) a rust
+internal function (i.e compiler intrinsic). In these cases, FSA must emit an
+error because it can’t know that those functions are safe to call from within a
+finalizer.
+
+However, for c) we noticed that many safe intrinsics were called from within a
+finalizer which FSA couldn’t know about. We thus audited each intrinsic and
+annotated those which are safe with a special \lstinline{rustc_fsa_safe_fn} attribute. Some
+intrinsics (e.g. transmute) allow users to use values in ways which could be
+unsound in a finalizer, and thus are never safe.
+
 
 \subsection{Cycles and Finalization}
 \label{sec:cycles_and_finalization}
