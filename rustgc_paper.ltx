@@ -207,7 +207,7 @@ machine pointers than normal Rust references: the indices can become
 stale, dangle, or may never have been valid in the first place. The programmer
 must also manually deal with issues such as detecting unused values,
 compaction, and so on. In other words, the programmer
-ends up writing a partial GC themselves. An important variant of this idea are
+ends up writing a partial GC themselves. A variant of this idea are
 \emph{arenas}, which gradually accumulate multiple values but free all of them in one go: values
 can no longer be reclaimed too early, though arenas tend to unnecessarily
 increase the lifetime of objects.
@@ -242,21 +242,21 @@ A program which uses GC is split between the \emph{mutator} (the user's program)
 the \emph{collector} (the GC itself). At any given point in time, a particular thread is either
 running as a mutator or a collector. In our context, all threads
 run as a collector at least sometimes, with some threads always running as a collector.
-Tracing and reclamation is performed during a \emph{collection} phase. In the context of
-this paper, collections are \emph{stop-the-world}, where all threads running
+Tracing and reclamation is performed during a \emph{collection} phase. Our
+collections always \emph{stop-the-world}, where all threads running
 mutator code are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
 from the roots can then be \emph{reclaimed}. In contrast, a reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
-in most GC literature, henceforth we use `GC' to mean `tracing GC' unless we
-explicitly say otherwise.
+in most GC literature, henceforth we use `GC' to mean `tracing GC' (and not
+reference counting or the like) unless we explicitly say otherwise.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}. We use the term `GC value' to refer both to the pointer wrapped in a
 \lstinline{Gc<T>} and the underlying value on the GC heap, even though multiple
-pointers / wrappers can refer to a single value on the heap, unless doing so
+pointers / wrappers can refer to a single value on the GC heap, unless doing so
 would lead to ambiguity.
 
 We use `\ourgc' to refer to the combination of: our extension to the Rust
