@@ -774,7 +774,7 @@ solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
 optimise values of other types as it so wishes. However, our approach still
 imposes a performance overhead on code that uses
 \lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
-\somrsastbarriers{bnaive}{worstperf}{percent}.
+\jake{TODO: worst}.
 
 Fortunately, we can optimise premature finalizer prevention further by
 piggy-backing on finalizer elision: if a finalizer can be
@@ -1633,6 +1633,101 @@ interested readers may find that they help flesh out some details.
 \EndFunction
 \end{algorithmic}
 \end{algorithm}
+
+\clearpage
+
+\section{Individual plots for experiment \Egcrc}
+
+This appendix contains the performance plots for the individual experiments, measured in wall-clock time.
+
+\subsection{SOM VM Performance}
+
+\begin{figure}[htbp!]
+    \centering
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-ast/perf.pdf}
+    \caption{\somrsast}
+    \label{fig:Egcrc:som-rs-ast:perf:individual}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-bc/perf.pdf}
+    \caption{\somrsbc}
+    \label{fig:Egcrc:som-rs-bc:perf:individual}
+    \end{subfigure}
+    \caption{Results of a performance evaluation of \somrsast and \somrsbc
+    using with two configurations: Gc, -- which uses \ourgc; and Rc -- which
+    uses single-threaded reference counting. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:som-rs:perf:individual}
+\end{figure}
+
+\subsection{SOM VM Memory}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-ast/profiles.pdf}
+    \caption{Time series comparison of heap usage for the SOM benchmark suite
+    on \somrsast -- a SOM AST interpreter. Each graph shows the results of a
+    single benchmark, across \benchmarkpexecs runs, with two configurations:
+    \somrsastgc, -- which uses \ourgc; and \somrsastrc -- which uses
+    single-threaded reference counting. Each run has been normalized
+    independantly to a fixed time-scale (0-1), before being aggregated to show
+    the mean heap usage over time. The x-axis thus allows comparisons about
+    patterns of heap usage to be made between configurations irrespective of
+    their absolute time (see ~\cref{fig:Egcrc:som-rs-ast:perf:individual} for
+    absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
+    lines represent the peak and average memory usage for each configuration
+    respectively. The shaded regions represent 99\% confidence intervals for
+    each configuration.}
+    \label{fig:Egcrc:som-rs-ast:mem:profiles}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-bc/profiles.pdf}
+    \caption{Time series comparison of heap usage for the SOM benchmark suite
+    on \somrsbc -- a SOM bytecode interpreter. Each graph shows the results of
+    a single benchmark, across \benchmarkpexecs runs, with two configurations:
+    \somrsbcgc, -- which uses \ourgc; and \somrsbcrc -- which uses
+    single-threaded reference counting. Each run has been normalized
+    independantly to a fixed time-scale (0-1), before being aggregated to show
+    the mean heap usage over time. The x-axis thus allows comparisons about
+    patterns of heap usage to be made between configurations irrespective of
+    their absolute time (see ~\cref{fig:Egcrc:individual:som-rs-bc:perf} for
+    absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
+    lines represent the peak and average memory usage for each configuration
+    respectively. The shaded regions represent 99\% confidence intervals for
+    each configuration.} \label{fig:Egcrc:individual:som-rs-bc:mem}
+\end{figure}
+
+\section{Individual plots for experiment \Epremopt}
+
+\subsection{SOM VM Performance}
+
+\begin{figure}[htbp!]
+    \centering
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-ast/perf.pdf}
+    \caption{\somrsast}
+    \label{fig:Epremopt:som-rs-ast:perf:individual}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-bc/perf.pdf}
+    \caption{\somrsbc}
+    \label{fig:Epremopt:som-rs-bc:perf:individual}
+    \end{subfigure}
+    \begin{subfigure}{\textwidth}
+    \includegraphics[width=1\textwidth]{plots/premopt/yksom/perf.pdf}
+    \caption{\yksom}
+    \label{fig:Epremopt:yksom:perf:individual}
+    \end{subfigure}
+    \caption{Results of a performance evaluation of \somrsast, \somrsbc, and
+    \yksom using three configurations: \bnone; \bopt; and \bnaive. Each
+    benchmark is run for \benchmarkpexecs process executions, where the error
+    bars represent 99\% confidence intervals.}
+    \label{fig:Epremopt:som-rs:perf:individual}
+\end{figure}
 
 \begin{figure}[!t]
 \begin{lstlisting}[

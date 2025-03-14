@@ -5,6 +5,8 @@
 
 LATEX_FILES = rustgc_paper.ltx
 
+PLOTS = $(patsubst %.svg,%.pdf, $(shell find plots -type f -name "*.svg"))
+
 all: rustgc_paper.pdf
 
 clean:
