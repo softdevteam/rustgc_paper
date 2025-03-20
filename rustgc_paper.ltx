@@ -1638,9 +1638,7 @@ interested readers may find that they help flesh out some details.
 
 \section{Individual plots for experiment \Egcrc}
 
-This appendix contains the performance plots for the individual experiments, measured in wall-clock time.
-
-\subsection{SOM VM Performance}
+\subsection{Performance}
 
 \begin{figure}[htbp!]
     \centering
@@ -1653,7 +1651,32 @@ This appendix contains the performance plots for the individual experiments, mea
 \label{fig:Egcrc:som:perf:individual}
 \end{figure}
 
-\subsection{SOM VM Memory}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{plots/gcvs/alacritty/perf.pdf}
+    \caption{Results of a performance evaluation of \alacritty
+    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
+    uses atomic reference counting. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:alacritty:perf:individual}
+\end{figure}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{plots/gcvs/fd/perf.pdf}
+    \caption{Results of a performance evaluation of \fd
+    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
+    uses atomic reference counting. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:fd:perf:individual}
+\end{figure}
+
+\clearpage
+
+\subsection{Memory}
 
 \begin{figure}[htbp!]
     \centering
@@ -1691,10 +1714,6 @@ This appendix contains the performance plots for the individual experiments, mea
     respectively. The shaded regions represent 99\% confidence intervals for
     each configuration.} \label{fig:Egcrc:individual:som-rs-bc:mem}
 \end{figure}
-
-\section{Individual plots for experiment \Epremopt}
-
-\subsection{SOM VM Performance}
 
 %\begin{figure}[htbp!]
 %    \centering
