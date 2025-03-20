@@ -1644,29 +1644,20 @@ This appendix contains the performance plots for the individual experiments, mea
 
 \begin{figure}[htbp!]
     \centering
-    \begin{subfigure}{\textwidth}
-    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-ast/perf.pdf}
-    \caption{\somrsast}
-    \label{fig:Egcrc:som-rs-ast:perf:individual}
-    \end{subfigure}
-    \begin{subfigure}{\textwidth}
-    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-bc/perf.pdf}
-    \caption{\somrsbc}
-    \label{fig:Egcrc:som-rs-bc:perf:individual}
-    \end{subfigure}
+    \includegraphics[width=1\textwidth]{plots/gcvs/som/perf.pdf}
     \caption{Results of a performance evaluation of \somrsast and \somrsbc
     using with two configurations: Gc, -- which uses \ourgc; and Rc -- which
     uses single-threaded reference counting. Each benchmark is run for
     \benchmarkpexecs process executions, where the error bars represent 99\%
     confidence intervals.}
-\label{fig:Egcrc:som-rs:perf:individual}
+\label{fig:Egcrc:som:perf:individual}
 \end{figure}
 
 \subsection{SOM VM Memory}
 
-\begin{figure}[htbp]
+\begin{figure}[htbp!]
     \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-ast/profiles.pdf}
+    \includegraphics[width=1\textwidth]{plots/gcvs/som/profiles/som-rs-ast.pdf}
     \caption{Time series comparison of heap usage for the SOM benchmark suite
     on \somrsast -- a SOM AST interpreter. Each graph shows the results of a
     single benchmark, across \benchmarkpexecs runs, with two configurations:
@@ -1675,7 +1666,7 @@ This appendix contains the performance plots for the individual experiments, mea
     independantly to a fixed time-scale (0-1), before being aggregated to show
     the mean heap usage over time. The x-axis thus allows comparisons about
     patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:som-rs-ast:perf:individual} for
+    their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
     absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
     lines represent the peak and average memory usage for each configuration
     respectively. The shaded regions represent 99\% confidence intervals for
@@ -1683,9 +1674,9 @@ This appendix contains the performance plots for the individual experiments, mea
     \label{fig:Egcrc:som-rs-ast:mem:profiles}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[htbp!]
     \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/som-rs-bc/profiles.pdf}
+    \includegraphics[width=1\textwidth]{plots/gcvs/som/profiles/som-rs-bc.pdf}
     \caption{Time series comparison of heap usage for the SOM benchmark suite
     on \somrsbc -- a SOM bytecode interpreter. Each graph shows the results of
     a single benchmark, across \benchmarkpexecs runs, with two configurations:
@@ -1694,7 +1685,7 @@ This appendix contains the performance plots for the individual experiments, mea
     independantly to a fixed time-scale (0-1), before being aggregated to show
     the mean heap usage over time. The x-axis thus allows comparisons about
     patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:individual:som-rs-bc:perf} for
+    their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
     absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
     lines represent the peak and average memory usage for each configuration
     respectively. The shaded regions represent 99\% confidence intervals for
@@ -1705,29 +1696,29 @@ This appendix contains the performance plots for the individual experiments, mea
 
 \subsection{SOM VM Performance}
 
-\begin{figure}[htbp!]
-    \centering
-    \begin{subfigure}{\textwidth}
-    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-ast/perf.pdf}
-    \caption{\somrsast}
-    \label{fig:Epremopt:som-rs-ast:perf:individual}
-    \end{subfigure}
-    \begin{subfigure}{\textwidth}
-    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-bc/perf.pdf}
-    \caption{\somrsbc}
-    \label{fig:Epremopt:som-rs-bc:perf:individual}
-    \end{subfigure}
-    \begin{subfigure}{\textwidth}
-    \includegraphics[width=1\textwidth]{plots/premopt/yksom/perf.pdf}
-    \caption{\yksom}
-    \label{fig:Epremopt:yksom:perf:individual}
-    \end{subfigure}
-    \caption{Results of a performance evaluation of \somrsast, \somrsbc, and
-    \yksom using three configurations: \bnone; \bopt; and \bnaive. Each
-    benchmark is run for \benchmarkpexecs process executions, where the error
-    bars represent 99\% confidence intervals.}
-    \label{fig:Epremopt:som-rs:perf:individual}
-\end{figure}
+%\begin{figure}[htbp!]
+%    \centering
+%    \begin{subfigure}{\textwidth}
+%    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-ast/perf.pdf}
+%    \caption{\somrsast}
+%    \label{fig:Epremopt:som-rs-ast:perf:individual}
+%    \end{subfigure}
+%    \begin{subfigure}{\textwidth}
+%    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-bc/perf.pdf}
+%    \caption{\somrsbc}
+%    \label{fig:Epremopt:som-rs-bc:perf:individual}
+%    \end{subfigure}
+%    \begin{subfigure}{\textwidth}
+%    \includegraphics[width=1\textwidth]{plots/premopt/yksom/perf.pdf}
+%    \caption{\yksom}
+%    \label{fig:Epremopt:yksom:perf:individual}
+%    \end{subfigure}
+%    \caption{Results of a performance evaluation of \somrsast, \somrsbc, and
+%    \yksom using three configurations: \bnone; \bopt; and \bnaive. Each
+%    benchmark is run for \benchmarkpexecs process executions, where the error
+%    bars represent 99\% confidence intervals.}
+%    \label{fig:Epremopt:som-rs:perf:individual}
+%\end{figure}
 
 \begin{figure}[!t]
 \begin{lstlisting}[
