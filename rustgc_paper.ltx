@@ -1253,19 +1253,21 @@ drop method that caused an FSA error.
 
 \begin{table}[t]
 \begin{center}
-\begin{tabular}{lll}
+\begin{tabular}{llll}
 \toprule
-  Benchmark & Version & Description \\
+    Benchmark & Version & Description & Heap is GC \\
 \midrule
-  \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark \\
-  \grmtools & \grmtoolsversion  & Lexer / parser library \\
+    \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark & \binarytpctgc \\
+    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolpctgc \\
+    \alacritty & \alacrittyversion  & Terminal emulator & \alacrittypctmanaged \\
+    \fd & \fdversion  & Unix find replacement & \fdpctmanaged \\
+    \ripgrep & \ripgrepversion  & Fast grep replacement & \ripgreppctmanaged \\
   % \minimoka & \minimokaversion  & Concurrent cache library \\
-  \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching \\
-  \sws & \swsversion  & Web server\\
+    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & - \\
   \midrule
-  \somrsast & git \#\somrsversion  & SOM AST VM\\
-  \somrsbc & git \#\somrsversion  & SOM bytecode VM\\
-  \yksom & git \#\yksomversion  & SOM bytecode VM\\
+    \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastpctgc \\
+    \somrsbc & git \#\somrsversion  & SOM bytecode VM & \somrsbcpctgc \\
+    \yksom & git \#\yksomversion  & SOM bytecode VM & - \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1275,8 +1277,7 @@ drop method that caused an FSA error.
   to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
   etc.). The top half of the table shows a traditional suite of benchmarks. The
   bottom half shows three SOM (a programming language) VMs. For all three SOM
-  VMs, we use the same SOM version of the `Are We Fast Yet?' benchmark suite
-  (git\#\awfyversion)\cite{marr16cross}; each SOM VM is thus a proxy for 26 additional benchmarks.}
+  VMs, we use the benchmark suite from the SOM core library; each SOM VM is thus a proxy for 26 additional benchmarks.}
 \label{tab:benchmarks}
 \end{table}
 
