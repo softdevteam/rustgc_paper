@@ -1765,6 +1765,20 @@ interested readers may find that they help flesh out some details.
 
 \begin{figure}[htbp!]
     \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/fd/profiles/fd.pdf}
+    \caption{Time series comparison of heap usage for \fd. Each graph
+    shows the results of a single benchmark, across \benchmarkpexecs runs, with
+    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
+    atomic reference counting. Each run has been normalized
+    independantly to a fixed time-scale (0-1), before being aggregated to show
+    the mean heap usage over time. The x-axis thus allows comparisons about
+    patterns of heap usage to be made between configurations irrespective of
+    their absolute time (see ~\cref{fig:Egcrc:fd:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.}}
+    \label{fig:Egcrc:fd:mem:profiles}
+\end{figure}
+
+\begin{figure}[htbp!]
+    \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
     \caption{Time series comparison of heap usage for \ripgrep. Each graph
     shows the results of a single benchmark, across \benchmarkpexecs runs, with
