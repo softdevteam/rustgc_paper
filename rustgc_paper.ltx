@@ -1675,6 +1675,39 @@ interested readers may find that they help flesh out some details.
 \label{fig:Egcrc:fd:perf:individual}
 \end{figure}
 
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{plots/gcvs/ripgrep/perf.pdf}
+    \caption{Results of a performance evaluation of \ripgrep
+    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
+    uses atomic reference counting. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:ripgrep:perf:individual}
+\end{figure}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{plots/gcvs/grmtools/perf.pdf}
+    \caption{Results of a performance evaluation of \grmtools
+    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
+    uses atomic reference counting. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:ripgrep:perf:individual}
+\end{figure}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=0.6\textwidth]{plots/gcvs/binary-trees/perf.pdf}
+    \caption{Results of a performance evaluation of \binarytrees
+    using four configurations: Gc, -- which uses \ourgc; Arc -- which
+    uses atomic reference counting; \rustgc; and typed arena -- the default. Each benchmark is run for
+    \benchmarkpexecs process executions, where the error bars represent 99\%
+    confidence intervals.}
+\label{fig:Egcrc:ripgrep:perf:individual}
+\end{figure}
+
 \clearpage
 
 \subsection{Memory}
@@ -1685,7 +1718,7 @@ interested readers may find that they help flesh out some details.
     \caption{Time series comparison of heap usage for the SOM benchmark suite
     on \somrsast -- a SOM AST interpreter. Each graph shows the results of a
     single benchmark, across \benchmarkpexecs runs, with two configurations:
-    \somrsastgc, -- which uses \ourgc; and \somrsastrc -- which uses
+    \gc, -- which uses \ourgc; and \rc -- which uses
     single-threaded reference counting. Each run has been normalized
     independantly to a fixed time-scale (0-1), before being aggregated to show
     the mean heap usage over time. The x-axis thus allows comparisons about
@@ -1704,7 +1737,7 @@ interested readers may find that they help flesh out some details.
     \caption{Time series comparison of heap usage for the SOM benchmark suite
     on \somrsbc -- a SOM bytecode interpreter. Each graph shows the results of
     a single benchmark, across \benchmarkpexecs runs, with two configurations:
-    \somrsbcgc, -- which uses \ourgc; and \somrsbcrc -- which uses
+    \gc, -- which uses \ourgc; and \rc -- which uses
     single-threaded reference counting. Each run has been normalized
     independantly to a fixed time-scale (0-1), before being aggregated to show
     the mean heap usage over time. The x-axis thus allows comparisons about
