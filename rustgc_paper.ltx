@@ -1694,7 +1694,7 @@ interested readers may find that they help flesh out some details.
     uses atomic reference counting. Each benchmark is run for
     \benchmarkpexecs process executions, where the error bars represent 99\%
     confidence intervals.}
-\label{fig:Egcrc:ripgrep:perf:individual}
+\label{fig:Egcrc:grmtools:perf:individual}
 \end{figure}
 
 \begin{figure}[htbp!]
@@ -1705,7 +1705,7 @@ interested readers may find that they help flesh out some details.
     uses atomic reference counting; \rustgc; and typed arena -- the default. Each benchmark is run for
     \benchmarkpexecs process executions, where the error bars represent 99\%
     confidence intervals.}
-\label{fig:Egcrc:ripgrep:perf:individual}
+\label{fig:Egcrc:binarytrees:perf:individual}
 \end{figure}
 
 \clearpage
@@ -1777,6 +1777,20 @@ interested readers may find that they help flesh out some details.
     \label{fig:Egcrc:ripgrep:mem:profiles}
 \end{figure}
 
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/binary-trees/profiles/binary-trees.pdf}
+    \caption{Time series comparison of heap usage for \binarytrees. The graph
+    shows the results across \benchmarkpexecs runs, with four configurations:
+    \gc, -- which uses \ourgc; \arc -- which uses atomic reference counting;
+    \rustgc; and typed arena -- the default. Each run has been normalized
+    independantly to a fixed time-scale (0-1), before being aggregated to show
+    the mean heap usage over time. The x-axis thus allows comparisons about
+    patterns of heap usage to be made between configurations irrespective of
+    their absolute time (see ~\cref{fig:Egcrc:binarytrees:perf:individual} for
+    absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
+    \label{fig:Egcrc:binarytrees:mem:profiles}
+\end{figure}
 %\begin{figure}[htbp!]
 %    \centering
 %    \begin{subfigure}{\textwidth}
