@@ -1749,6 +1749,20 @@ interested readers may find that they help flesh out some details.
     each configuration.} \label{fig:Egcrc:individual:som-rs-bc:mem}
 \end{figure}
 
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/grmtools/profiles/grmtools.pdf}
+    \caption{Time series comparison of heap usage for grmtools. Each graph
+    shows the results of a single benchmark, across \benchmarkpexecs runs, with
+    two configurations: \gc, -- which uses \ourgc; and \rc -- which uses
+    single-threaded reference counting. Each run has been normalized
+    independantly to a fixed time-scale (0-1), before being aggregated to show
+    the mean heap usage over time. The x-axis thus allows comparisons about
+    patterns of heap usage to be made between configurations irrespective of
+    their absolute time (see ~\cref{fig:Egcrc:grmtools:perf:individual} for
+    absolute time).\jake{FIXME: The formatting of this figure needs fixing}} \label{fig:Egcrc:individual:som-rs-bc:mem}
+\end{figure}
+
 %\begin{figure}[htbp!]
 %    \centering
 %    \begin{subfigure}{\textwidth}
