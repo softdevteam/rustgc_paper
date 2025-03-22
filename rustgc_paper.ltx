@@ -1253,21 +1253,21 @@ drop method that caused an FSA error.
 
 \begin{table}[t]
 \begin{center}
-\begin{tabular}{llll}
+\begin{tabular}{lllll}
 \toprule
-    Benchmark & Version & Description & Heap is GC \\
+    Benchmark & Version & Description & \% Gc & \% Gc (transitive) \\
 \midrule
-    \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark & \binarytpctgc \\
-    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolpctgc \\
-    \alacritty & \alacrittyversion  & Terminal emulator & \alacrittypctmanaged \\
-    \fd & \fdversion  & Unix find replacement & \fdpctmanaged \\
-    \ripgrep & \ripgrepversion  & Fast grep replacement & \ripgreppctmanaged \\
+    \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark & - & - \\
+    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolsheapgcpct & \grmtoolsheapgctpct \\
+    \alacritty & \alacrittyversion  & Terminal emulator & \alacrittyheapgcpct & \alacrittyheapgctpct \\
+    \fd & \fdversion  & Unix find replacement & \fdheapgcpct & \fdheapgctpct \\
+    \ripgrep & \ripgrepversion  & Fast grep replacement & - & \ripgreppctmanaged \\
   % \minimoka & \minimokaversion  & Concurrent cache library \\
-    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & - \\
+    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & \regexreduxheapgcpct & - \\
   \midrule
-    \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastpctgc \\
-    \somrsbc & git \#\somrsversion  & SOM bytecode VM & \somrsbcpctgc \\
-    \yksom & git \#\yksomversion  & SOM bytecode VM & - \\
+    \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastheapgcpct & \somrsastheapgctpct \\
+    \somrsbc & git \#\somrsversion  & SOM bytecode VM & \somrsbcheapgcpct & \somrsbcheapgctpct \\
+    \yksom & git \#\yksomversion  & SOM bytecode VM & - & - \\
 \bottomrule
 \end{tabular}
 \end{center}
