@@ -1429,7 +1429,7 @@ of destructors and finalizers in general. In this section we mostly survey the m
 parts of the GC for Rust landscape more widely. Our survey is
 inevitably incomplete, in part because this is a rapidly evolving field
 (a number of changes have occurred since the most recent equivalent
-survey we are aware of is~\cite{manish21arena}).
+survey we are aware of~\cite{manish21arena}).
 We also cover some relevant non-Rust GC work not mentioned elsewhere.
 
 Early versions of Rust had `managed pointers' (using the \lstinline{@T} syntax)
@@ -1508,10 +1508,10 @@ a special `root' type which is the only place where roots can be stored.
 Mutating the heap can only be done in the context of functions that are
 passed a branded reference to the GCed heap. Once such a function has completed,
 \textsc{GcArena} is in full control of the GC heap, and knows that
-only the root type needs to be scanned for roots. This provides strong
-guarantees about when GC references are available but it is possible for code to keep executing in
-an arena for too long, at which point the system can be starved of resources
-even if much of the arena is no longer used. \textsc{GcArena} was originally
+only the root type needs to be scanned for roots. This leads to a precise
+guarantee about GC reference lifetimes. However, if code executes in an
+arena for too long, the system can find itself starved of resources,
+with no way of recovering, even if much of the arena is no longer used. \textsc{GcArena} was originally
 part of the \emph{Piccolo} VM  (which was itself previously called
 \emph{Luster}), a Lua VM written in Rust. Such VMs have a frequently executed
 main loop which is a natural point for a program to relinquish references
