@@ -1262,7 +1262,6 @@ drop method that caused an FSA error.
     \alacritty & \alacrittyversion  & Terminal emulator & \alacrittyheapgcpct & \alacrittyheapgctpct \\
     \fd & \fdversion  & Unix find replacement & \fdheapgcpct & \fdheapgctpct \\
     \ripgrep & \ripgrepversion  & Fast grep replacement & - & \ripgreppctmanaged \\
-  % \minimoka & \minimokaversion  & Concurrent cache library \\
     \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & \regexreduxheapgcpct & - \\
   \midrule
     \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastheapgcpct & \somrsastheapgctpct \\
@@ -1273,11 +1272,17 @@ drop method that caused an FSA error.
 \end{center}
 
   \vspace{5pt}
-  \caption{Our suite of benchmarks: we take these Rust programs and alter them
-  to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
-  etc.). The top half of the table shows a traditional suite of benchmarks. The
-  bottom half shows three SOM (a programming language) VMs. For all three SOM
-  VMs, we use the benchmark suite from the SOM core library; each SOM VM is thus a proxy for 26 additional benchmarks.}
+  \caption{
+  \laurie{what do the two `Gc' columns mean?}
+  \laurie{i think we need another column: `\# benchmarks' where for each suite
+  we say ``how many benchmarks are in this suite''. e.g.~that will make clear
+  that, say, `ripgrep' is a suite of 13 benchmarks}
+  The benchmark suites that form our experiment: we take the Rust programs
+  above, each of which is itself a suite of multiple benchmarks, and alter
+  them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
+  etc.). The top portion of the table shows a variety of `normal' programs;
+  the bottom portion of the program shows three implementations of the SOM
+  programming language.}
 \label{tab:benchmarks}
 \end{table}
 
