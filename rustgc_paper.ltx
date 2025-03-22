@@ -1704,7 +1704,7 @@ interested readers may find that they help flesh out some details.
     using four configurations: Gc, -- which uses \ourgc; Arc -- which
     uses atomic reference counting; \rustgc; and typed arena -- the default. Each benchmark is run for
     \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    confidence intervals. \laurie{why is alloy so much faster than arc?}}
 \label{fig:Egcrc:binarytrees:perf:individual}
 \end{figure}
 
@@ -1746,7 +1746,7 @@ interested readers may find that they help flesh out some details.
     absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
     lines represent the peak and average memory usage for each configuration
     respectively. The shaded regions represent 99\% confidence intervals for
-    each configuration.} \label{fig:Egcrc:individual:som-rs-bc:mem}
+    each configuration. \laurie{why is the blue line so different to that in figure 7? it looks like the resolution here is much coarser or ... ?}} \label{fig:Egcrc:individual:som-rs-bc:mem}
 \end{figure}
 
 \begin{figure}[htbp!]
@@ -1759,7 +1759,7 @@ interested readers may find that they help flesh out some details.
     independantly to a fixed time-scale (0-1), before being aggregated to show
     the mean heap usage over time. The x-axis thus allows comparisons about
     patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:grmtools:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.}}
+    their absolute time (see ~\cref{fig:Egcrc:grmtools:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.\laurie{the eclipse figure looks like alloy is leaking?!}}}
     \label{fig:Egcrc:grmtools:mem:profiles}
 \end{figure}
 
