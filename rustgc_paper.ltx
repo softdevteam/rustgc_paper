@@ -112,7 +112,7 @@ In this paper we show that it is possible to reuse most
 Rust destructors as finalizers in a satisfying way. We introduce novel solutions to the
 long-standing problems this implies by making use of some of Rust's unusual
 static guarantees. We thus gain a better GC for
-Rust and solutions to open GC problems. Our solutions, in order, are:
+Rust \emph{and} solutions to open GC problems. Our solutions, in order, are:
 (1) \emph{finalizer elision} statically optimises away finalizers if the
 underlying destructor duplicates the GC's work;
 (2) \emph{premature finalizer prevention} automatically inserts barriers to prevent
@@ -138,7 +138,7 @@ and solutions (\cref{sec:destructor challenges,sec:elision,sec:premature_finaliz
 (\cref{sec:evaluation}). The first three parts have the challenge that our work
 straddles two areas that seem almost mutually exclusive: GC and Rust. We have
 tried to provide sufficient material for readers expert in one of these
-areas to gain adequate familiarity with the other, without boring either, but we explicitly encourage
+areas to gain adequate familiarity with the other, without boring either, but we encourage
 readers to skip material they are already comfortable with.
 
 
@@ -188,8 +188,10 @@ However, there are many programs which need to express data structures
 which do not fit into the restrictions of affine types and
 ownership. These are often described as `cyclic data-structures', though
 that sometimes gives the incorrect impression that only data structures
-such as doubly linked lists are of interest. In reality, programs as diverse as
-interpreters for dynamically typed languages have need to use such types.
+such as doubly linked lists are of interest. In reality, programs such as
+interpreters for dynamically typed languages need to use data-structures
+that may not always be cyclic, but which might not be directly expressible
+with affine types and ownership.
 In this paper we use the more abstract term `shared ownership', which includes,
 but is not limited to, cyclic data-structures.
 
