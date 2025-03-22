@@ -1403,7 +1403,7 @@ Any performance judgements we make are necessarily contingent on our particular
 benchmark suite. We cannot say, for example, that finalizer elision will always
 improve performance by the \laurie{X\%} we see in our experiment: there
 undoubtedly exist reasonable, non-pathological, programs which will see
-performance changes beyond those our results suggest. Although the \Egcrc
+performance changes outside the ranges that our results suggest. Although the \Egcrc
 experiment requires a very specific benchmark suite, our other experiments
 would probably be a good fit for a standard benchmarking suite.
 Since the benchmark suite in this paper is the largest for any GC in Rust \laurie{is that true of
@@ -1414,10 +1414,11 @@ Using \boehm as the allocator for all benchmarks has the advantage of removing
 of the performance characteristics of benchmarks will be changed (e.g.~the
 impact on CPU caches). A generic, modern conservative GC, using the insights of
 recent non-GC allocators, would probably give a better idea of the true
-performance of \ourgc relative to other shared ownership strategies. We are
-not aware of a production quality modern, generic conservative GC being
-available right now, though we hope one does become available: it would
-be interesting to rerun our experiments if and when that occurs.
+performance of \ourgc relative to other shared ownership strategies. To the
+best of our knowledge there is not currently an alternative production-quality
+modern, generic conservative, GC we could use instead, though we are aware of
+at least one attempt to create such an alternative: it will be interesting to rerun our
+experiments if and when that arrives.
 
 
 \section{Related work}
