@@ -1042,6 +1042,27 @@ autotrait \lstinline{ReferenceFree}, with negative implementations for
 and \lstinline{Sync}, we know that there can be no unsafe projections used in a
 destructor, and can bypass most FSA checks entirely. \jake{We actually use \lstinline{FinalizerSafe} instead of \lstinline{ReferenceFree} (which has gone) for the purpose you describe above. There is also one edge case that makes this statement not quite correct: if a type implements Send + Sync + FinalizerSafe, then you are correct that we don't need to check for unsafe projections in that drop method. However, we cannot ignore the type completely, we do still need to check that it doesn't use a thread-local variable. So this can instead be thought of as a slight optimization. This is not theoretical btw, we do actually do this.} \laurie{could we not add a negative trait impl to thread locals to avoid this?}
 
+\jake{Unfortunately not. Thread locals can be misused in T::drop without it belonging to a field (and thus a projection) on the T in Gc<T>. Have a look at the example below:}
+
+\begin{lstlisting}
+
+thread_local! {
+    static COUNTER: Cell<u32> = Cell::new(0);
+}
+
+struct S;
+
+impl Drop for S {
+    fn drop(&mut self) {
+        // Access the thread-local variable
+        let x = COUNTER.get();
+    }
+}
+\end{lstlisting}
+
+\jake{if we short-circuited FSA on S (i.e. avoided looking at its drop because its Send + Sync + FinalizerSafe) then we would miss this unsafe thread-local access. Note that this problem does not apply to globals. In Rust, if you want to access a global static mutably you either need to use interior mutability or use unsafe which both cover us.}
+
+
 \cref{alg:fsa} also captures \ourgc's approach to error messages.
 Rather than just inform a user that `your drop method has not passed FSA', \ourgc
 pinpoints which field or line in a drop method caused FSA to fail:
