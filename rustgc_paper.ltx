@@ -1308,11 +1308,12 @@ drop method that caused an FSA error.
     Benchmark & Version & Description & \% Gc & \% Gc (transitive) \\
 \midrule
     \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark & - & - \\
-    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolsheapgcpct & \grmtoolsheapgctpct \\
+    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & \regexreduxheapgcpct & - \\
+  \midrule
     \alacritty & \alacrittyversion  & Terminal emulator & \alacrittyheapgcpct & \alacrittyheapgctpct \\
     \fd & \fdversion  & Unix find replacement & \fdheapgcpct & \fdheapgctpct \\
+    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolsheapgcpct & \grmtoolsheapgctpct \\
     \ripgrep & \ripgrepversion  & Fast grep replacement & - & \ripgreppctmanaged \\
-    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & \regexreduxheapgcpct & - \\
   \midrule
     \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastheapgcpct & \somrsastheapgctpct \\
     \somrsbc & git \#\somrsversion  & SOM bytecode VM & \somrsbcheapgcpct & \somrsbcheapgctpct \\
@@ -1330,7 +1331,9 @@ drop method that caused an FSA error.
   The benchmark suites that form our experiment: we take the Rust programs
   above, each of which is itself a suite of multiple benchmarks, and alter
   them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
-  etc.). The top portion of the table shows a variety of `normal' programs;
+  etc.). \binarytrees and \regexredux are classic stand-alone GC benchmarks; the other `benchmarks'
+  are in fact suites of benchmarks. The middle
+  portion of the table shows a variety of `normal' programs;
   the bottom portion of the program shows three implementations of the SOM
   programming language.}
 \label{tab:benchmarks}
@@ -1343,15 +1346,18 @@ our methodology and our experimental results.
 
 \subsection{Methodology}
 
-In order to understand the performance of \ourgc we ran three experiments:
+In order to understand the performance of \ourgc we carried out three experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
-  \Egcrc & the relative performance of \texttt{Gc<T>} over other allocation strategies (e.g.~\texttt{Rc<T>}) \\
+  \Egcrc & the relative performance of \texttt{Gc<T>} vs.~other allocation strategies \\
   \Eelision & the performance gains of finalizer elision \\
   \Eprem & the costs of premature finalizer prevention and its optimisation \\
 \end{tabular}
 \vspace{10pt}
+
+
+\subsubsection{The benchmark suite}
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
@@ -1362,17 +1368,23 @@ package system) looking for suitable candidates. Many that use
 shared ownership strategies do not use them in performance
 critical areas (\laurie{give two examples}): any resulting benchmark would be
 unlikely to show anything of interest to this paper. Some relied on
-unusual and/or unsafe features of their memory strategy that were too difficult
-or time-consuming to adapt (e.g.~\emph{RustPython}, \emph{Rkyv}).
+unusual and/or unsafe features strategy that were too difficult
+or time-consuming to adapt (e.g.~\emph{RustPython}).
 
-\cref{tab:benchmarks} shows our eventual benchmark suite. \binarytrees and \regexredux
-are well-known microbenchmarks. \binarytrees is both allocation intensive
+\cref{tab:benchmarks} shows our eventual benchmark suite: note that, with
+the exception of \binarytrees \and \regexredux, the other `benchmarks' are themselves
+benchmark suites. Collectively, our suite thus contains \laurie{how many?} benchmarks.
+
+\binarytrees is both allocation intensive
 and sufficiently simple that we could port it to a variety of shared ownership strategies.
-\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively: the
-core library is around 18KLoC, excluding dependencies.
-%\minimoka \laurie{uses what?};
-To benchmark \grmtools, we used 4 large Java source files (collectively
-around 28KLoc of source code).
+\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively,
+particularly in error recovery: the
+core library is around 18KLoC, excluding dependencies. We benchmarked it
+using 28KLoC of Java source code which we injected errors into to exercise
+error recovery. \alacritty, \fd, and \ripgrep are well known Rust tools all
+of which have their own benchmark suites.
+
+\laurie{i don't think we use \sws anymore?}
 \sws is built on top of the \emph{Hyper} HTTP library, which itself uses the
 \emph{tokio} async runtime and uses \lstinline{Arc<T>} extensively: the
 core server is around 16KLoC, with \emph{Hyper} around 27KLoC, and
@@ -1381,30 +1393,33 @@ To benchmark \sws, we use the standard \emph{wrk} HTTP benchmarking
 tool which fires as many requests as possible at \sws in one minute.
 Unlike our other benchmarks, we thus report requests per second for \sws.
 
-Our suite also includes three SOM VMs. SOM is a small, but complete,
-language in the Smalltalk mould, which has a wide variety of implementations. \somrsast and
-\somrsbc are existing implementations and both relatively faithful ports of a Java
-SOM VMs into Rust that use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
+Our suite includes three SOM VMs. SOM is a small, but complete,
+language in the Smalltalk mould, which has a wide variety of implementations. \somrsast
+(which represents programs as ASTs) and \somrsbc (which represents programs as
+bytecode) are existing ports of a Java
+SOM VM into Rust; both use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
 for this paper that is designed to be more idiomatic Rust code. Each SOM VM is
-around 5KLoC. Crucially, the SOM VMs enable us to run the same `Are We Fast Yet?'
-benchmark suite~\cite{marr16cross}, turning what appears to be 1 benchmark into 26
-(mostly micro) benchmarks.
+approximately 5KLoC. The SOM VMs all run the same `Are We Fast Yet?'
+benchmark suite~\cite{marr16cross}.
 
-We compare \ourgc against three other shared ownership approaches: for most
-experiments against \lstinline{Rc<T>} and \lstinline{Arc<T>} (the two being
-very similar to oneanother); and for \binarytrees against \rustgc (a user
-library for GC for Rust~\cite{manish15rustgc}) and \typedarena (a non-GC memory
-arena~\laurie{is this \url{https://github.com/thomcc/rust-typed-arena}?}).
-We used the other shared ownership approaches in their
-standard configurations.
+Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
+programs in our benchmark suite to all allocation strategies. As shown in Table~\laurie{3 i think?},
+we variously compare performance against: \lstinline{Rc<T>} and
+\lstinline{Arc<T>} (the latter being the thread-safe version of the former);
+\rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
+(a non-GC memory arena~\laurie{is this
+\url{https://github.com/thomcc/rust-typed-arena}?}).
 
-One confounding factor we have controlled for is the underlying memory
-allocator. \boehm's core dates to the 1980s and allocators have made
-many advances since. A quick experiment showed us that modern system
-allocators are noticeably faster than \boehm: comparing \ourgc with \boehm
-to \rustc with a modern system allocator would be uncomfortably
-close to apples and oranges. We therefore use \boehm as the allocator
-for both \ourgc and \rustc.
+
+\subsubsection{Running the experiment}
+
+A challenge in our experiment is that different allocation strategies can use
+different underlying allocators. In particular, \ourgc has to use \boehm, but,
+for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
+Much has changed in the performance of our allocators since \boehm's 1980s
+roots, and a quick experiment showed us that comparing different underlying
+allocators was a significant confounding factor. To avoid this, we use
+\boehm as the allocator for both \ourgc and \rustc.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 For the non-SOM benchmarks reporting timings we measured wall-clock time of a process using
@@ -1413,7 +1428,7 @@ the conventional \emph{rebench} tool~\cite{rebench18marr}, which internally
 measures wall-clock time using \lstinline{time}.
 We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
-as both can interfere with the kind of benchmarking we wish to perform.
+as both can colour results.
 
 Our experiment is fully repeatable and downloadable from
 \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
