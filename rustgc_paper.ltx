@@ -1214,17 +1214,14 @@ unsafe.
 
 \subsection{Putting it all together}
 
-In essence, FSA integrates the seemingly separate parts presented above into one:
-as shown in \cref{alg:fsa} it iterates over
-every function in \rustc's MIR and checks whether types used in a
-\lstinline{Gc<T>} satisfy FSA. To simplify the presentation, we ignored
-caching in the algorithm though the actual implementation does perform
-caching (e.g.~the \lstinline{needs_finalizer} intrinsinc) .
+FSA integrates the seemingly separate parts presented above into one,
+iterating over every function in \rustc's MIR and checking whether types used in a
+\lstinline{Gc<T>} satisfy FSA. \cref{alg:fsa} shows the essence of FSA
+(minus details of caching which \ourgc uses to speed up compile times).
 
-The implementation of FSA also gives good quality error messages. Rather
-than just inform a user that `your drop method has not passed FSA', \ourgc
-pinpoints precisely which field or line in a drop method caused FSA to fail
-(via the \lstinline{Emit*Error} functions):
+\cref{alg:fsa} also captures \ourgc's approach to error messages.
+Rather than just inform a user that `your drop method has not passed FSA', \ourgc
+pinpoints which field or line in a drop method caused FSA to fail:
 \lstinline{EmitReferenceError} informs the user when a reference in a type
 is used in a way that violates FSA (see~\cref{sec:fsa_rust_references}); and
 \lstinline{EmitFinalizerUnsafeError} when a drop method
@@ -1232,6 +1229,57 @@ contains code which is unsafe (e.g.~references a \lstinline{Gc<T>} type, an
 opaque function, etc.). \cref{fig:finalizer_cycle_err} shows an example of
 the errors reported by \ourgc: note that it pinpoints the line within a
 drop method that caused an FSA error.
+
+\begin{algorithm}[t]
+  \captionof{algorithm}{Finalizer safety analysis}
+  \label{alg:fsa}
+  \begin{algorithmic}[1]
+    \Function{FinalizerSafetyAnalysis}{\textit{func}}
+      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
+            \State $t \gets$ \textit{basic\_block.terminator}
+            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
+                \State \textbf{continue}
+            \EndIf
+            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
+            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
+              \State \textbf{continue}
+            \EndIf
+            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
+            \State \Call{EmitReferenceError}{}
+            \Else
+            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
+              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
+            \EndFor
+            \EndIf
+      \EndFor
+\EndFunction
+\State{}
+    \Function{CheckDropMethodSafety}{\textit{drop}}
+    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
+    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
+      \State \Return
+    \EndIf
+      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
+        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
+            \ForEach {$\textit{projection} \in \textit{statement}$}
+              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+            \EndFor
+        \EndFor
+      \EndFor
+
+\EndFunction
+\State{}
+  \Function{IsFinalizerSafe}{\textit{ty}}
+    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
 
 \begin{figure}[tb]
   \begin{center}
@@ -1676,56 +1724,6 @@ interested readers may find that they help flesh out some details.
 \EndFunction
 \end{algorithmic}
   \label{alg:barrier_removal}
-\end{algorithm}
-
-\begin{algorithm}[t]
-  \captionof{algorithm}{Finalizer safety analysis}
-  \label{alg:fsa}
-  \begin{algorithmic}[1]
-    \Function{FinalizerSafetyAnalysis}{\textit{func}}
-      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
-            \State $t \gets$ \textit{basic\_block.terminator}
-            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
-                \State \textbf{continue}
-            \EndIf
-            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
-            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
-              \State \textbf{continue}
-            \EndIf
-            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
-            \State \Call{EmitReferenceError}{}
-            \Else
-            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
-              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
-            \EndFor
-            \EndIf
-      \EndFor
-\EndFunction
-\State{}
-    \Function{CheckDropMethodSafety}{\textit{drop}}
-    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
-    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
-      \State \Return
-    \EndIf
-      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
-        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
-            \ForEach {$\textit{projection} \in \textit{statement}$}
-              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-            \EndFor
-        \EndFor
-      \EndFor
-
-\EndFunction
-\State{}
-  \Function{IsFinalizerSafe}{\textit{ty}}
-    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
-\EndFunction
-\end{algorithmic}
 \end{algorithm}
 
 \clearpage
