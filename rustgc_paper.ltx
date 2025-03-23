@@ -859,7 +859,7 @@ forbid \emph{projections} (which include a struct's fields, indexes into a
 vector, and so on) to reference types. Any other references that are created
 in a drop method are by definition safe to use, as they either exist only
 for the duration of the drop method (references to variables on the stack)
-or will exist for the remainder of the program (references to global variables).
+or will exist for the remainder of the program (references to global variables). \jake{With the exception of references to thread-local storage, which is memory-safe in that the reference will point to valid memory, but it will almost certainly do the wrong thing because it points to the finalizer thread's TLS value rather than that of the mutator which the user most likely intended. We thus also ban references to TLS.}
 
 Forbidding all projections in this way over-approximates the safe set of
 destructors. For example, if a drop method creates a new
@@ -868,75 +868,23 @@ raise an error, even though that reference can only exist for the duration of
 the drop method. It may be possible to relax our rule further, but we found that it becomes
 rapidly harder to define and article what is safe, and to implement the resulting design in \rustc.
 
-\jake{FSA has changed quite a bit since the last write-up in this section, below I will detail the key differences from before}
-
-\subsection{New FSA rules}
-
-\subsubsection{Bypassing FSA}
-
-The \lstinline{FinalizerSafe} auto-trait no longer exists. This means there is
-now no user-implementable auto-trait that can be implemented on types to bypass
-FSA. The only way to now bypass FSA is to wrap a type inside
-\lstinline{FinalizerUnchecked}.
-
-The use of \lstinline{FinalizerUnchecked} works at both the top level, and
-indirectly when used in a field. For example, the following would be allowed in
-\ourgc:
-
-\begin{lstlisting}[language=Rust, numbers=none]
-struct S { x: *const u8 } // not Send + Sync because of the raw ptr
-impl Drop for S { fn drop(&mut self) { let _ = *self.x }; }
-
-Gc::new(unsafe { FinalizerUnchecked::new(S)});
-\end{lstlisting}
-
-\lstinline{S} is not safe to use in a finalizer because its drop method
-dereferences the non-Send non-Sync raw pointer field \lstinline{x}. However, by
-passing a wrapped \lstinline{FinalizerUnchecked} value of \lstinline{S} to
-\lstinline{Gc::new} we have explicitly disabled FSA for this value. Note that
-this is an unsafe operation because it could allow unsoundness.
-
-This also works indirectly. For example:
-
-\begin{lstlisting}[language=Rust, numbers=none]
-struct T { y: FinalizerUnchecked<S> }
-
-Gc::new(T { y: unsafe { FinalizerUnchecked::new(S)} });
-\end{lstlisting}
-
-Here, \lstinline{FinalizerUnchecked} is used to prevent FSA from checking the
-drop method of \lstinline{S} only. In the above example, \lstinline{T}'s
-finalizer will be allowed. However, if \lstinline{T} had an unsafe drop method.
-FSA would still throw an error. This is useful for making sure that where FSA
-is too conservative, it need only be disabled in the places it needs to be, and
-other errors can't accidentally sneak through.
-
-\lstinline{FinalizeUnchecked} has another benefit over the old approach of
-implementing \lstinline{FinalizerSafe} for a specific type: it only affects a
-particular instance of a type. In other words, implementing
-\lstinline{FinalizerSafe} (or indeed \lstinline{Send + Sync}) for types so that
-they can be finalized in GC means that users must be sure all uses of that type
-are safe. I personally found this very difficult to be confident with --
-especially over larger codebases (i.e. alacritty).
-
 \subsubsection{FSA Entry-points}
 
-Previously, we hard-coded \lstinline{Gc::new} to be the ``entry-point'' which
-FSA would use to check a type. This was fine at the time, because
-\lstinline{Gc::new<T>} was the only safe way to construct a Gcable object of
-type \lstinline{T}. However, we have since extended the GC API to support
-\lstinline{from/into} conversions, which are used extensively in some of the
-\lstinline{Rc}'d programs that we have retrofitted.
+Apart from the obvious \lstinline{Gc::new} constructor, there are other ways to
+instantiate GC objects. These are usually using the \lstinline{from/into}
+implicit conversion trait that Rust provides. We need to ensure that when these
+methods are called to create a GC, they act as an ``entry-point'' for FSA to
+perform analysis on the GC'd type. Empirically we notice these APIs were used
+heavily when converting \alacritty and \ripgrep to use GC for benchmarking.
 
-We now define an internal rustc-only attribute
-(\lstinline{#[rustc_fsa_entry_point]}) to replace this. The first stage of FSA
-was to traverse the whole-program MIR looking for \lstinline{Gc::new}
-constructors. Instead, we now traverse the whole-program MIR looking for
-functions which have the \lstinline{#[rustc_fsa_entry_point]}. Constructor-like
-functions inside the GC standard library (such as \lstinline{Gc::new} /
-\lstinline{Gc::from}) are annotated with this attribute.
+In order to know when a type must be FSA'd, we define an internal rustc-only
+attribute (\lstinline{#[rustc_fsa_entry_point]}) which is annotated on the GC
+constructor methods (\lstinline{Gc::new} / \lstinline{Gc::from}). During the
+compile-time FSA pass, we traverse the whole-program MIR looking for functions
+annotated with \lstinline{#[rustc_fsa_entry_point]} and use these as the
+starting point for the rest of the analysis.
 
-\subsubsection{The ReferenceFree auto-trait is back}
+\subsubsection{The FinalizerSafe auto-trait is back}
 
 The viral properties of auto-traits are really useful for the kind of analyses
 we want to do in FSA. E.g. with Send and Sync, we can know for certain if
@@ -1179,37 +1127,53 @@ such checks in its semantics.
 
 FSA is deliberately conservative. In particular, when checking whether drop
 methods satisfy certain properties, FSA naturally checks whether code
-reachable from those drop methods satisfies those properties. Currently,
-function calls which are inlined are checked in detail, but all other function
-calls are considered \emph{opaque} and fail FSA's checks. Calls to
-non-inlined normal Rust functions are not checked due to
-a minor limitation inside \ourgc. Other kinds of function call are fundamentally
+reachable from those drop methods satisfies those properties. The function bodies of function calls made from within a drop method are recursively checked for finalizer safety. However, some function call are fundamentally
 hard or impossible to check, specifically: calls to externally linked (e.g.~an FFI
 call to C) function; or dynamic dispatch calls in \emph{trait objects}, where we can't
 tell which of many possible implementations of a method will actually be
-called.
+called. In such cases, we err on the side of caution and throw errors for such drop methods.
 
 In some cases, users are able to prove to their satisfaction that the resulting
 false positives are incorrect (e.g.~because the C function they are calling
-has no side effects). Depending on the error they receive, they can then
-implement the unsafe traits \lstinline{FinalizerSafe}, \lstinline{Send}, or
-\lstinline{Sync} appropriately. \laurie{is this still relevant?}
-A challenge in all three cases is that
-implementing a trait implicitly guarantees that all dynamic values
-satisfy the static trait implementation.
-One way to sidestep this problem is to provide a newtype that allows only a
-subset of values to be declared as safe to use in a finalizer: the newtype
-implements the \lstinline{FinalizerSafe}, \lstinline{Send}, and \lstinline{Sync}
-traits, implicitly blessing the type it wraps. We found a particular need for
-this when interfacing with external GC-unaware libraries. \ourgc thus provides
-a standard newtype \lstinline{FinalizerUnchecked<T>} which allows allows users to inform
-FSA that certain uses of
-a type \lstinline{T} satisfy its properties. We still want to require the user
+has no side effects). To provide users with an escape hatch where FSA can be
+bypassed in such cases, we provide a newtype \lstinline{FinalizerUnchecked<T>} that allows only a
+subset of values to be declared as safe to use in a finalizer. This type has
+compiler support and its existence is explicitly checked for during FSA. We
+still want to require the user
 to explicitly opt-in to unsafe Rust when using
 \lstinline{FinalizerUnchecked<T>}, since incorrect use is dangerous,
 but Rust structs cannot be marked as unsafe directly. Instead we mark
 the struct's constructor (\lstinline{FinalizerUnchecked::new}) as
 unsafe.
+
+The use of \lstinline{FinalizerUnchecked} works at both the top level, and
+indirectly when used in a field. For example, the following would be allowed in
+\ourgc:
+
+\begin{lstlisting}[language=Rust, numbers=none]
+struct S { x: *const u8 } // not Send + Sync because of the raw ptr field
+impl Drop for S { fn drop(&mut self) { let _ = *self.x }; }
+
+Gc::new(unsafe { FinalizerUnchecked::new(S)});
+\end{lstlisting}
+
+\lstinline{S} on its own is not safe to use in a finalizer because its drop method
+dereferences the non-Send non-Sync raw pointer field \lstinline{x}. However, by
+passing a wrapped \lstinline{FinalizerUnchecked} value of \lstinline{S} to
+\lstinline{Gc::new} we have explicitly disabled FSA for this value. Note that
+this is an unsafe operation because it could allow unsoundness.
+
+A different solution could be to use an unsafe marker trait which you implement
+on types that you don't want to FSA (e.g. something like \lstinline{T:DontFSA}).
+This has a trade-off: it is more flexible because (especially with
+migrating code) you only have to annotate stuff at the type definition level
+rather than at each use. However, personally I think this is too unsafe,
+because implementing \lstinline{DontFSA} (or indeed fudging a type to be
+\lstinline{Send + Sync} just for finalization purposes) means that users must
+be sure all uses of that type are safe. I personally found this very difficult
+to be confident with -- especially over larger codebases (i.e. alacritty) where
+the type can be used in a GC without realising because its nested several
+layers deep.
 
 
 \subsection{Putting it all together}
