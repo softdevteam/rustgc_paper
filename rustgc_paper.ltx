@@ -852,9 +852,9 @@ The eventual rule we alighted upon for FSA is that a destructor for a type
 \lstinline{T} can be used as a finalizer provided the destructor's drop methods
 do not obtain references derived from \lstinline{T}'s fields (including fields
 reachable from its attributes). Using Rust's terminology, we
-forbid \emph{projections} \laurie{``in a drop method''?}\jake{Yes, but also then in functions which are called from that drop method and so on} (which include a struct's fields, indexes into a
-vector, and so on) from leading to references. Any non-projection references that are created
-in a drop method are by definition safe to use, as they either exist only
+forbid \emph{projections} in destructors (which include a struct's fields, indexes into a
+vector, and so on) from leading to references. Any non-projection references that are
+used in a destructor are by definition safe to use, as they either exist only
 for the duration of the drop method (references to variables on the stack)
 or will exist for the remainder of the program (references to global variables).
 
@@ -978,21 +978,23 @@ solely to running finalizers.
 
 We must therefore ensure that it is safe to run a type's destructor on the
 finalizer thread. A conservative definition is that \lstinline{Gc<T>}
-is safe to use if \lstinline{T} implements both of Rust's existing \lstinline{Send} (is a type safe to be
-moved permanently from one thread to another?) and \lstinline{Sync} (is a type
-safe to be accessed from more than one thread simultaneously?) auto traits. \jake{Not sure about this phrasing. The Qs in parenthesis made me think that placeholder comments were left in the prose.}
-However, requiring that finalization be restricted to types that implement both \lstinline{Send} and
+is safe to use if \lstinline{T} implements both of Rust's existing \lstinline{Send}
+(denoting a type that can be permanently moved from one thread to another)
+and \lstinline{Sync} (denoting a type that can be safely accessed simultaneously
+by multiple threads) auto traits. However, requiring that finalization be
+restricted to types that implement both \lstinline{Send} and
 \lstinline{Sync} can be frustrating, particularly because more types
 implement \lstinline{Send} than \lstinline{Sync}.
 
-It may seem sufficient to require \lstinline{T} to implement
-\lstinline{Send} alone \jake{... ``because the object's finalizer is by definition run on an unreachable object''?}. However, this would not prevent a finalizer indirectly accessing
+It may seem sufficient to require \lstinline{T} to implement \lstinline{Send}
+alone so that the object can be safely sent to the finalizer thread. However,
+this would not prevent a finalizer indirectly accessing
 state shared with a non-GCed value via a mechanism such as \lstinline{Arc},
 causing the very problems we are trying to avoid.
 
 FSA's eventual approach is thus very different: it ignores whether a type
 implements \lstinline{Send} or \lstinline{Sync} (or not) and instead examines
-the destructor itself. To pass FSA, any fields projections the
+the destructor itself. To pass FSA, any projections the
 destructor implements must implement both \lstinline{Send} and
 \lstinline{Sync}. Intuitively, this allows a
 non-\lstinline{Send}-or-\lstinline{Sync} type \lstinline{T} to have a safe
@@ -1036,9 +1038,9 @@ optimisations to reduce such costs. As alluded to above, FSA caches the results
 of various checks to avoid pointlessly repeating work. We also introduce a new
 autotrait \lstinline{ReferenceFree}, with negative implementations for
 \lstinline{Gc<T>}, \lstinline{&T}, and \lstinline{&mut T}. If a type
-\lstinline{T} implements all of \lstinline{ReferenceFree}, \lstinline{Send},
+\lstinline{T} implements all of \lstinline{FinalizerSafe}, \lstinline{Send},
 and \lstinline{Sync}, we know that there can be no unsafe projections used in a
-destructor, and bypass that aspect of FSA checks entirely. \jake{We actually use \lstinline{FinalizerSafe} instead of \lstinline{ReferenceFree} (which has gone) for the purpose you describe above. There is also one edge case that makes this statement not quite correct: if a type implements Send + Sync + FinalizerSafe, then you are correct that we don't need to check for unsafe projections in that drop method. However, we cannot ignore the type completely, we do still need to check that it doesn't use a thread-local variable. So this can instead be thought of as a slight optimization. This is not theoretical btw, we do actually do this.}
+destructor, and can bypass most FSA checks entirely. \jake{We actually use \lstinline{FinalizerSafe} instead of \lstinline{ReferenceFree} (which has gone) for the purpose you describe above. There is also one edge case that makes this statement not quite correct: if a type implements Send + Sync + FinalizerSafe, then you are correct that we don't need to check for unsafe projections in that drop method. However, we cannot ignore the type completely, we do still need to check that it doesn't use a thread-local variable. So this can instead be thought of as a slight optimization. This is not theoretical btw, we do actually do this.} \laurie{could we not add a negative trait impl to thread locals to avoid this?}
 
 \cref{alg:fsa} also captures \ourgc's approach to error messages.
 Rather than just inform a user that `your drop method has not passed FSA', \ourgc
@@ -1065,8 +1067,9 @@ attribute, which FSA then checks for.
 
 Second, in most cases, FSA runs on Rust functions whose generic types have been
 replaced with concrete types (in Rust terminology, functions have been
-`monomorphised'). Sometimes, however, FSA encounters functions whose generic
-types have not yet been replaced \laurie{how/why?} \jake{sometimes this is because those functions are special (e.g. intrinsics or have special compiler hooks like allocation functions), somtimes i think it's also to do with cycles in type / trait resolution. though admitedly i'm not entirely sure how or why that manifests, only that the \rustc monomorphize api methods are fallible} with concrete types: FSA can
+`monomorphised'). Sometimes, however, FSA encounters functions (e.g.~intrinsics
+or functions with certain annotations) whose generic
+types have not yet been replaced with concrete types: FSA can
 still run on such functions, but unless (for reasons covered shortly) those
 generic types imply the \lstinline{FinalizerSafe}, \lstinline{Send}, and
 \lstinline{Sync} traits, FSA will reject them.
