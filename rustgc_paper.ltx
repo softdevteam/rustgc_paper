@@ -1373,7 +1373,92 @@ Our experiment is fully repeatable and downloadable from
 
 \subsection{Results}
 
-\jake{TODO: Pull in relevant plots from the appendix}
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/gcvs/perf_summary}
+}
+  \vspace{5pt}
+  \caption{Performance results for the \Egcrc experiment, comparing
+  benchmarks running on \ourgc against other shared ownership approaches. With
+  the exception of \binarytrees, which we ported to several approaches, most
+  compare \ourgc with one other shared ownership approach. All benchmarks
+  were run 30 times with wall-clock times reported. We report 99\% confidence
+  intervals.}
+  \label{table:Ercgc:perf}
+\end{table}
+
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/gcvs/mem_summary}
+}
+  \vspace{5pt}
+  \caption{Memory results for the \Egcrc experiment, comparing benchmarks
+    running on \ourgc against other shared ownership approaches. With the
+    exception of \binarytrees, which we ported to several approaches, most
+    compare \ourgc with one other shared ownership approach. All benchmarks
+    were run 30 times with average heap usage reported. We record heap usage
+    using KDE heaptrack, which track individual allocations throughout the
+    lifetime of a program. We report 99\% confidence intervals.}
+  \label{table:Ercgc:mem}
+\end{table}
+
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/premopt/perf_summary}
+}
+  \vspace{5pt}
+  \caption{Summary results of \Epremopt performance (the detailed breakdown for each
+  benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows
+  premature finalizer prevention turned on for all types; \emph{Opt} shows
+  optimised premature finalizer prevention (see \cref{sec:optimising_prem});
+  and \emph{None} shows premature finalizer prevention turned off.
+  \emph{None} is unsound, but provides the ultimate ceiling for \emph{Opt}'s
+  performance. All benchmarks were run 30 times with wall-clock times
+  reported. We report 99\% confidence intervals.}
+  \label{table:Epremopt:perf}
+\end{table}
+
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/premopt/mem_summary}
+}
+  \vspace{5pt}
+  \caption{Summary results of \Epremopt memory (the detailed breakdown for each
+    benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive}
+    shows premature finalizer prevention turned on for all types; \emph{Opt}
+    shows optimised premature finalizer prevention (see
+    \cref{sec:optimising_prem}); and \emph{None} shows premature finalizer
+    prevention turned off. \emph{None} is unsound, but provides the ultimate
+    ceiling for \emph{Opt}'s performance. All benchmarks were run 30 times with
+    average heap usage reported. We report 99\% confidence intervals.}
+  \label{table:Epremopt:mem}
+\end{table}
+
+\begin{table}[t]
+    \centering
+    \scalebox{0.7}{%
+      \input{plots/elision/perf_summary}
+    }
+      \vspace{5pt}
+    \caption{
+    Summary results of \Eelision performance (the detailed breakdown for each
+    benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
+    off finalizer elision.}
+\label{fig:Eelision:perf}
+\end{table}
+
+\begin{table}[t]
+    \centering
+    \scalebox{0.7}{%
+      \input{plots/elision/mem_summary}
+    }
+      \vspace{5pt}
+    \caption{
+    Summary results of \Eelision average memory usage (the detailed breakdown for each
+    benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
+    off finalizer elision.}
+\label{fig:Eelision:mem}
+\end{table}
 
 \section{Threats to validity}
 
