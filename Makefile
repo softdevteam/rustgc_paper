@@ -20,7 +20,7 @@ rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt expe
 	pdflatex rustgc_paper.ltx
 	pdflatex rustgc_paper.ltx
 
-rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx
+rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	set -e; \
 	  tmpltx=`mktemp`; \
 	  cat ${@:fmt=ltx} > $${tmpltx}; \
