@@ -1331,6 +1331,79 @@ in one go. Interestingly, despite being
 and 2$\times$ faster than \lstinline{Rc<T>} on \binarytrees. Unlike the general pattern we see with other benchmarks, \ourgc consistently uses less memory than \rc throughout the benchmark with \rc experiencing a large spike in the last phase of the benchmark. I think this is a memory leak with \rc, because of the cyclic way in which tree nodes are allocated (note though that \rc does return to 0 at the end, so i think it's being kept alive throughout the various phases and then a large destruction chain happens at the end).
 
 
+\subsection{Things we learn from heaptrack}
+
+We modified both boehm and heaptrack to support allocation tracking for \ourgc.
+It uses \lstinline{LD_PRELOAD} to intercept malloc and free calls, as well as a
+\lstinline{GC_profiler_hook()} function in the collector's sweeper which is
+called on each swept object. Heaptrack gives us two bits of data here: a
+profile (or trace) showing the memory usage over time; and a summary, showing
+the total allocations, frees, leaks.
+
+For the profile, Heaptrack takes a snapshot every 1ms, which results in
+gigabytes of data for even short running benchmarks when they're run 10-30
+times.
+
+To output this data, we use heaptrack's \lstinline{heaptrack_print} tool for
+generating valgrind massif traces which are designed to be be easily parsed (as
+far as I'm aware there exists no tool to parse the raw heaptrack .zst dumps).
+The snapshot intervals in massif profiles are dynamic: it starts by taking
+frequent snapshots, and then uses exponential decay to reduce this frequency as
+the program goes on.
+
+
+Here are some interesting observations we can see from the heaptrack data:
+
+It makes it very easy to see when an \rc leaks. \rc uses destructors for
+calling free which will be called at the end of the lexical scope of the last
+\rc reference. If a benchmark's heap usage with the \rc configuration does not
+return to 0 at the end, then it's leaked because Rust runs destructors on exit.
+We should be a bit careful here though, because it's possible that a program
+leaked memory some other way, unrelated to the \rc's in the program (e.g. they
+called \lstinline{std::mem::forget} or used unsafe somewhere). We can't solely
+rely on the profile graphs to say 100\% that it was an \rc that leaked because
+Box and Rc are allocated both with the global allocator and heaptrack does not
+differentiate this. \jake{Personally, I think it's pretty hard to leak memory
+in Rust if you're not using some kind of shared ownership, so in practice i
+don't think this is an issue. Though it is worth mentioning that we considered
+it}
+
+Another useful observation is that for our \Eelision experiment, it shows an
+interesting deferred object reclaimation pattern when we use elision. Note that
+finalizer elision's goal is to remove an object's finalizer call, and then let
+that object's memory get reclaimed later by the collector. I think this can be
+thought of really as a throughput / latency trade-off: if we want that memory
+to be reclaimed faster (i.e. better latency) then we should not elide the
+finalizer because finalizers are called before objects are swept. Elision on
+the other hand removes the work that the finalizer needs to do (as well as the
+synchronisation costs associated with it), and accepts that the object(s) that
+would be dealloc'd by the finalizer will eventually be garbage collected. This
+is evident from the traces, when programs run for long enough, the elided
+benchmarks do return to the same memory usage as their naive counterparts. So
+here, elision has decided to prioritise throughput: we get a faster mutator for
+transiently increased memory usage. I think in most cases (and at least in part
+because the differences in memory that we actually see is not that bad) people
+want throughput here. I would argue that if you wanted low latency object
+destruction you'd be using reference counting over tracing GC anyway.
+
+
+Another thing to note is that heaptrack profiles can be potentially misleading
+when determining if \ourgc is leaking. First, and the most obvious issue, is
+that because GC cycles happen at set points in time when the world is stopped,
+inevitably there will be a situation where the program exits before the GC was
+able to schedule the reclamation of the last bunch of objects. \boehm does not
+GC on exit (it provides limited support for this, but with explicit
+recommendation against its use and that it should be used as a debugging aid).
+The second potential issue with heaptrack profiles is that \rc allocation
+patterns which frequently oscillate between allocating and deallocating in
+quick succession will tend to appear as a straight horizontal line, whereas for
+\ourgc, this will look like a big slope as the number of allocations climbs
+until the GC threshold is reached. \jake{todo from our discussion, check the
+temporary allocations heaptrack data to see if that's what is happening with
+grmtools}. This can be a bit deceptive as you might think that \ourgc is
+leaking, when actually it's just the nature of tracing gc: it's bunching all
+the freeing to be done in one go during the sweeper.
+
 \begin{table}[t]
 \scalebox{0.7}{%
   \input{plots/premopt/perf_summary}
