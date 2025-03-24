@@ -1182,64 +1182,18 @@ In order to understand the performance of \ourgc we carried out three experiment
 \vspace{10pt}
 
 
-\subsubsection{The benchmark suite}
+\subsection{The benchmark suite}
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
 want to compare programs using existing shared ownership approaches such as \lstinline{Rc<T>} against
 \lstinline{Gc<T>}. We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
-package system) looking for suitable candidates. Many that use
-shared ownership strategies do not use them in performance
-critical areas (\laurie{give two examples}): any resulting benchmark would be
-unlikely to show anything of interest to this paper. Some relied on
-unusual and/or unsafe features strategy that were too difficult
-or time-consuming to adapt (e.g.~\emph{RustPython}).
-
-We also converted numbat (scripting language for scientific computation), mini-moka (caching library like redis), salsa (on-demand incrementalized computation framework), static-web-server, hyper (low level request library), jiff (datetime library), bevy (game engine), frawk (awk rust implementation), rust-analyzer, RustPython. Below I will explain why some are not included:
-
-numbat, mini-moka, and salsa were difficult to find interesting benchmarks for.
-I could create some very artificial example programs in numbat like bigloop and
-fibonacci but I don't know how useful that is. mini-moka and salsa both use
-criterion benchmarks which when i ported to using regular rust binaries did not
-tease out the parts of the code which i replaced Rc with.
-
-rust-analyzer and bevy are not converted correctly because they make heavy use
-of APIs in Arc like \lstinline{make_mut} or \lstinline{get_mut} which allow you
-to mutate their contents when you know you're the sole owner, something that is
-just not possible in a Gc analog. When we try and convert those parts to use
-mutexes instead, we cause deadlocks because my guess is those parts of the code
-were not written to be deadlock-aware. This is also a problem for alacritty,
-but it was possible to do a partial conversion (though this does mean that
-unfortunately we could not change the module in alacritty responsible for UTF8
-handling which i think would have been more interesting as it would be pushed
-hard in the vim benchmark). I was able to do a partial conversion of just the
-parser module in rust-analyzer, but this alone runs too quickly over the large
-example Rust input files they provide that you can't do any meaningful
-comparisons.
-
-RustPython was converted, with tests passing, but I am not confident in its
-correctness because of the way it implements the del method. It's not
-implemented straightforwardly using the drop method on the Rc'd python objects
-but instead uses dynamic dispatch with trait objects. I could not see an easy
-path to fudge this into \ourgc's finalization mechanics without exposing some
-kind of explicit \lstinline{Gc::register_finalizer(function_pointer)} API which
-is fundamentally different because it doesn't use drop. The long and short of
-it then is that it would be bad-faith to use RustPython in a benchmark
-comparison because any python object with a \lstinline{__del__} method would
-leak memory in \ourgc's port  (which is a fairly common idiom if my python
-memory serves me right!)
-
-For static-web-server, hyper, jiff, and frawk, i belive these may be usable but
-have not yet interrogated their outputs. \jake{In fact, I seem to have make
-clean'd their results by mistake so am running them in parallel on b10 so we
-can verify and include or remove later today}
-
-
-
+package system) looking for suitable candidates.
 \cref{tab:benchmarks} shows our eventual benchmark suite: note that, with
 the exception of \binarytrees \and \regexredux, the other `benchmarks' are themselves
-benchmark suites. Collectively, our suite thus contains \laurie{how many?} benchmarks.
+benchmark suites. Collectively, our suite thus contains -- depending on whether you
+count the SOM implementations collectively or separately -- 62 or 114 benchmarks.
 
 \binarytrees is both allocation intensive
 and sufficiently simple that we could port it to a variety of shared ownership strategies.
@@ -1248,16 +1202,8 @@ particularly in error recovery: the
 core library is around 18KLoC, excluding dependencies. We benchmarked it
 using 28KLoC of Java source code which we injected errors into to exercise
 error recovery. \alacritty, \fd, and \ripgrep are well known Rust tools all
-of which have their own benchmark suites.
-
-\laurie{i don't think we use \sws anymore?}
-\sws is built on top of the \emph{Hyper} HTTP library, which itself uses the
-\emph{tokio} async runtime and uses \lstinline{Arc<T>} extensively: the
-core server is around 16KLoC, with \emph{Hyper} around 27KLoC, and
-tokio around 90KLoC (though \sws uses only a subset of each library).
-To benchmark \sws, we use the standard \emph{wrk} HTTP benchmarking
-tool which fires as many requests as possible at \sws in one minute.
-Unlike our other benchmarks, we thus report requests per second for \sws.
+of which have their own benchmark suites. We found an issue porting \alacritty's
+UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>} \laurie{i assume \lstinline{Arc<T>} and not \lstinline{Rc<T>}?}.
 
 Our suite includes three SOM VMs. SOM is a small, but complete,
 language in the Smalltalk mould, which has a wide variety of implementations. \somrsast
@@ -1275,6 +1221,44 @@ we variously compare performance against: \lstinline{Rc<T>} and
 \rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
 (a non-GC memory arena~\laurie{is this
 \url{https://github.com/thomcc/rust-typed-arena}?}).
+
+
+\subsubsection{What we couldn't include in the benchmark suite}
+
+We tried porting porting 10 other programs that are not included in our
+benchmark suite. To avoid readers wondering if we have `cherry-picked' our
+eventual benchmark suite, we briefly report here why those other programs have
+been excluded.
+
+Several programs (e.g.~numbat, mini-moka, and salsa), once ported, turned out
+to be uninteresting from a GC benchmarking perspective. Irrespective of the
+number of source locations that reference memory allocation types, the
+benchmarks we could run from them allocated sufficiently little memory that
+there are no worthwhile differences between different allocation strategies.
+Put another way: including these programs / benchmarks in our benchmark suite would
+risk drowning ourselves and readers in repetitive, and uninteresting, detail,
+since all these programs are in a sense `the same' from our evaluation perspective.
+
+Two programs (bevy and rust-analyzer) did not run correctly after
+porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
+functions in \lstinline{Rc<T>} which allow a programmer to mutate their contents
+when it can be statically proven that there is a single owner. There is not,
+and cannot be, equivalent functionality in \lstinline{Gc<T>}. We thus had to
+use alternative mechanisms to express the desired outcome, but found that
+this occasionally led to deadlocks (this same problem also occurred in
+one small portion of \alacritty, but was easily isolated to it). It is likely
+that such issues can be solved, but this is unlikely to be a quick exercise.
+
+We also ported RustPython, but found that doing so changed the semantics of
+its implementation of \lstinline{__del__} methods to the extent that we felt
+that the resulting performance numbers would be misleading. In essence, RustPython
+uses trait objects \lstinline{and drop methods?} in a way that \lstinline{Gc<T>}
+cannot express directly \laurie{i haven't really understood why}.
+
+For static-web-server, hyper, jiff, and frawk, i belive these may be usable but
+have not yet interrogated their outputs. \jake{In fact, I seem to have make
+clean'd their results by mistake so am running them in parallel on b10 so we
+can verify and include or remove later today}
 
 
 \subsubsection{Running the experiment}
