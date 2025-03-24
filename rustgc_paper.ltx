@@ -1163,29 +1163,25 @@ rarely, but there are valid idioms of use where we found it necessary.
 \begin{center}
 \begin{tabular}{lllll}
 \toprule
-    Benchmark & Version & Description & \% Gc & \% Gc (transitive) \\
+    Benchmark & Version & Description & \# benchmarks \\
 \midrule
-    \binarytrees & Debian CLBG \binarytreesversion  & Heap allocation microbenchmark & - & - \\
-    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & \regexreduxheapgcpct & - \\
+    \binarytrees & Debian CLBG \binarytreesversion & Heap allocation microbenchmark & 1 \\
+    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & 1 \\
   \midrule
-    \alacritty & \alacrittyversion  & Terminal emulator & \alacrittyheapgcpct & \alacrittyheapgctpct \\
-    \fd & \fdversion  & Unix find replacement & \fdheapgcpct & \fdheapgctpct \\
-    \grmtools & \grmtoolsversion  & Lexer / parser library & \grmtoolsheapgcpct & \grmtoolsheapgctpct \\
-    \ripgrep & \ripgrepversion  & Fast grep replacement & - & \ripgreppctmanaged \\
+    \alacritty & \alacrittyversion  & Terminal emulator & 10 \\
+    \fd & \fdversion  & Unix find replacement & 7 \\
+    \grmtools & \grmtoolsversion  & Lexer / parser library & 4 \\
+    \ripgrep & \ripgrepversion  & Fast grep replacement & 13 \\
   \midrule
-    \somrsast & git \#\somrsversion  & SOM AST VM & \somrsastheapgcpct & \somrsastheapgctpct \\
-    \somrsbc & git \#\somrsversion  & SOM bytecode VM & \somrsbcheapgcpct & \somrsbcheapgctpct \\
-    \yksom & git \#\yksomversion  & SOM bytecode VM & - & - \\
+    \somrsast & git \#\somrsversion  & SOM AST VM & 26 \\
+    \somrsbc & git \#\somrsversion  & SOM bytecode VM & 26 \\
+    \yksom & git \#\yksomversion  & SOM bytecode VM & 26 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
   \vspace{5pt}
   \caption{
-  \laurie{what do the two `Gc' columns mean?}
-  \laurie{i think we need another column: `\# benchmarks' where for each suite
-  we say ``how many benchmarks are in this suite''. e.g.~that will make clear
-  that, say, `ripgrep' is a suite of 13 benchmarks}
   The benchmark suites that form our experiment: we take the Rust programs
   above, each of which is itself a suite of multiple benchmarks, and alter
   them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
@@ -1281,7 +1277,7 @@ allocators was a significant confounding factor. To avoid this, we use
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 For the non-SOM benchmarks reporting timings we measured wall-clock time of a process using
-the standard Unix \lstinline{time}. We ran SOM benchmarks using
+the standard Unix \lstinline{time} \jake{We also use time for the SOM benchmarks}. We ran SOM benchmarks using
 the conventional \emph{rebench} tool~\cite{rebench18marr}, which internally
 measures wall-clock time using \lstinline{time}.
 We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
