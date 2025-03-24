@@ -84,60 +84,398 @@
 \newcommand\alacrittyheapgcpct{0.81\%\xspace}
 \newcommand\alacrittyheapgctpct{1.31\%\xspace}
 
-% som gcvs perf summary stats
 
-% som-rs-ast gc perf summary stats
-\newcommand\gcvssomrsastgcworstpct{28.20\%\xspace}
-\newcommand\gcvssomrsastgcworstvalue{3732.00\xspace}
-\newcommand\gcvssomrsastgcworstbenchmark{Richards\xspace}
-\newcommand\gcvssomrsastgcbestpct{-6.25\%\xspace}
-\newcommand\gcvssomrsastgcbestvalue{320.00\xspace}
-\newcommand\gcvssomrsastgcbestbenchmark{NBody\xspace}
-\newcommand\gcvssomrsastgcworstsipct{28.20\%\xspace}
-\newcommand\gcvssomrsastgcworstsivalue{3732.00\xspace}
-\newcommand\gcvssomrsastgcworstsibenchmark{Richards\xspace}
-\newcommand\gcvssomrsastgcbestsipct{-6.25\%\xspace}
-\newcommand\gcvssomrsastgcbestsivalue{320.00\xspace}
-\newcommand\gcvssomrsastgcbestsibenchmark{NBody\xspace}
+% Config stats: gcvs:grmtools:gc:perf
+\newcommand\gcvsperfgrmtoolsgcworstvalue{3627.00\xspace}
+\newcommand\gcvsperfgrmtoolsgcworstbenchmark{Jenkins\xspace}
+\newcommand\gcvsperfgrmtoolsgcworstpct{-10.07\%\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestvalue{17030.00\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestbenchmark{Hadoop\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestpct{19.77\%\xspace}
+\newcommand\gcvsperfgrmtoolsgcworstsivalue{3627.00\xspace}
+\newcommand\gcvsperfgrmtoolsgcworstsibenchmark{Jenkins\xspace}
+\newcommand\gcvsperfgrmtoolsgcworstsipct{-10.07\%\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestsivalue{17030.00\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestsibenchmark{Hadoop\xspace}
+\newcommand\gcvsperfgrmtoolsgcbestsipct{19.77\%\xspace}
 
-% som-rs-ast rc perf summary stats
-\newcommand\gcvssomrsastrcworstpct{-6.25\%\xspace}
-\newcommand\gcvssomrsastrcworstvalue{300.00\xspace}
-\newcommand\gcvssomrsastrcworstbenchmark{NBody\xspace}
-\newcommand\gcvssomrsastrcbestpct{28.20\%\xspace}
-\newcommand\gcvssomrsastrcbestvalue{2911.00\xspace}
-\newcommand\gcvssomrsastrcbestbenchmark{Richards\xspace}
-\newcommand\gcvssomrsastrcworstsipct{-6.25\%\xspace}
-\newcommand\gcvssomrsastrcworstsivalue{300.00\xspace}
-\newcommand\gcvssomrsastrcworstsibenchmark{NBody\xspace}
-\newcommand\gcvssomrsastrcbestsipct{28.20\%\xspace}
-\newcommand\gcvssomrsastrcbestsivalue{2911.00\xspace}
-\newcommand\gcvssomrsastrcbestsibenchmark{Richards\xspace}
+% Config stats: gcvs:grmtools:rc:perf
+\newcommand\gcvsperfgrmtoolsrcworstvalue{20396.00\xspace}
+\newcommand\gcvsperfgrmtoolsrcworstbenchmark{Hadoop\xspace}
+\newcommand\gcvsperfgrmtoolsrcworstpct{19.77\%\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestvalue{4033.00\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestbenchmark{Jenkins\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestpct{-10.07\%\xspace}
+\newcommand\gcvsperfgrmtoolsrcworstsivalue{20396.00\xspace}
+\newcommand\gcvsperfgrmtoolsrcworstsibenchmark{Hadoop\xspace}
+\newcommand\gcvsperfgrmtoolsrcworstsipct{19.77\%\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestsivalue{4033.00\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestsibenchmark{Jenkins\xspace}
+\newcommand\gcvsperfgrmtoolsrcbestsipct{-10.07\%\xspace}
 
-% som-rs-bc gc perf summary stats
-\newcommand\gcvssomrsbcgcworstpct{19.88\%\xspace}
-\newcommand\gcvssomrsbcgcworstvalue{1248.00\xspace}
-\newcommand\gcvssomrsbcgcworstbenchmark{Richards\xspace}
-\newcommand\gcvssomrsbcgcbestpct{15.71\%\xspace}
-\newcommand\gcvssomrsbcgcbestvalue{210.00\xspace}
-\newcommand\gcvssomrsbcgcbestbenchmark{Storage\xspace}
-\newcommand\gcvssomrsbcgcworstsipct{19.88\%\xspace}
-\newcommand\gcvssomrsbcgcworstsivalue{1248.00\xspace}
-\newcommand\gcvssomrsbcgcworstsibenchmark{Richards\xspace}
-\newcommand\gcvssomrsbcgcbestsipct{15.71\%\xspace}
-\newcommand\gcvssomrsbcgcbestsivalue{210.00\xspace}
-\newcommand\gcvssomrsbcgcbestsibenchmark{Storage\xspace}
+% Config stats: gcvs:grmtool:gc:mem
+\newcommand\gcvsmemgrmtoolgcworstvalue{143.13MiB\xspace}
+\newcommand\gcvsmemgrmtoolgcworstbenchmark{Hadoop\xspace}
+\newcommand\gcvsmemgrmtoolgcworstpct{364.32\%\xspace}
+\newcommand\gcvsmemgrmtoolgcbestvalue{36.69MiB\xspace}
+\newcommand\gcvsmemgrmtoolgcbestbenchmark{Jenkins\xspace}
+\newcommand\gcvsmemgrmtoolgcbestpct{-68.17\%\xspace}
+\newcommand\gcvsmemgrmtoolgcworstsivalue{143.13MiB\xspace}
+\newcommand\gcvsmemgrmtoolgcworstsibenchmark{Hadoop\xspace}
+\newcommand\gcvsmemgrmtoolgcworstsipct{364.32\%\xspace}
+\newcommand\gcvsmemgrmtoolgcbestsivalue{36.69MiB\xspace}
+\newcommand\gcvsmemgrmtoolgcbestsibenchmark{Jenkins\xspace}
+\newcommand\gcvsmemgrmtoolgcbestsipct{-68.17\%\xspace}
 
-% som-rs-bc rc perf summary stats
-\newcommand\gcvssomrsbcrcworstpct{15.71\%\xspace}
-\newcommand\gcvssomrsbcrcworstvalue{243.00\xspace}
-\newcommand\gcvssomrsbcrcworstbenchmark{Storage\xspace}
-\newcommand\gcvssomrsbcrcbestpct{19.88\%\xspace}
-\newcommand\gcvssomrsbcrcbestvalue{1041.00\xspace}
-\newcommand\gcvssomrsbcrcbestbenchmark{Richards\xspace}
-\newcommand\gcvssomrsbcrcworstsipct{15.71\%\xspace}
-\newcommand\gcvssomrsbcrcworstsivalue{243.00\xspace}
-\newcommand\gcvssomrsbcrcworstsibenchmark{Storage\xspace}
-\newcommand\gcvssomrsbcrcbestsipct{19.88\%\xspace}
-\newcommand\gcvssomrsbcrcbestsivalue{1041.00\xspace}
-\newcommand\gcvssomrsbcrcbestsibenchmark{Richards\xspace}
+% Config stats: gcvs:grmtool:rc:mem
+\newcommand\gcvsmemgrmtoolrcworstvalue{11.68MiB\xspace}
+\newcommand\gcvsmemgrmtoolrcworstbenchmark{Jenkins\xspace}
+\newcommand\gcvsmemgrmtoolrcworstpct{-68.17\%\xspace}
+\newcommand\gcvsmemgrmtoolrcbestvalue{30.83MiB\xspace}
+\newcommand\gcvsmemgrmtoolrcbestbenchmark{Hadoop\xspace}
+\newcommand\gcvsmemgrmtoolrcbestpct{364.32\%\xspace}
+\newcommand\gcvsmemgrmtoolrcworstsivalue{11.68MiB\xspace}
+\newcommand\gcvsmemgrmtoolrcworstsibenchmark{Jenkins\xspace}
+\newcommand\gcvsmemgrmtoolrcworstsipct{-68.17\%\xspace}
+\newcommand\gcvsmemgrmtoolrcbestsivalue{30.83MiB\xspace}
+\newcommand\gcvsmemgrmtoolrcbestsibenchmark{Hadoop\xspace}
+\newcommand\gcvsmemgrmtoolrcbestsipct{364.32\%\xspace}
+
+% Config stats: gcvs:ripgrep:arc:perf
+\newcommand\gcvsperfripgreparcworstvalue{690.00\xspace}
+\newcommand\gcvsperfripgreparcworstbenchmark{Linux Literal Mmap\xspace}
+\newcommand\gcvsperfripgreparcworstpct{-9.80\%\xspace}
+\newcommand\gcvsperfripgreparcbestvalue{105.00\xspace}
+\newcommand\gcvsperfripgreparcbestbenchmark{Linux Re Literal Suffix\xspace}
+\newcommand\gcvsperfripgreparcbestpct{259.05\%\xspace}
+\newcommand\gcvsperfripgreparcworstsivalue{690.00\xspace}
+\newcommand\gcvsperfripgreparcworstsibenchmark{Linux Literal Mmap\xspace}
+\newcommand\gcvsperfripgreparcworstsipct{-9.80\%\xspace}
+\newcommand\gcvsperfripgreparcbestsivalue{105.00\xspace}
+\newcommand\gcvsperfripgreparcbestsibenchmark{Linux Re Literal Suffix\xspace}
+\newcommand\gcvsperfripgreparcbestsipct{259.05\%\xspace}
+
+% Config stats: gcvs:ripgrep:gc:perf
+\newcommand\gcvsperfripgrepgcworstvalue{377.00\xspace}
+\newcommand\gcvsperfripgrepgcworstbenchmark{Linux Re Literal Suffix\xspace}
+\newcommand\gcvsperfripgrepgcworstpct{259.05\%\xspace}
+\newcommand\gcvsperfripgrepgcbestvalue{765.00\xspace}
+\newcommand\gcvsperfripgrepgcbestbenchmark{Linux Literal Mmap\xspace}
+\newcommand\gcvsperfripgrepgcbestpct{-9.80\%\xspace}
+\newcommand\gcvsperfripgrepgcworstsivalue{377.00\xspace}
+\newcommand\gcvsperfripgrepgcworstsibenchmark{Linux Re Literal Suffix\xspace}
+\newcommand\gcvsperfripgrepgcworstsipct{259.05\%\xspace}
+\newcommand\gcvsperfripgrepgcbestsivalue{765.00\xspace}
+\newcommand\gcvsperfripgrepgcbestsibenchmark{Linux Literal Mmap\xspace}
+\newcommand\gcvsperfripgrepgcbestsipct{-9.80\%\xspace}
+
+% Config stats: gcvs:ripgrep:arc:mem
+\newcommand\gcvsmemripgreparcworstvalue{3.77MiB\xspace}
+\newcommand\gcvsmemripgreparcworstbenchmark{Linux Literal\xspace}
+\newcommand\gcvsmemripgreparcworstpct{-53.63\%\xspace}
+\newcommand\gcvsmemripgreparcbestvalue{4.42MiB\xspace}
+\newcommand\gcvsmemripgreparcbestbenchmark{Linux Unicode Word 1\xspace}
+\newcommand\gcvsmemripgreparcbestpct{103.43\%\xspace}
+\newcommand\gcvsmemripgreparcworstsivalue{3.77MiB\xspace}
+\newcommand\gcvsmemripgreparcworstsibenchmark{Linux Literal\xspace}
+\newcommand\gcvsmemripgreparcworstsipct{-53.63\%\xspace}
+\newcommand\gcvsmemripgreparcbestsivalue{4.42MiB\xspace}
+\newcommand\gcvsmemripgreparcbestsibenchmark{Linux Unicode Word 1\xspace}
+\newcommand\gcvsmemripgreparcbestsipct{103.43\%\xspace}
+
+% Config stats: gcvs:ripgrep:gc:mem
+\newcommand\gcvsmemripgrepgcworstvalue{8.99MiB\xspace}
+\newcommand\gcvsmemripgrepgcworstbenchmark{Linux Unicode Word 1\xspace}
+\newcommand\gcvsmemripgrepgcworstpct{103.43\%\xspace}
+\newcommand\gcvsmemripgrepgcbestvalue{8.12MiB\xspace}
+\newcommand\gcvsmemripgrepgcbestbenchmark{Linux Literal\xspace}
+\newcommand\gcvsmemripgrepgcbestpct{-53.63\%\xspace}
+\newcommand\gcvsmemripgrepgcworstsivalue{8.99MiB\xspace}
+\newcommand\gcvsmemripgrepgcworstsibenchmark{Linux Unicode Word 1\xspace}
+\newcommand\gcvsmemripgrepgcworstsipct{103.43\%\xspace}
+\newcommand\gcvsmemripgrepgcbestsivalue{8.12MiB\xspace}
+\newcommand\gcvsmemripgrepgcbestsibenchmark{Linux Literal\xspace}
+\newcommand\gcvsmemripgrepgcbestsipct{-53.63\%\xspace}
+
+% Config stats: gcvs:fd:arc:perf
+\newcommand\gcvsperffdarcworstvalue{1206.00\xspace}
+\newcommand\gcvsperffdarcworstbenchmark{Simple Pattern\xspace}
+\newcommand\gcvsperffdarcworstpct{-1.15\%\xspace}
+\newcommand\gcvsperffdarcbestvalue{1315.00\xspace}
+\newcommand\gcvsperffdarcbestbenchmark{File Extension\xspace}
+\newcommand\gcvsperffdarcbestpct{2.74\%\xspace}
+\newcommand\gcvsperffdarcworstsivalue{1206.00\xspace}
+\newcommand\gcvsperffdarcworstsibenchmark{Simple Pattern\xspace}
+\newcommand\gcvsperffdarcworstsipct{-1.15\%\xspace}
+\newcommand\gcvsperffdarcbestsivalue{1315.00\xspace}
+\newcommand\gcvsperffdarcbestsibenchmark{File Extension\xspace}
+\newcommand\gcvsperffdarcbestsipct{2.74\%\xspace}
+
+% Config stats: gcvs:fd:gc:perf
+\newcommand\gcvsperffdgcworstvalue{1351.00\xspace}
+\newcommand\gcvsperffdgcworstbenchmark{File Extension\xspace}
+\newcommand\gcvsperffdgcworstpct{2.74\%\xspace}
+\newcommand\gcvsperffdgcbestvalue{1220.00\xspace}
+\newcommand\gcvsperffdgcbestbenchmark{Simple Pattern\xspace}
+\newcommand\gcvsperffdgcbestpct{-1.15\%\xspace}
+\newcommand\gcvsperffdgcworstsivalue{1351.00\xspace}
+\newcommand\gcvsperffdgcworstsibenchmark{File Extension\xspace}
+\newcommand\gcvsperffdgcworstsipct{2.74\%\xspace}
+\newcommand\gcvsperffdgcbestsivalue{1220.00\xspace}
+\newcommand\gcvsperffdgcbestsibenchmark{Simple Pattern\xspace}
+\newcommand\gcvsperffdgcbestsipct{-1.15\%\xspace}
+
+% Config stats: gcvs:fd:arc:mem
+\newcommand\gcvsmemfdarcworstvalue{5.44MiB\xspace}
+\newcommand\gcvsmemfdarcworstbenchmark{Simple Pattern\xspace}
+\newcommand\gcvsmemfdarcworstpct{5.27\%\xspace}
+\newcommand\gcvsmemfdarcbestvalue{5.19MiB\xspace}
+\newcommand\gcvsmemfdarcbestbenchmark{Command Execution\xspace}
+\newcommand\gcvsmemfdarcbestpct{2.16\%\xspace}
+\newcommand\gcvsmemfdarcworstsivalue{5.44MiB\xspace}
+\newcommand\gcvsmemfdarcworstsibenchmark{Simple Pattern\xspace}
+\newcommand\gcvsmemfdarcworstsipct{5.27\%\xspace}
+\newcommand\gcvsmemfdarcbestsivalue{5.19MiB\xspace}
+\newcommand\gcvsmemfdarcbestsibenchmark{Command Execution\xspace}
+\newcommand\gcvsmemfdarcbestsipct{2.16\%\xspace}
+
+% Config stats: gcvs:fd:gc:mem
+\newcommand\gcvsmemfdgcworstvalue{5.31MiB\xspace}
+\newcommand\gcvsmemfdgcworstbenchmark{Command Execution\xspace}
+\newcommand\gcvsmemfdgcworstpct{2.16\%\xspace}
+\newcommand\gcvsmemfdgcbestvalue{5.17MiB\xspace}
+\newcommand\gcvsmemfdgcbestbenchmark{Simple Pattern\xspace}
+\newcommand\gcvsmemfdgcbestpct{5.27\%\xspace}
+\newcommand\gcvsmemfdgcworstsivalue{5.31MiB\xspace}
+\newcommand\gcvsmemfdgcworstsibenchmark{Command Execution\xspace}
+\newcommand\gcvsmemfdgcworstsipct{2.16\%\xspace}
+\newcommand\gcvsmemfdgcbestsivalue{5.17MiB\xspace}
+\newcommand\gcvsmemfdgcbestsibenchmark{Simple Pattern\xspace}
+\newcommand\gcvsmemfdgcbestsipct{5.27\%\xspace}
+
+% Config stats: gcvs:som-rs-ast:gc:perf
+\newcommand\gcvsperfsomrsastgcworstvalue{3732.00\xspace}
+\newcommand\gcvsperfsomrsastgcworstbenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsastgcworstpct{28.20\%\xspace}
+\newcommand\gcvsperfsomrsastgcbestvalue{320.00\xspace}
+\newcommand\gcvsperfsomrsastgcbestbenchmark{Nbody\xspace}
+\newcommand\gcvsperfsomrsastgcbestpct{-6.25\%\xspace}
+\newcommand\gcvsperfsomrsastgcworstsivalue{3732.00\xspace}
+\newcommand\gcvsperfsomrsastgcworstsibenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsastgcworstsipct{28.20\%\xspace}
+\newcommand\gcvsperfsomrsastgcbestsivalue{320.00\xspace}
+\newcommand\gcvsperfsomrsastgcbestsibenchmark{Nbody\xspace}
+\newcommand\gcvsperfsomrsastgcbestsipct{-6.25\%\xspace}
+
+% Config stats: gcvs:som-rs-ast:rc:perf
+\newcommand\gcvsperfsomrsastrcworstvalue{300.00\xspace}
+\newcommand\gcvsperfsomrsastrcworstbenchmark{Nbody\xspace}
+\newcommand\gcvsperfsomrsastrcworstpct{-6.25\%\xspace}
+\newcommand\gcvsperfsomrsastrcbestvalue{2911.00\xspace}
+\newcommand\gcvsperfsomrsastrcbestbenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsastrcbestpct{28.20\%\xspace}
+\newcommand\gcvsperfsomrsastrcworstsivalue{300.00\xspace}
+\newcommand\gcvsperfsomrsastrcworstsibenchmark{Nbody\xspace}
+\newcommand\gcvsperfsomrsastrcworstsipct{-6.25\%\xspace}
+\newcommand\gcvsperfsomrsastrcbestsivalue{2911.00\xspace}
+\newcommand\gcvsperfsomrsastrcbestsibenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsastrcbestsipct{28.20\%\xspace}
+
+% Config stats: gcvs:som-rs-bc:gc:perf
+\newcommand\gcvsperfsomrsbcgcworstvalue{1248.00\xspace}
+\newcommand\gcvsperfsomrsbcgcworstbenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsbcgcworstpct{19.88\%\xspace}
+\newcommand\gcvsperfsomrsbcgcbestvalue{210.00\xspace}
+\newcommand\gcvsperfsomrsbcgcbestbenchmark{Storage\xspace}
+\newcommand\gcvsperfsomrsbcgcbestpct{15.71\%\xspace}
+\newcommand\gcvsperfsomrsbcgcworstsivalue{1248.00\xspace}
+\newcommand\gcvsperfsomrsbcgcworstsibenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsbcgcworstsipct{19.88\%\xspace}
+\newcommand\gcvsperfsomrsbcgcbestsivalue{210.00\xspace}
+\newcommand\gcvsperfsomrsbcgcbestsibenchmark{Storage\xspace}
+\newcommand\gcvsperfsomrsbcgcbestsipct{15.71\%\xspace}
+
+% Config stats: gcvs:som-rs-bc:rc:perf
+\newcommand\gcvsperfsomrsbcrcworstvalue{243.00\xspace}
+\newcommand\gcvsperfsomrsbcrcworstbenchmark{Storage\xspace}
+\newcommand\gcvsperfsomrsbcrcworstpct{15.71\%\xspace}
+\newcommand\gcvsperfsomrsbcrcbestvalue{1041.00\xspace}
+\newcommand\gcvsperfsomrsbcrcbestbenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsbcrcbestpct{19.88\%\xspace}
+\newcommand\gcvsperfsomrsbcrcworstsivalue{243.00\xspace}
+\newcommand\gcvsperfsomrsbcrcworstsibenchmark{Storage\xspace}
+\newcommand\gcvsperfsomrsbcrcworstsipct{15.71\%\xspace}
+\newcommand\gcvsperfsomrsbcrcbestsivalue{1041.00\xspace}
+\newcommand\gcvsperfsomrsbcrcbestsibenchmark{Richards\xspace}
+\newcommand\gcvsperfsomrsbcrcbestsipct{19.88\%\xspace}
+
+% Config stats: gcvs:som-rs-ast:gc:mem
+\newcommand\gcvsmemsomrsastgcworstvalue{19.23MiB\xspace}
+\newcommand\gcvsmemsomrsastgcworstbenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsastgcworstpct{628.03\%\xspace}
+\newcommand\gcvsmemsomrsastgcbestvalue{563.15KiB\xspace}
+\newcommand\gcvsmemsomrsastgcbestbenchmark{Fieldloop\xspace}
+\newcommand\gcvsmemsomrsastgcbestpct{-34.41\%\xspace}
+\newcommand\gcvsmemsomrsastgcworstsivalue{19.23MiB\xspace}
+\newcommand\gcvsmemsomrsastgcworstsibenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsastgcworstsipct{628.03\%\xspace}
+\newcommand\gcvsmemsomrsastgcbestsivalue{563.15KiB\xspace}
+\newcommand\gcvsmemsomrsastgcbestsibenchmark{Fieldloop\xspace}
+\newcommand\gcvsmemsomrsastgcbestsipct{-34.41\%\xspace}
+
+% Config stats: gcvs:som-rs-ast:rc:mem
+\newcommand\gcvsmemsomrsastrcworstvalue{369.37KiB\xspace}
+\newcommand\gcvsmemsomrsastrcworstbenchmark{Fieldloop\xspace}
+\newcommand\gcvsmemsomrsastrcworstpct{-34.41\%\xspace}
+\newcommand\gcvsmemsomrsastrcbestvalue{2.64MiB\xspace}
+\newcommand\gcvsmemsomrsastrcbestbenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsastrcbestpct{628.03\%\xspace}
+\newcommand\gcvsmemsomrsastrcworstsivalue{369.37KiB\xspace}
+\newcommand\gcvsmemsomrsastrcworstsibenchmark{Fieldloop\xspace}
+\newcommand\gcvsmemsomrsastrcworstsipct{-34.41\%\xspace}
+\newcommand\gcvsmemsomrsastrcbestsivalue{2.64MiB\xspace}
+\newcommand\gcvsmemsomrsastrcbestsibenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsastrcbestsipct{628.03\%\xspace}
+
+% Config stats: gcvs:som-rs-bc:gc:mem
+\newcommand\gcvsmemsomrsbcgcworstvalue{4.50MiB\xspace}
+\newcommand\gcvsmemsomrsbcgcworstbenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsbcgcworstpct{112.89\%\xspace}
+\newcommand\gcvsmemsomrsbcgcbestvalue{1.75MiB\xspace}
+\newcommand\gcvsmemsomrsbcgcbestbenchmark{Jsonsmall\xspace}
+\newcommand\gcvsmemsomrsbcgcbestpct{26.43\%\xspace}
+\newcommand\gcvsmemsomrsbcgcworstsivalue{4.50MiB\xspace}
+\newcommand\gcvsmemsomrsbcgcworstsibenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsbcgcworstsipct{112.89\%\xspace}
+\newcommand\gcvsmemsomrsbcgcbestsivalue{1.75MiB\xspace}
+\newcommand\gcvsmemsomrsbcgcbestsibenchmark{Jsonsmall\xspace}
+\newcommand\gcvsmemsomrsbcgcbestsipct{26.43\%\xspace}
+
+% Config stats: gcvs:som-rs-bc:rc:mem
+\newcommand\gcvsmemsomrsbcrcworstvalue{2.22MiB\xspace}
+\newcommand\gcvsmemsomrsbcrcworstbenchmark{Jsonsmall\xspace}
+\newcommand\gcvsmemsomrsbcrcworstpct{26.43\%\xspace}
+\newcommand\gcvsmemsomrsbcrcbestvalue{2.11MiB\xspace}
+\newcommand\gcvsmemsomrsbcrcbestbenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsbcrcbestpct{112.89\%\xspace}
+\newcommand\gcvsmemsomrsbcrcworstsivalue{2.22MiB\xspace}
+\newcommand\gcvsmemsomrsbcrcworstsibenchmark{Jsonsmall\xspace}
+\newcommand\gcvsmemsomrsbcrcworstsipct{26.43\%\xspace}
+\newcommand\gcvsmemsomrsbcrcbestsivalue{2.11MiB\xspace}
+\newcommand\gcvsmemsomrsbcrcbestsibenchmark{Graphsearch\xspace}
+\newcommand\gcvsmemsomrsbcrcbestsipct{112.89\%\xspace}
+
+% Summary stats: gcvs:gcvs-arc:perf
+\newcommand\gcvsperfarcworstsuite{\binarytrees\xspace}
+\newcommand\gcvsperfarcworstvalue{132.00\xspace}
+\newcommand\gcvsperfarcworstpct{500.00\%\xspace}
+\newcommand\gcvsperfarcbestsuite{\ripgrep\xspace}
+\newcommand\gcvsperfarcbestvalue{164.87\xspace}
+\newcommand\gcvsperfarcbestpct{155.08\%\xspace}
+\newcommand\gcvsperfarcworstsisuite{\binarytrees\xspace}
+\newcommand\gcvsperfarcworstsivalue{132.00\xspace}
+\newcommand\gcvsperfarcworstsipct{500.00\%\xspace}
+\newcommand\gcvsperfarcbestsisuite{\ripgrep\xspace}
+\newcommand\gcvsperfarcbestsivalue{164.87\xspace}
+\newcommand\gcvsperfarcbestsipct{155.08\%\xspace}
+
+% Summary stats: gcvs:gcvs-gc:perf
+\newcommand\gcvsperfgcworstsuite{\ripgrep\xspace}
+\newcommand\gcvsperfgcworstvalue{420.55\xspace}
+\newcommand\gcvsperfgcworstpct{155.08\%\xspace}
+\newcommand\gcvsperfgcbestsuite{\binarytrees\xspace}
+\newcommand\gcvsperfgcbestvalue{69.00\xspace}
+\newcommand\gcvsperfgcbestpct{91.30\%\xspace}
+\newcommand\gcvsperfgcworstsisuite{\ripgrep\xspace}
+\newcommand\gcvsperfgcworstsivalue{420.55\xspace}
+\newcommand\gcvsperfgcworstsipct{155.08\%\xspace}
+\newcommand\gcvsperfgcbestsisuite{\grmtools\xspace}
+\newcommand\gcvsperfgcbestsivalue{5956.66\xspace}
+\newcommand\gcvsperfgcbestsipct{15.18\%\xspace}
+
+% Summary stats: gcvs:gcvs-rust-gc:perf
+\newcommand\gcvsperfrustworstsuite{\binarytrees\xspace}
+\newcommand\gcvsperfrustworstvalue{258.00\xspace}
+\newcommand\gcvsperfrustworstpct{95.45\%\xspace}
+\newcommand\gcvsperfrustbestsuite{\binarytrees\xspace}
+\newcommand\gcvsperfrustbestvalue{258.00\xspace}
+\newcommand\gcvsperfrustbestpct{-48.84\%\xspace}
+\newcommand\gcvsperfrustworstsisuite{\binarytrees\xspace}
+\newcommand\gcvsperfrustworstsivalue{258.00\xspace}
+\newcommand\gcvsperfrustworstsipct{95.45\%\xspace}
+\newcommand\gcvsperfrustbestsisuite{\binarytrees\xspace}
+\newcommand\gcvsperfrustbestsivalue{258.00\xspace}
+\newcommand\gcvsperfrustbestsipct{-48.84\%\xspace}
+
+% Summary stats: gcvs:gcvs-typed-arena:perf
+\newcommand\gcvsperftypedworstsuite{\binarytrees\xspace}
+\newcommand\gcvsperftypedworstvalue{22.00\xspace}
+\newcommand\gcvsperftypedworstpct{-83.33\%\xspace}
+\newcommand\gcvsperftypedbestsuite{\binarytrees\xspace}
+\newcommand\gcvsperftypedbestvalue{22.00\xspace}
+\newcommand\gcvsperftypedbestpct{500.00\%\xspace}
+\newcommand\gcvsperftypedworstsisuite{\binarytrees\xspace}
+\newcommand\gcvsperftypedworstsivalue{22.00\xspace}
+\newcommand\gcvsperftypedworstsipct{-83.33\%\xspace}
+\newcommand\gcvsperftypedbestsisuite{\binarytrees\xspace}
+\newcommand\gcvsperftypedbestsivalue{22.00\xspace}
+\newcommand\gcvsperftypedbestsipct{500.00\%\xspace}
+
+% Summary stats: gcvs:gcvs-rc:perf
+\newcommand\gcvsperfrcworstsisuite{\grmtools\xspace}
+\newcommand\gcvsperfrcworstsivalue{6860.98\xspace}
+\newcommand\gcvsperfrcworstsipct{15.18\%\xspace}
+\newcommand\gcvsperfrcbestsisuite{\somrsast\xspace}
+\newcommand\gcvsperfrcbestsivalue{662.64\xspace}
+\newcommand\gcvsperfrcbestsipct{20.16\%\xspace}
+
+% Summary stats: gcvs:gcvs-arc:mem
+\newcommand\gcvsmemarcworstsuite{\binarytrees\xspace}
+\newcommand\gcvsmemarcworstvalue{1.22MiB\xspace}
+\newcommand\gcvsmemarcworstpct{71.80\%\xspace}
+\newcommand\gcvsmemarcbestsuite{\ripgrep\xspace}
+\newcommand\gcvsmemarcbestvalue{3.80MiB\xspace}
+\newcommand\gcvsmemarcbestpct{117.75\%\xspace}
+\newcommand\gcvsmemarcworstsisuite{\binarytrees\xspace}
+\newcommand\gcvsmemarcworstsivalue{1.22MiB\xspace}
+\newcommand\gcvsmemarcworstsipct{71.80\%\xspace}
+\newcommand\gcvsmemarcbestsisuite{\ripgrep\xspace}
+\newcommand\gcvsmemarcbestsivalue{3.80MiB\xspace}
+\newcommand\gcvsmemarcbestsipct{117.75\%\xspace}
+
+% Summary stats: gcvs:gcvs-gc:mem
+\newcommand\gcvsmemgcworstsuite{\ripgrep\xspace}
+\newcommand\gcvsmemgcworstvalue{8.29MiB\xspace}
+\newcommand\gcvsmemgcworstpct{117.75\%\xspace}
+\newcommand\gcvsmemgcbestsuite{\binarytrees\xspace}
+\newcommand\gcvsmemgcbestvalue{1.06MiB\xspace}
+\newcommand\gcvsmemgcbestpct{15.63\%\xspace}
+\newcommand\gcvsmemgcworstsisuite{\grmtools\xspace}
+\newcommand\gcvsmemgcworstsivalue{75.83MiB\xspace}
+\newcommand\gcvsmemgcworstsipct{342.27\%\xspace}
+\newcommand\gcvsmemgcbestsisuite{\regexredux\xspace}
+\newcommand\gcvsmemgcbestsivalue{72.97MiB\xspace}
+\newcommand\gcvsmemgcbestsipct{0.31\%\xspace}
+
+% Summary stats: gcvs:gcvs-rust-gc:mem
+\newcommand\gcvsmemrustworstsuite{\binarytrees\xspace}
+\newcommand\gcvsmemrustworstvalue{3.30MiB\xspace}
+\newcommand\gcvsmemrustworstpct{169.16\%\xspace}
+\newcommand\gcvsmemrustbestsuite{\binarytrees\xspace}
+\newcommand\gcvsmemrustbestvalue{3.30MiB\xspace}
+\newcommand\gcvsmemrustbestpct{-62.85\%\xspace}
+\newcommand\gcvsmemrustworstsisuite{\binarytrees\xspace}
+\newcommand\gcvsmemrustworstsivalue{3.30MiB\xspace}
+\newcommand\gcvsmemrustworstsipct{169.16\%\xspace}
+\newcommand\gcvsmemrustbestsisuite{\binarytrees\xspace}
+\newcommand\gcvsmemrustbestsivalue{3.30MiB\xspace}
+\newcommand\gcvsmemrustbestsipct{-62.85\%\xspace}
+
+
+% Summary stats: gcvs:gcvs-rc:mem
+\newcommand\gcvsmemrcworstsisuite{\somrsbc\xspace}
+\newcommand\gcvsmemrcworstsivalue{422.13KiB\xspace}
+\newcommand\gcvsmemrcworstsipct{-39.44\%\xspace}
+\newcommand\gcvsmemrcbestsisuite{\grmtools\xspace}
+\newcommand\gcvsmemrcbestsivalue{17.14MiB\xspace}
+\newcommand\gcvsmemrcbestsipct{342.27\%\xspace}
