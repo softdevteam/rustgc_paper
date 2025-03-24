@@ -1349,21 +1349,6 @@ and 2$\times$ faster than \lstinline{Rc<T>} on \binarytrees. Unlike the general 
 
 \begin{table}[t]
 \scalebox{0.7}{%
-  \input{plots/gcvs/mem_summary}
-}
-  \vspace{5pt}
-  \caption{Memory results for the \Egcrc experiment, comparing benchmarks
-    running on \ourgc against other shared ownership approaches. With the
-    exception of \binarytrees, which we ported to several approaches, most
-    compare \ourgc with one other shared ownership approach. All benchmarks
-    were run 30 times with average heap usage reported. We record heap usage
-    using KDE heaptrack, which track individual allocations throughout the
-    lifetime of a program. We report 99\% confidence intervals.}
-  \label{table:Ercgc:mem}
-\end{table}
-
-\begin{table}[t]
-\scalebox{0.7}{%
   \input{plots/premopt/perf_summary}
 }
   \vspace{5pt}
@@ -1637,6 +1622,21 @@ interested readers may find that they help flesh out some details.
 \end{algorithmic}
   \label{alg:barrier_removal}
 \end{algorithm}
+
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/gcvs/mem_summary}
+}
+  \vspace{5pt}
+  \caption{Memory results for the \Egcrc experiment, comparing benchmarks
+    running on \ourgc against other shared ownership approaches. With the
+    exception of \binarytrees, which we ported to several approaches, most
+    compare \ourgc with one other shared ownership approach. All benchmarks
+    were run 30 times with average heap usage reported. We record heap usage
+    using KDE heaptrack, which track individual allocations throughout the
+    lifetime of a program. We report 99\% confidence intervals.}
+  \label{table:Ercgc:mem}
+\end{table}
 
 \clearpage
 
