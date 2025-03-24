@@ -1308,6 +1308,37 @@ Our experiment is fully repeatable and downloadable from
   \label{table:Ercgc:perf}
 \end{table}
 
+\jake{Below is a brain dump of my findings and analysis from the results of the
+various benchmarks}
+
+
+\ourgc is about 1.1 to 2.5$\times$ slower than \arc on \ripgrep. I believe the
+primary reason for this comes down to conversion. Though we have converted all
+immediate Arcs inside of ripgrep itself. It uses crates which use Arc
+themselves. (Specifically regex, and parts which we are unable to convert due
+to difficulty with the API). The problem though is that these objects are
+heavily intertwined. There are now many cases where Gcs own Arcs (in e.g. the
+regex crate). This leads to a big performance penalty because every object in
+that chain will need to have their finalizers run, and finalizers are not
+cheap.
+
+What's more, Arc specifically amplifies this penalty. This is because when
+using a finalizer to decref a count on shared data, we delay the reclamation of
+more than just an immediate boxed heap object that the Gc could be pointing to.
+In other words, until that finalizer runs, we can end up with a reference
+keeping alive another chain of shared data. I believe this is what is shown in
+the memory profile graphs (where they keep growing for Gc) and also the fact
+that we were only able to elide 50\% of finalizers for \ripgrep.
+
+For \fd, \ourgc ranges between \gcvsperffdgcworstpct slower and \gcvsperffdgcbestpct faster\jake{todo: fix the negative pct}. Ultimately though, the confidence intervals overlap when we look at the geometric mean for this entire benchmark suite so it's difficult to draw many conclusions from this. We should also be careful to note that out of \fdheapall heap allocations, only \fdheapgcs were Gc objects, which at first implies that the Arcs that we converted (though we did convert all of them) were not on a performance critical path. However, if we take into consideration the transitively reachable allocations from those Gcs, that number jumps to \fdheapgcts.
+
+\binarytrees uses a batch approach to allocation that is perfectly suited to
+\typedarena: it waits until the end of the benchmark to deallocate all memory
+in one go. Interestingly, despite being
+4$\times$ slower than \typedarena, \ourgc is 4.5$\times$ faster than \rustgc
+and 2$\times$ faster than \lstinline{Rc<T>} on \binarytrees. Unlike the general pattern we see with other benchmarks, \ourgc consistently uses less memory than \rc throughout the benchmark with \rc experiencing a large spike in the last phase of the benchmark. I think this is a memory leak with \rc, because of the cyclic way in which tree nodes are allocated (note though that \rc does return to 0 at the end, so i think it's being kept alive throughout the various phases and then a large destruction chain happens at the end).
+
+
 \begin{table}[t]
 \scalebox{0.7}{%
   \input{plots/gcvs/mem_summary}
