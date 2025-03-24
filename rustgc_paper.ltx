@@ -943,7 +943,7 @@ be interleaved with mutator code on the same thread. Since most threads are alwa
 running some mutator code, the most general way to solve this problem
 is to run finalizers on a separate thread(s) that never
 runs mutator code. While such a thread(s) could perform other non-mutator work,
-for our purposes we can imagine a single \emph{finalizer thread} dedicated
+for our purposes there is a single \emph{finalizer thread} dedicated
 solely to running finalizers.
 
 We must therefore ensure that it is safe to run a type's destructor on the
@@ -984,6 +984,11 @@ would be unsafe in other languages and implementations (for example our
 assumption would be unsafe in Java due to synchronisation removal~\cite{wang06escape}). We
 leave it as an open question to others as to whether Rust should deliberately permit or forbid
 such checks in its semantics.
+
+The implementation of the finalization thread is fairly simple. For example, we
+do not need to explicitly synchronise memory between the mutator and
+finalization threads because \boehm's stop-the-world collection phase
+synchronises all memory between threads already.
 
 \laurie{in our benchmark suite, how often does this relaxation make a difference?}\jake{I will post a write-up here once I have the numbers from all the benchmarks}
 
