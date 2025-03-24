@@ -1165,13 +1165,7 @@ rarely, but there are valid idioms of use where we found it necessary.
 \end{table}
 
 To understand the performance of \ourgc, and the various aspects that make it
-up, we carried out several performance experiments. In this section we explain
-our methodology and our experimental results.
-
-
-\subsection{Methodology}
-
-In order to understand the performance of \ourgc we carried out three experiments:
+up, we carried out three experiments:
 
 \vspace{6pt}
 \begin{tabular}{ll}
@@ -1181,8 +1175,12 @@ In order to understand the performance of \ourgc we carried out three experiment
 \end{tabular}
 \vspace{10pt}
 
+\noindent In this section we explain our methodology and our experimental results.
 
-\subsection{The benchmark suite}
+
+\subsection{Methodology}
+
+\subsubsection{The benchmark suite}
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
@@ -1274,11 +1272,9 @@ allocators was a significant confounding factor. To avoid this, we use
 \boehm as the allocator for both \ourgc and \rustc.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
-For the non-SOM benchmarks reporting timings we measured wall-clock time of a process using
-the standard Unix \lstinline{time} \jake{We also use time for the SOM benchmarks}. We ran SOM benchmarks using
-the conventional \emph{rebench} tool~\cite{rebench18marr}, which internally
-measures wall-clock time using \lstinline{time}.
-We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
+We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
+utility. The SOM benchmarks are run using its conventional \emph{rebench} tool
+(which itself uses \lstinline{time} internally). We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
