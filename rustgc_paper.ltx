@@ -52,13 +52,13 @@ are Garbage Collected (GCed) or not: GCed languages enable implicit memory manag
 non-GCed languages require explicit memory management (e.g~\lstinline{C}'s \lstinline{malloc} /
 \lstinline{free} functions). Rust's use of affine types~\citep[p.~5]{pierce04advanced}
 and ownership does not
-fit within this classification: it is not GCed but it has implicit memory management.
+fit within this classification: it is not GCed but it has implicit memory management. \jake{I don't think i like the term implicit memory management. I get what you mean but it sounds like it can be easily confused with automatic memory management (i.e. GC). The distinction i think we care about is that unlike GC it's static, while also being ``implicit''. So it's kind of like an implicit scope-based memory management, a term familiar with the C++ world}
 Most portions of most Rust programs are as
 succinct as a GCed equivalent, but ownership is too inflexible to express
 \emph{shared ownership} for data-structures that require multiple owners
 (e.g.~doubly linked lists).
 Workarounds such as reference counting impose an extra burden on the programmer,
-make mistakes more likely, and often come with a performance penalty.
+\jake{`which'.. ?} make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
 (e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
@@ -79,7 +79,7 @@ for GC for Rust: how to give \lstinline{Gc<T>} an idiomatic and complete
 API; and how to make \emph{finalizers} (i.e.~the code that is run just before a
 value is collected by the GC) safe, performant, and ergonomic. We show that
 \emph{conservative} GC (i.e.~treating each reachable machine word as
-a potential pointer) is necessary and sufficient to solve the API challenge,
+a potential pointer) is necessary and sufficient \jake{confusing phrasing imo. necessary and sufficient feel mutually exclusive (even though they're not) and caused me to double take here. What about something like ``is sufficient, and indeed necessary..''}
 but the finalization challenge is more involved.
 
 Normal Rust code uses \emph{destructors} (i.e.~code which is run just before a
@@ -307,7 +307,7 @@ be preferable for Rust to have different types for `data width' and
 `address'. Modern C, for example, captures this difference with the \lstinline{size_t} and
 \lstinline{uintptr_t} types respectively. Rust now has a provenance lint to
 nudge users in this general direction, but the \lstinline{as}
-keyword still allows arbitrary conversions.}.
+keyword still allows arbitrary conversions.}.\jake{I agree with both of these statements that a) we need a \lstinline{to_raw/from_raw} api; and b) casting usize back and forth has a profound impact. But (b) does not follow (a). (b) stands on its own because you can encounter this problem without the to/fromraw fns. (e.g. you can get a \lstinline{&T} from \lstinline{Gc<T>}, cast \lstinline{&T} to\lstinline{*const T} and then to \lstinline{usize})}
 
 \label{conservative_gc}
 Having acknowledged that pointers can be `disguised' as integers, it is then
