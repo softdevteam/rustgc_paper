@@ -1211,16 +1211,17 @@ language in the Smalltalk mould, which has a wide variety of implementations. \s
 bytecode) are existing ports of a Java
 SOM VM into Rust; both use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
 for this paper that is designed to be more idiomatic Rust code. Each SOM VM is
-approximately 5KLoC. The SOM VMs all run the same `Are We Fast Yet?'
-benchmark suite~\cite{marr16cross}\jake{I don't actually think we use the AWFY suite. We run all the benchmarks in the SOM core library which have some that AWFY doesn't have and AWFY has some that we don't have (e.g. havlak). We do this because we use wanted to use the same version of the core library for all three VMs and this was the most recent git checkout that was supported for all 3 VMs. So we use \lstinline{https://github.com/smarr/SOM/tree/master/Examples/Benchmarks} at commit \#afd5a6}
+approximately 5KLoC. The SOM VMs run benchmarks run the same benchmark suite:
+we took the set of benchmarks from SOM git commit \#AFD5A6 that runs successfully
+on all three SOM VMs.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
-programs in our benchmark suite to all allocation strategies. As shown in Table~\laurie{3 i think?}\jake{No it's table 2},
+programs in our benchmark suite to all allocation strategies. As shown in \cref{table:Ercgc:perf},
 we variously compare performance against: \lstinline{Rc<T>} and
 \lstinline{Arc<T>} (the latter being the thread-safe version of the former);
 \rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
 (a non-GC memory arena~\laurie{is this
-\url{https://github.com/thomcc/rust-typed-arena}?}\jake{yes it is}).
+\url{https://github.com/thomcc/rust-typed-arena}?}\jake{yes it is}\laurie{let's add it to softdevbib}).
 
 
 \subsubsection{What we couldn't include in the benchmark suite}
@@ -1235,9 +1236,8 @@ to be uninteresting from a GC benchmarking perspective. Irrespective of the
 number of source locations that reference memory allocation types, the
 benchmarks we could run from them allocated sufficiently little memory that
 there are no worthwhile differences between different allocation strategies.
-Put another way: including these programs / benchmarks in our benchmark suite would
-risk drowning ourselves and readers in repetitive, and uninteresting, detail,
-since all these programs are in a sense `the same' from our evaluation perspective.
+Put another way: these programs are in a sense `the same' from our evaluation perspective,
+and including them would drown us in unnecessary detail.
 
 Two programs (bevy and rust-analyzer) did not run correctly after
 porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
@@ -1249,11 +1249,13 @@ this occasionally led to deadlocks (this same problem also occurred in
 one small portion of \alacritty, but was easily isolated to it). It is likely
 that such issues can be solved, but this is unlikely to be a quick exercise.
 
-We also ported RustPython, but found that doing so changed the semantics of
-its implementation of \lstinline{__del__} methods to the extent that we felt
-that the resulting performance numbers would be misleading. In essence, RustPython
-uses trait objects \lstinline{and drop methods?} in a way that \lstinline{Gc<T>}
-cannot express directly \laurie{i haven't really understood why}. \jake{They implement their own version of Rc, but the key difference is that when Rc::drop hits 0 and they have to dealloc they don't just call dealloc like Rc::drop does, they actually call the python object's vtable dealloc method. So basically the destruction chain of python objects is not known at compile-time, instead it's delegated to some opaque deallocation virtual function that could drop arbitrarily nested objects. Thinking about this in the Gc context it means that without a heavy rewrite we are left with two unsatisfying options: a) either every pyobject gets a finalizer -- the collector then becomes a glorified delayed drop method runner because it can't do any deallocation on its own (unusable performance hit). b) we don't use finalizers, but pyobjects will inevitably leak because they expect their vtable dealloc method to be called. See here \lstinline{https://github.com/RustPython/RustPython/blob/9779de98b86e456350ce6d9b155a23370348d1c0/vm/src/object/core.rs#L826} }
+We also ported RustPython, but were unable to faithfully implement Python-level
+destructors. In essence, in RustPython's default configuration, its
+representation of objects is not compatible with FSA. This means that we can
+not run Python \lstinline{__del__} methods in the finalizer thread. Although
+technically this is still compatible with Python's semantics, we felt this
+would be a misleading comparison, as our port of RustPython would be doing less
+work.
 
 For static-web-server, hyper, jiff, and frawk, i belive these may be usable but
 have not yet interrogated their outputs. \jake{In fact, I seem to have make
