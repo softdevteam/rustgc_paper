@@ -1135,7 +1135,7 @@ rarely, but there are valid idioms of use where we found it necessary.
 \begin{center}
 \begin{tabular}{lllll}
 \toprule
-    Benchmark & Version & Description & \# benchmarks \\
+    Benchmark & Version & Description & \#benchmarks \\
 \midrule
     \binarytrees & Debian CLBG \binarytreesversion & Heap allocation microbenchmark & 1 \\
     \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & 1 \\
@@ -1155,11 +1155,10 @@ rarely, but there are valid idioms of use where we found it necessary.
   \vspace{5pt}
   \caption{
   The benchmark suites that form our experiment: we take the Rust programs
-  above, each of which is itself a suite of multiple benchmarks, and alter
+  above -- most of which are themselves a suite of benchmarks -- and alter
   them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
-  etc.). \binarytrees and \regexredux are classic stand-alone GC benchmarks; the other `benchmarks'
-  are in fact suites of benchmarks. The middle
-  portion of the table shows a variety of `normal' programs;
+  etc.). \binarytrees and \regexredux are classic stand-alone GC benchmarks;
+  the middle portion of the table shows a variety of `normal' Rust programs;
   the bottom portion of the program shows three implementations of the SOM
   programming language.}
 \label{tab:benchmarks}
