@@ -1274,7 +1274,7 @@ allocators was a significant confounding factor. To avoid this, we use
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
 utility. The SOM benchmarks are run using its conventional \emph{rebench} tool
-(which itself uses \lstinline{time} internally). We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
+(which itself uses \lstinline{time} internally \jake{Not by default. We set it to use this to standardise it with our other benchmarks}). We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
