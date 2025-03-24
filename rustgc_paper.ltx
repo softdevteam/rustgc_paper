@@ -1197,6 +1197,47 @@ unlikely to show anything of interest to this paper. Some relied on
 unusual and/or unsafe features strategy that were too difficult
 or time-consuming to adapt (e.g.~\emph{RustPython}).
 
+We also converted numbat (scripting language for scientific computation), mini-moka (caching library like redis), salsa (on-demand incrementalized computation framework), static-web-server, hyper (low level request library), jiff (datetime library), bevy (game engine), frawk (awk rust implementation), rust-analyzer, RustPython. Below I will explain why some are not included:
+
+numbat, mini-moka, and salsa were difficult to find interesting benchmarks for.
+I could create some very artificial example programs in numbat like bigloop and
+fibonacci but I don't know how useful that is. mini-moka and salsa both use
+criterion benchmarks which when i ported to using regular rust binaries did not
+tease out the parts of the code which i replaced Rc with.
+
+rust-analyzer and bevy are not converted correctly because they make heavy use
+of APIs in Arc like \lstinline{make_mut} or \lstinline{get_mut} which allow you
+to mutate their contents when you know you're the sole owner, something that is
+just not possible in a Gc analog. When we try and convert those parts to use
+mutexes instead, we cause deadlocks because my guess is those parts of the code
+were not written to be deadlock-aware. This is also a problem for alacritty,
+but it was possible to do a partial conversion (though this does mean that
+unfortunately we could not change the module in alacritty responsible for UTF8
+handling which i think would have been more interesting as it would be pushed
+hard in the vim benchmark). I was able to do a partial conversion of just the
+parser module in rust-analyzer, but this alone runs too quickly over the large
+example Rust input files they provide that you can't do any meaningful
+comparisons.
+
+RustPython was converted, with tests passing, but I am not confident in its
+correctness because of the way it implements the del method. It's not
+implemented straightforwardly using the drop method on the Rc'd python objects
+but instead uses dynamic dispatch with trait objects. I could not see an easy
+path to fudge this into \ourgc's finalization mechanics without exposing some
+kind of explicit \lstinline{Gc::register_finalizer(function_pointer)} API which
+is fundamentally different because it doesn't use drop. The long and short of
+it then is that it would be bad-faith to use RustPython in a benchmark
+comparison because any python object with a \lstinline{__del__} method would
+leak memory in \ourgc's port  (which is a fairly common idiom if my python
+memory serves me right!)
+
+For static-web-server, hyper, jiff, and frawk, i belive these may be usable but
+have not yet interrogated their outputs. \jake{In fact, I seem to have make
+clean'd their results by mistake so am running them in parallel on b10 so we
+can verify and include or remove later today}
+
+
+
 \cref{tab:benchmarks} shows our eventual benchmark suite: note that, with
 the exception of \binarytrees \and \regexredux, the other `benchmarks' are themselves
 benchmark suites. Collectively, our suite thus contains \laurie{how many?} benchmarks.
