@@ -936,15 +936,10 @@ check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 ]{listings/finalizer_deadlock.rs}
 \end{figure}
 
-Running finalizers on the same thread as a mutator causes problems when the
+Running finalizers on the same thread as a mutator can cause problems when the
 finalizer accesses state shared with the mutator (see~\cref{sec:general_challenges}).
-The solution to these problems is to ensure that finalizers can never
-be interleaved with mutator code on the same thread. Since most threads are always
-running some mutator code, the most general way to solve this problem
-is to run finalizers on a separate thread(s) that never
-runs mutator code. While such a thread(s) could perform other non-mutator work,
-for our purposes there is a single \emph{finalizer thread} dedicated
-solely to running finalizers.
+The most general solution to this problem is to run finalizers on a separate
+\emph{finalizer thread} that never runs mutator code.
 
 We must therefore ensure that it is safe to run a type's destructor on the
 finalizer thread. A conservative definition is that \lstinline{Gc<T>}
@@ -956,7 +951,7 @@ restricted to types that implement both \lstinline{Send} and
 \lstinline{Sync} can be frustrating, particularly because more types
 implement \lstinline{Send} than \lstinline{Sync}.
 
-It may seem sufficient to require \lstinline{T} to implement \lstinline{Send}
+It may seem sufficient for \lstinline{T} to implement \lstinline{Send}
 alone so that the object can be safely sent to the finalizer thread. However,
 this would not prevent a finalizer indirectly accessing
 state shared with a non-GCed value via a mechanism such as \lstinline{Arc},
@@ -964,7 +959,7 @@ causing the very problems we are trying to avoid.
 
 FSA's eventual approach is thus very different: it ignores whether a type
 implements \lstinline{Send} or \lstinline{Sync} (or not) and instead examines
-the destructor itself. To pass FSA: the destructor must not access thread
+the code the destructor runs. To pass FSA: the destructor must not access thread
 locals; and any types the destructor accesses via projections must implement
 both \lstinline{Send} and
 \lstinline{Sync}. Intuitively, this allows a
@@ -972,12 +967,12 @@ non-\lstinline{Send}-or-\lstinline{Sync} type \lstinline{T} to have a safe
 finalizer provided that \lstinline{T}'s destructor access the \lstinline{Send}
 and \lstinline{Sync} `subset' of \lstinline{T}.
 
-This rule shows quite clearly that FSA is a form of abstract interpretation
+This rule shows clearly that FSA is a form of abstract interpretation
 rather than a mere extension of the type system\footnote{Our initial
 implementation of FSA was, in essence, an extension of Rust's type system and
-suffered from significant false positives. For example, when porting \alacritty
-our type system approach raised 110 errors; our abstract interpretation
-approach raises just 2}. After careful examination we
+suffered from false positives. For example, porting \alacritty
+led to 110 errors --- but our abstract interpretation
+approach raises just 2.}. After careful examination we
 believe this is compatible with Rust's semantics (and \rustc and LLVM's
 implementations) at the time of writing, but it is worth knowing that this rule
 would be unsafe in other languages and implementations (for example our
@@ -995,10 +990,10 @@ synchronises all memory between threads already.
 
 \subsection{Putting it all together}
 
-FSA integrates the seemingly separate components presented above into one,
-iterating over every function in a Rust program and checking whether types used
-in a \lstinline{Gc<T>} which implicitly wish to use a destructor as a finalizer
-satisfy FSA. \cref{alg:fsa} shows the essence of FSA
+FSA integrates the seemingly separate components presented above into one. It
+iterates over every function in a Rust program analysing destructors of types
+that are used in \lstinline{Gc<T>}.
+\cref{alg:fsa} shows the essence of FSA
 (minus details of caching which \ourgc uses to speed up compile times).
 
 Because FSA is a form of abstract interpretation, we need to determine when to
@@ -1007,7 +1002,7 @@ to create a new \lstinline{Gc<T>}, FSA is run. As well as the \lstinline{Gc::new
 constructor, \lstinline{Gc<T>} instances can be created with conversion traits
 such as \lstinline{From}. We annotated each such entry point with a new \rustc-only
 attribute \lstinline{#[rustc_fsa_entry_point]}: calls to functions with this
-an attribute lead to FSA being run.
+attribute lead to FSA checks.
 
 A naive implementation of FSA would be a notable cost: \ourgc uses several
 optimisations to reduce such costs. As alluded to above, FSA caches the results
@@ -1016,7 +1011,7 @@ autotrait \lstinline{ReferenceFree}, with negative implementations for
 \lstinline{Gc<T>}, \lstinline{&T}, and \lstinline{&mut T}. If a type
 \lstinline{T} implements all of \lstinline{FinalizerSafe}, \lstinline{Send},
 and \lstinline{Sync}, we know that there can be no unsafe projections used in a
-destructor, and can bypass most FSA checks entirely (we still need to check
+destructor, and can bypass most FSA checks entirely (though we still need to check
 for thread local accesses).
 
 \cref{alg:fsa} also captures \ourgc's approach to error messages.
@@ -1031,36 +1026,39 @@ the errors reported by \ourgc: note that it pinpoints the line within a
 drop method that caused an FSA error.
 
 
-\subsubsection{FSA challenges}
+\subsubsection{Awkward kinds of functions}
 
-There are two main practical challenges, that FSA must deal with.
+There are two kinds of `awkward' functions from FSA's perspective.
 
 First, some functions (e.g.~due to use of trait objects, or FFIs) do not have a
 body available when FSA runs: using such a function necessarily causes an FSA
 check to fail. One common class of functions which causes this are Rust
 intrinsics \laurie{e.g.~XYZ}: we audited the most frequently used of these and
 annotated those which are FSA-safe with a new \lstinline{rustc_fsa_safe_fn}
-attribute, which FSA then checks for.
+attribute.
 
 Second, in most cases, FSA runs on Rust functions whose generic types have been
 replaced with concrete types (in Rust terminology, functions have been
 `monomorphised'). Sometimes, however, FSA encounters functions (e.g.~intrinsics
 or functions with certain annotations) whose generic
-types have not yet been replaced with concrete types: FSA can
+types have not yet been replaced: FSA can
 still run on such functions, but unless (for reasons covered shortly) those
 generic types imply the \lstinline{FinalizerSafe}, \lstinline{Send}, and
-\lstinline{Sync} traits, FSA will reject them.
+\lstinline{Sync} traits, FSA must reject them \laurie{are these traits enough?
+couldn't such a function still access thread-locals in a way not captured by
+those traits? or is our comment in the previous subsubsection that we `still
+need to check for thread local accesses' wrong?}.
 
-The common theme in both challenges is that we wish FSA to be sound, at which
-point we forego completeness. This can cause user frustration when FSA raises
+The common theme to both is that we wish FSA to be sound, at which
+point we forego completeness. This can cause users frustration when FSA raises
 an error on code they know is FSA safe. As is common in Rust, we therefore
 provide an unsafe escape hatch which allows users to silence FSA errors when
 they can prove to their satisfaction that doing so does undermine correctness.
 We experimented with a per-type approach, but found that unduly restrictive: we
 therefore provide a per-value escape hatch with the \lstinline{unsafe FinalizerUnchecked<T>}
 type. Values wrapped in this type are considered safe to use at all points in
-FSA. Our aim with FSA is that users should need to resort to this escape hatch
-rarely, but there are valid idioms of use where we found it necessary.
+FSA. Our aim is that users should rarely need to resort to this escape hatch,
+but there are valid idioms of use where we found it necessary.
 
 
 \begin{algorithm}[t]
