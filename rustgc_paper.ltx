@@ -368,8 +368,10 @@ for \ourgc, we expect that our techniques will apply to other conservative GCs w
 relative ease.
 
 We made the following changes to \boehm. First, we disabled \boehm's parallel collector
-because, for reasons we don't fully understand, it worsens \ourgc's
-performance \jake{what we do know however, is that it increases lock contention on the heap because the worker threads fight for the global alloc lock along with the mutator, almost all the extra time is spent in \lstinline{futex_wait}.}. Second, \boehm cannot scan pointers stored in thread locals
+because it worsens \ourgc's performance. We don't have a good explanation for
+this: we observe significant lock contention within \boehm during GC
+collections, but have not correlated this with a cause.
+Second, \boehm cannot scan pointers stored in thread locals
 because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
@@ -1286,8 +1288,10 @@ takes a complete snapshot of the heap every millisecond, tracking
 allocated chunks of memory throughout their lifetime. We had to modify both
 \boehm and heaptrack itself so that both worked correctly in the context of
 \ourgc. We added a hook into \boehm's collector so that each reclaimed object
-is reported to heaptrack. We built a second \rustgc binary when running under
-heaptrack, as it is necessarily an invasive change \laurie{why?}\jake{because our usual alloy distribution has libgc statically linked. This is mainly for usability. We have a custom libgc fork, so if we want to use dynamic linkage we don't want the rpath to resolve to the user's system install, which it will do if they don't ldpreload it. Heaptrack requires it to be dynamically linked though so that it can replace alloc calls with its own}.
+is reported to heaptrack. We built a second \rustgc binary for heaptrack,
+since heaptrack requires the binary it is tracking to be dynamically linked
+and, normally, \rustgc and \ourgc are statically linked. There are no other
+differences between the two \rustgc builds \laurie{i assume}.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
