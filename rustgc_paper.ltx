@@ -534,7 +534,7 @@ reduce this overhead.
 A variety of factors contribute to the finalizer performance overhead, including:
 a queue of finalizers
 must be maintained, whereas destructors can be run immediately; and finalizers run
-some time after the last access of a value making cache misses more likely.
+some time after the last access of a value making cache misses more likely. \jake{and they can keep objects around on the heap for longer because you have to wait until theyve been finalized to reclaim them. This increases tracing time}
 Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that it is missing optimisations which would overcome all of this overhead.
@@ -627,7 +627,7 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>},
 \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>},
 \lstinline{RawTable<K, V>}\footnote{This is contained in the separate \lstinline{hashbrown} crate,
-which is then included in Rust's standard library.}, and \lstinline{BinaryHeap<T>}. Fortunately,
+which is then included in Rust's standard library.\jake{We don't impl it for RawTable now. Instead we have a hack for this where in our \lstinline{needs_finalize} method we hard code it to look for \rustc's hashmap/hashset struct. This way we only need to check if \lstinline{K,V} need a finalizer and no longer maintain a fork of hashbrown.}}, and \lstinline{BinaryHeap<T>}. Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
@@ -991,8 +991,6 @@ do not need to explicitly synchronise memory between the mutator and
 finalization threads because \boehm's stop-the-world collection phase
 synchronises all memory between threads already.
 
-\laurie{in our benchmark suite, how often does this relaxation make a difference?}\jake{I will post a write-up here once I have the numbers from all the benchmarks}
-
 
 \subsection{Putting it all together}
 
@@ -1288,11 +1286,6 @@ not run Python \lstinline{__del__} methods in the finalizer thread. Although
 technically this is still compatible with Python's semantics, we felt this
 would be a misleading comparison, as our port of RustPython would be doing less
 work.
-
-For static-web-server, hyper, jiff, and frawk, i belive these may be usable but
-have not yet interrogated their outputs. \jake{In fact, I seem to have make
-clean'd their results by mistake so am running them in parallel on b10 so we
-can verify and include or remove later today}
 
 
 \subsubsection{Running the experiment}
