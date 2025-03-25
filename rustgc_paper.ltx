@@ -1195,7 +1195,7 @@ the exception of \binarytrees \and \regexredux, the other `benchmarks' are thems
 benchmark suites. Collectively, our suite thus contains -- depending on whether you
 count the SOM implementations collectively or separately -- 62 or 114 benchmarks.
 
-\binarytrees is allocation intensive and sufficiently simple \laurie{this isn't true of regex-redux?} that it
+\binarytrees is allocation intensive and sufficiently simple \laurie{this isn't true of regex-redux?} \jake{We ported the rust regex library too. So IMO it wouldn't be a fair comparison to port typed arena and rust-gc because then you'd be comparing a mix of allocations} that it
 can easily be ported to a variety of shared ownership strategies.
 \alacritty, \fd, and \ripgrep are well known Rust tools, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
