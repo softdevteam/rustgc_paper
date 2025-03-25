@@ -353,7 +353,7 @@ than most other GCs for Rust which which tend to rely, at least in part, on refe
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion and have
-added or changed approximately 3,150 \laurie{needs updating? also split apart the LoC for tests} Lines of Code (LoC). Users must opt-in
+added or changed approximately 1,700 Lines of Code (LoC), with 6388 LoC added for tests. Users must opt-in
 to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
 
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
@@ -523,7 +523,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \label{sec:elision}
 
 Finalizers are much slower to run than destructors --- running every Rust destructor
-as a GC finalizer in \ourgc causes a significant slowdown \laurie{this is a case where a `worse of' might make sense, and i think it's 4x or similar?}
+as a GC finalizer in \ourgc causes a significant slowdown \laurie{this is a case where a `worse of' might make sense, and i think it's 4x or similar?} \jake{Use som-rs-ast Fibonnaci as the worst case scenario:} \elisionperfsomrsastnaiveworstratio$\times$
 in our benchmark suite. In this section we show how to sidestep much of this overhead.
 
 A variety of factors contribute to the finalizer performance overhead, including:
@@ -1033,7 +1033,7 @@ There are two kinds of `awkward' functions from FSA's perspective.
 First, some functions (e.g.~due to use of trait objects, or FFIs) do not have a
 body available when FSA runs: using such a function necessarily causes an FSA
 check to fail. One common class of functions which causes this are Rust
-intrinsics \laurie{e.g.~XYZ}: we audited the most frequently used of these and
+intrinsics (e.g.~low-level scalar operations; \lstinline{align_of},\lstinline{ptr_add} etc): we audited the most frequently used of these and
 annotated those which are FSA-safe with a new \lstinline{rustc_fsa_safe_fn}
 attribute.
 
