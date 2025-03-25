@@ -1,12 +1,16 @@
-\begin{tabular}{lrr}
+\begin{tabular}{lrrrrrrr}
 \toprule
-configuration & Elision Naive & Elision Opt \\
+configuration & elision-naive & elision-opt \\
 suite &  &  \\
 \midrule
-\binarytrees & 77.00 \footnotesize{± 9.000} & 74.00 \footnotesize{± 10.000} \\
-\regexredux & 512.00 \footnotesize{± 4.000} & 495.00 \footnotesize{± 6.000} \\
-\somrsast & 2845.42 \footnotesize{± 1749.747} & 796.26 \footnotesize{± 243.018} \\
-\somrsbc & 829.75 \footnotesize{± 293.018} & 280.64 \footnotesize{± 88.164} \\
-\yksom & 286.17 \footnotesize{± 106.210} & 97.41 \footnotesize{± 25.549} \\
+alacritty & 366.95 \footnotesize{(333.14-404.18)} & 367.03 \footnotesize{(333.55-403.88)} \\
+binary-trees & 72.00 \footnotesize{(61.39-82.61)} & 67.00 \footnotesize{(62.04-71.96)} \\
+fd & 1133.73 \footnotesize{(1009.21-1273.62)} & 1133.70 \footnotesize{(1009.75-1272.86)} \\
+grmtools & 6947.11 \footnotesize{(5428.89-8889.90)} & 5936.97 \footnotesize{(4549.29-7747.94)} \\
+regex-redux & 471.00 \footnotesize{(465.17-476.83)} & 451.00 \footnotesize{(447.75-454.25)} \\
+ripgrep & 471.30 \footnotesize{(446.94-496.99)} & 419.41 \footnotesize{(394.10-446.35)} \\
+som-rs-ast & 2704.78 \footnotesize{(2435.84-3003.41)} & 794.36 \footnotesize{(734.25-859.39)} \\
+som-rs-bc & 794.96 \footnotesize{(733.76-861.26)} & 277.23 \footnotesize{(256.19-299.99)} \\
+yksom & 287.49 \footnotesize{(265.71-311.05)} & 97.58 \footnotesize{(91.86-103.65)} \\
 \bottomrule
 \end{tabular}
