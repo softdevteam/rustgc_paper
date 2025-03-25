@@ -1542,7 +1542,7 @@ performance changes outside the ranges that our results suggest. Although the \E
 experiment requires a very specific benchmark suite, our other experiments
 would probably be a good fit for a standard benchmarking suite.
 Since the benchmark suite in this paper is the largest for any GC in Rust \laurie{is that true of
-Bronze?}, it may serve as a partial basis for such a suite in the future.
+Bronze?}\jake{Yes}, it may serve as a partial basis for such a suite in the future.
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
 `pure' allocator performance as a confounding factor, but does mean that some
@@ -1614,7 +1614,7 @@ must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by the provided
 \lstinline{Trace} macro. \rustgc detects accesses to already-finalized values
 dynamically at run-time, panicking if they occur. Unlike \rustbacon, these accesses
-are detected by recording \laurie{the next bit doesn't make sense} per-state what the collector's state is in: if the
+are detected by recording what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
 panic. We have not yet verified whether cross-thread collection / sweeping can
 evade this check.
