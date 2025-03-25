@@ -1295,15 +1295,6 @@ Our experiment is fully repeatable and downloadable from
 
 \begin{table}[t]
 \scalebox{0.7}{%
-  \input{plots/conversion}
-}
-  \vspace{5pt}
-    \caption{Conversion table}
-  \label{table:Ercgc:conversion}
-\end{table}
-
-\begin{table}[t]
-\scalebox{0.7}{%
   \input{plots/gcvs/perf_summary}
 }
   \vspace{5pt}
@@ -1315,29 +1306,69 @@ Our experiment is fully repeatable and downloadable from
   \label{table:Ercgc:perf}
 \end{table}
 
-\jake{Below is a brain dump of my findings and analysis from the results of the
-various benchmarks}
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/conversion}%
+}
+  \vspace{5pt}
+    \caption{Conversion table}
+  \label{table:Ercgc:conversion}
+\end{table}
 
+Starting with \Egcrc, wall-clock times for benchmarks can be found
+in~\cref{table:Ercgc:perf}, which we suggest interpreting in conjunction with
+the `quantity of memory' data found in \cref{table:Ercgc:conversion}. The broad
+story we can see from this data is that \ourgc has (when confidence intervals
+are taken into account) similar performance to other memory allocation
+approaches when few finalizers are run.
 
-\ourgc is about 1.1 to 2.5$\times$ slower than \arc on \ripgrep. I believe the
-primary reason for this comes down to conversion. Though we have converted all
-immediate Arcs inside of ripgrep itself. It uses crates which use Arc
-themselves. (Specifically regex, and parts which we are unable to convert due
-to difficulty with the API). The problem though is that these objects are
-heavily intertwined. There are now many cases where Gcs own Arcs (in e.g. the
-regex crate). This leads to a big performance penalty because every object in
-that chain will need to have their finalizers run, and finalizers are not
-cheap.
+However, there is a notable correlation between the quantity of finalizers and
+additional overhead in \ourgc. We can see the contrast between these two cases
+using two different benchmark suites as exemplars. \grmtools allocates large
+numbers of \lstinline{Gc<T>} objects, but requires no finalizers. This is
+because, eliding various wrappers, \lstinline{T} is either a nested
+\lstinline{Gc<T>} or an integer type --- since neither has a destructor, a
+finalizer is not required. In contrast, \ripgrep allocates a relative small portion
+of \lstinline{Gc<T>} data, but \laurie{half?} of the resulting objects require
+a finalizer.
 
-What's more, Arc specifically amplifies this penalty. This is because when
-using a finalizer to decref a count on shared data, we delay the reclamation of
-more than just an immediate boxed heap object that the Gc could be pointing to.
-In other words, until that finalizer runs, we can end up with a reference
-keeping alive another chain of shared data. I believe this is what is shown in
-the memory profile graphs (where they keep growing for Gc) and also the fact
-that we were only able to elide 50\% of finalizers for \ripgrep.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
+    \caption{Time series comparison of heap usage for \ripgrep. Each graph
+    shows the results of a single benchmark, across \benchmarkpexecs runs, with
+    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
+    atomic reference counting. Each run has been normalized independantly to a
+    fixed time-scale (0-1), before being aggregated to show the mean heap usage
+    over time. The x-axis thus allows comparisons about patterns of heap usage
+    to be made between configurations irrespective of their absolute time (see
+    ~\cref{fig:Egcrc:ripgrep:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
+    \label{fig:Egcrc:ripgrep:mem:profiles}
+\end{figure}
 
-For \fd, \ourgc ranges between \gcvsperffdgcworstpct slower and \gcvsperffdgcbestpct faster\jake{todo: fix the negative pct}. Ultimately though, the confidence intervals overlap when we look at the geometric mean for this entire benchmark suite so it's difficult to draw many conclusions from this. We should also be careful to note that out of \fdheapall heap allocations, only \fdheapgcs were Gc objects, which at first implies that the Arcs that we converted (though we did convert all of them) were not on a performance critical path. However, if we take into consideration the transitively reachable allocations from those Gcs, that number jumps to \fdheapgcts.
+This correlation surprised us: finalizers do impose some overhead on the
+mutator, but most of the costs should be borne by the (parallel) finalizer
+thread. To investigate further, we created additional configurations of \ourgc
+and \rustc to record memory data with heaptrack \laurie{cite} for all of our
+benchmarks.
+
+\cref{fig:Egcrc:ripgrep:mem:profiles} shows the data for \ripgrep. At first
+glance, this may suggest that \ourgc is leaking memory. Three very different
+factors, however, explain what is really happening. First, \ripgrep depends
+heavily on a number of external libraries which are not converted to
+\lstinline{Gc<T>}. In this instance, \ripgrep is heavily intertwined with the
+\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively --- and
+which requires a finalizer when part of a \lstinline{Gc<T>}. Second,
+\lstinline{Arc<T>} (like similar types such as \lstinline{Gc<T>}!) is often the
+entry point to a large tree of objects. When placed inside a \lstinline{Gc<T>},
+that tree of objects is kept alive for a longer period of time: only after the
+finalizer is run by the finalization thread can the underlying memory be freed.
+In the interim, that memory contributes to the overall conservative marking
+overhead, even though it will shortly be freed.
+
+Summarising this in a different way, we believe the more fundamental message
+from our evaluation is that the more of a codebase you convert to use
+\lstinline{Gc<T>}, the less the overall head tends to become.
 
 \binarytrees uses a batch approach to allocation that is perfectly suited to
 \typedarena: it waits until the end of the benchmark to deallocate all memory
@@ -1839,20 +1870,6 @@ interested readers may find that they help flesh out some details.
     patterns of heap usage to be made between configurations irrespective of
     their absolute time (see ~\cref{fig:Egcrc:fd:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.}}
     \label{fig:Egcrc:fd:mem:profiles}
-\end{figure}
-
-\begin{figure}[htbp!]
-    \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
-    \caption{Time series comparison of heap usage for \ripgrep. Each graph
-    shows the results of a single benchmark, across \benchmarkpexecs runs, with
-    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
-    atomic reference counting. Each run has been normalized independantly to a
-    fixed time-scale (0-1), before being aggregated to show the mean heap usage
-    over time. The x-axis thus allows comparisons about patterns of heap usage
-    to be made between configurations irrespective of their absolute time (see
-    ~\cref{fig:Egcrc:ripgrep:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
-    \label{fig:Egcrc:ripgrep:mem:profiles}
 \end{figure}
 
 \begin{figure}[htbp!]
