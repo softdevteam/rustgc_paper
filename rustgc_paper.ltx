@@ -662,6 +662,18 @@ allowing the associated conditional to be removed too. In other words --
 compiler optimisations allowing -- the `does this specific type require a
 finalizer?' check has no run-time overhead.
 
+\jake{This is missing a key part of the explanation. Posted below}
+
+Once we elide the finalizer of a GC object, the collector needs to be aware
+that it is now responsible for freeing that memory (i.e. there will no longer
+be a manual free call). This is implemented very simply: we allocate all
+objects on the heap as ``potentially GCable'' from the perspective of \boehm.
+We do this based on the assumption that heap objects which are used in the
+regular Rust RAII way will always have at least one live pointer to them
+keeping them from being collected. Of course, this does mean that in \ourgc, in
+addition to pointers to \lstinline{Gc}s, you must not obfuscate pointers to
+regular heap objects.
+
 
 \section{Premature Finalizer Prevention}
 \label{sec:premature_finalize_prevention}
