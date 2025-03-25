@@ -1267,6 +1267,7 @@ can verify and include or remove later today}
 \subsubsection{Running the experiment}
 
 \laurie{for the non-gc experiments, are we using `alloy' with the GC bits turned off or ... ?}
+\jake{We're running two builds of alloy for everything: one with heaptrack, one regular one. All builds log-stats like finalizer counts etc. Even non-GC experiments}
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
