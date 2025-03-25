@@ -1,17 +1,18 @@
-\begin{tabular}{lrrr|rr|rrr}
+\begin{tabular}{lrrrrrrrrr}
 \toprule
-& \multicolumn{3}{c|}{Allocated} & \multicolumn{2}{c|}{Finalizers} & \multicolumn{3}{c}{Percentage managed} \\
+& \multicolumn{3}{c}{Allocated} & \multicolumn{2}{c}{Finalizers} & \multicolumn{3}{c}{Percentage managed} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-6} \cmidrule(lr){7-9}
 & Arcs & Rcs & Boxes & Registered & Elided & by gc directly & by arc directly & by rc directly \\
 \midrule
-\binarytrees & 0 & 0 & 390 & 6.4M & 6.4M & 99.999597 & 0 & 0 \\
-\regexredux & 0 & 0 & 92910 & 156 & 132 & 2.456693 & 0 & 0 \\
+\binarytrees & 0 & 0 & 390 & 6.4M & 6.4M & 99.99 & 0.00 & 0.00 \\
+\regexredux & 0 & 0 & 92.9K & 156 & 132 & 2.46 & 0.00 & 0.00 \\
 \midrule
-\alacritty & 11700 & 2700 & 7420758 & 40 & 0 & 0.008069 & 0.157348 & 0.036311 \\
-\fd & 30737630 & 0 & 316939268 & 28.9K & 28 & 0.124391 & 8.829863 & 0 \\
-\grmtools & 0 & 0 & 1845102791 & 492.5M & 492.5M & 82.839778 & 0 & 0 \\
-\ripgrep & 5507279 & 0 & 194714880 & 676.6K & 534.8K & 4.824670 & 2.617878 & 0 \\
+\alacritty & 11.7K & 2.7K & 7.4M & 40 & 0 & 0.01 & 0.16 & 0.04 \\
+\fd & 30.7M & 0 & 316.9M & 28.9K & 28 & 0.12 & 8.83 & 0.00 \\
+\grmtools & 0 & 0 & 1.8B & 492.5M & 492.5M & 82.84 & 0.00 & 0.00 \\
+\ripgrep & 5.5M & 0 & 194.7M & 676.6K & 534.8K & 4.82 & 2.62 & 0.00 \\
 \midrule
-\somrsast & 0 & 0 & 6380791080 & 92.6M & 92.6M & 17.876032 & 0 & 0 \\
-\somrsbc & 0 & 0 & 771931200 & 92.3M & 92.3M & 64.196136 & 0 & 0 \\
+\somrsast & 0 & 0 & 6.4B & 92.6M & 92.6M & 17.88 & 0.00 & 0.00 \\
+\somrsbc & 0 & 0 & 771.9M & 92.3M & 92.3M & 64.20 & 0.00 & 0.00 \\
 \bottomrule
 \end{tabular}
