@@ -568,6 +568,7 @@ drop method, when deciding whether a corresponding finalizer can be elided.
 \subsection{Implementing finalizer elision}
 
 \begin{algorithm}[t]
+\small
 \caption{Finalizer Elision}
 \label{alg:elision}
 \begin{algorithmic}
@@ -1064,6 +1065,7 @@ but there are valid idioms of use where we found it necessary.
 
 
 \begin{algorithm}[t]
+  \small
   \captionof{algorithm}{Finalizer safety analysis}
   \label{alg:fsa}
   \begin{algorithmic}[1]
@@ -1136,10 +1138,11 @@ but there are valid idioms of use where we found it necessary.
 \label{sec:evaluation}
 
 \begin{table}[t]
+\small
 \begin{center}
 \begin{tabular}{lllll}
 \toprule
-    Benchmark & Version & Description & \#benchmarks \\
+                  & Version & Description & \#benchmarks \\
 \midrule
     \binarytrees & Debian CLBG \binarytreesversion & Heap allocation microbenchmark & 1 \\
     \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & 1 \\
@@ -1681,6 +1684,7 @@ None of these are necessary to understand the main part of the paper, but
 interested readers may find that they help flesh out some details.
 
 \begin{algorithm}[h]
+\small
 \caption{Removing elidable drops}
 \begin{algorithmic}
 \Function{RemoveElidableDrops}{$func$}
