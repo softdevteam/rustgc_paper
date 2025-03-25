@@ -1195,25 +1195,24 @@ the exception of \binarytrees \and \regexredux, the other `benchmarks' are thems
 benchmark suites. Collectively, our suite thus contains -- depending on whether you
 count the SOM implementations collectively or separately -- 62 or 114 benchmarks.
 
-\binarytrees is both allocation intensive
-and sufficiently simple that we could port it to a variety of shared ownership strategies.
-\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively,
-particularly in error recovery: the
-core library is around 18KLoC, excluding dependencies. We benchmarked it
-using 28KLoC of Java source code which we injected errors into to exercise
-error recovery. \alacritty, \fd, and \ripgrep are well known Rust tools all
+\binarytrees is allocation intensive and sufficiently simple \laurie{this isn't true of regex-redux?} that it
+can easily be ported to a variety of shared ownership strategies.
+\alacritty, \fd, and \ripgrep are well known Rust tools, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
 UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
+\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively
+in error recovery: we benchmarked it
+using 28KLoC of Java source code to which we injected errors.
 
 Our suite includes three SOM VMs. SOM is a small, but complete,
 language in the Smalltalk mould, which has a wide variety of implementations. \somrsast
 (which represents programs as ASTs) and \somrsbc (which represents programs as
 bytecode) are existing ports of a Java
 SOM VM into Rust; both use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
-for this paper that is designed to be more idiomatic Rust code. Each SOM VM is
-approximately 5KLoC. The SOM VMs run benchmarks run the same benchmark suite:
-we took the set of benchmarks from SOM git commit \#AFD5A6 that runs successfully
-on all three SOM VMs.
+for this paper that was designed to explore how idiomatic Rust code can use a GC.
+Each SOM VM is
+approximately 5KLoC. The SOM VMs all run the same benchmark suite, derived
+from SOM git commit \#afd5a6.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{table:Ercgc:perf},
@@ -1228,7 +1227,7 @@ we variously compare performance against: \lstinline{Rc<T>} and
 
 We tried porting porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
-eventual benchmark suite, we briefly report here why those other programs have
+eventual benchmark suite, we briefly report why those other programs have
 been excluded.
 
 Several programs (e.g.~numbat, mini-moka, and salsa), once ported, turned out
@@ -1243,11 +1242,14 @@ Two programs (bevy and rust-analyzer) did not run correctly after
 porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
 functions in \lstinline{Rc<T>} which allow a programmer to mutate their contents
 when it can be statically proven that there is a single owner. There is not,
-and cannot be, equivalent functionality in \lstinline{Gc<T>}. We thus had to
+and cannot be, equivalent functionality with a copyable \lstinline{Gc<T>} type. We thus had to
 use alternative mechanisms to express the desired outcome, but found that
 this occasionally led to deadlocks (this same problem also occurred in
-one small portion of \alacritty, but was easily isolated to it). It is likely
-that such issues can be solved, but this is unlikely to be a quick exercise.
+one small portion of \alacritty, but we excluded the one benchmark affected).
+We attempted to fix such problems, but in some cases we suspect that
+important portions of the program's structure have been designed with the
+flexibilities and limitations of existing APIs in mind: adapting them may
+be no small effort.
 
 We also ported RustPython, but were unable to faithfully implement Python-level
 destructors. In essence, in RustPython's default configuration, its
@@ -1265,13 +1267,17 @@ can verify and include or remove later today}
 
 \subsubsection{Running the experiment}
 
+\laurie{for the non-gc experiments, are we using `alloy' with the GC bits turned off or ... ?}
+
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
 roots, and a quick experiment showed us that comparing different underlying
-allocators was a significant confounding factor. To avoid this, we use
-\boehm as the allocator for both \ourgc and \rustc.
+allocators was a significant confounding factor. Fortunately, \boehm can
+be used as a `traditional' allocator that allocates and frees on demand
+(i.e.~no conservative GC occurs): we thus use \boehm as the allocator for all
+benchmarks.
 
 We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
