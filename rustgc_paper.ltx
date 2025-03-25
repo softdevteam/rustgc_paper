@@ -1047,7 +1047,7 @@ generic types imply the \lstinline{FinalizerSafe}, \lstinline{Send}, and
 \lstinline{Sync} traits, FSA must reject them \laurie{are these traits enough?
 couldn't such a function still access thread-locals in a way not captured by
 those traits? or is our comment in the previous subsubsection that we `still
-need to check for thread local accesses' wrong?}.
+need to check for thread local accesses' wrong?}. \jake{I might be misunderstanding the question. We always look through function calls in drop. If we cant look through one, we must reject it. This is because we are checking for thread-locals. Another thing we check for explicitly actually is inline assembly}
 
 The common theme to both is that we wish FSA to be sound, at which
 point we forego completeness. This can cause users frustration when FSA raises
