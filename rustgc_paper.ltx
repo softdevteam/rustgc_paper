@@ -1229,6 +1229,23 @@ we variously compare performance against: \lstinline{Rc<T>} and
 (a non-GC memory arena\cite{chiovoloni15typed}).
 
 
+\subsubsection{Static conversion data}
+
+\begin{table}[t]
+\begin{tabular}{|l|r|}
+\hline
+\textbf{Category} & \textbf{Total} \\
+\hline
+Arcs converted & 222 \\
+Weaks converted & 2 \\
+ArcWeaks converted & 2 \\
+Elidable Finalizers & 88 \\
+\hline
+\end{tabular}
+    \caption{Rip Grep}
+\end{table}
+
+
 \subsubsection{What we couldn't include in the benchmark suite}
 
 We tried porting porting 10 other programs that are not included in our
@@ -1312,7 +1329,7 @@ running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
 Our experiment is fully repeatable and downloadable from
-\url{https://github.com/softdevteam/rustgc_paper_experiment/}.
+\url{https://github.com/softdevteam/rustgc_paper_experiment/}\jake{Should we remove this for submission for anonymity?}.
 
 
 \subsection{Results}
