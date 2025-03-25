@@ -1231,49 +1231,23 @@ we variously compare performance against: \lstinline{Rc<T>} and
 
 \subsubsection{Static conversion data}
 
-\begin{table}[t]
-\begin{tabular}{|l|r|}
-\hline
-\textbf{Category} & \textbf{Total} \\
-\hline
-Arcs converted & 222 \\
-Weaks converted & 2 \\
-ArcWeaks converted & 2 \\
-Elidable Finalizers & 88 \\
-\hline
-\end{tabular}
-    \caption{Rip Grep}
-\end{table}
-
-
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|r|}
+\begin{tabular}{lrrrrrr}
 \hline
-\textbf{Category} & \textbf{Total} \\
+Benchmark & Gcs & Rcs & Arcs & Weaks & Arcweaks & Elidable Finalizers \\
 \hline
-ARCs & 402 \\
-Weaks & 0 \\
-ARC Weaks & 1 \\
-Elidable Finalizers & 4 \\
-\hline
-\end{tabular}
-\caption{\fd}
-\end{table}
-
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|r|}
-\hline
-\textbf{Category} & \textbf{Total} \\
-\hline
-ARCs & 50689 \\
-Weaks & 69 \\
-ARC Weaks & 8730 \\
-Elidable Finalizers & 482335 \\
+\yksom & 464 & 21 & 18 & 0 & 0 & 292 \\
+\grmtools & 299 & 1686 & 139 & 2 & 21 & 2310 \\
+\fd & 7 & 19 & 402 & 0 & 1 & 4 \\
+\ripgrep & 104 & 27 & 222 & 2 & 2 & 88 \\
+\binarytrees & 2 & 0 & 0 & 0 & 0 & 0 \\
+\regexredux & 108 & 0 & 109 & 0 & 0 & 31 \\
+\alacritty & 107 & 1904 & 7546 & 45 & 1925 & 1533 \\
 \hline
 \end{tabular}
-\caption{\alacritty}
+\caption{table showing the number of types of each shared object in each benchmark. This shows how many gc types we were able to convert. Because these are static, they do not correspond to the number of actual objects at runtime.}
+\label{tab:conversion:static}
 \end{table}
 
 
