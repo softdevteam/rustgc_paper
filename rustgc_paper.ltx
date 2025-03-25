@@ -533,8 +533,10 @@ reduce this overhead.
 
 A variety of factors contribute to the finalizer performance overhead, including:
 a queue of finalizers
-must be maintained, whereas destructors can be run immediately; and finalizers run
-some time after the last access of a value making cache misses more likely. \jake{and they can keep objects around on the heap for longer because you have to wait until theyve been finalized to reclaim them. This increases tracing time}
+must be maintained, whereas destructors can be run immediately; finalizers run
+some time after the last access of a value making cache misses more likely; and
+(as we shall see in~\cref{sec:evaluation}) finalizers cause objects to live for longer
+(e.g.~leading to increased marking overhead).
 Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that it is missing optimisations which would overcome all of this overhead.
@@ -626,8 +628,11 @@ unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
 \lstinline{Vec<T>}, \lstinline{RawVec<T>}, \lstinline{VecDeque<T>},
 \lstinline{LinkedList<T>}, \lstinline{BTreeMap<K, V>}, \lstinline{BTreeSet<T>},
 \lstinline{HashMap<K, V>}, \lstinline{HashSet<T>},
-\lstinline{RawTable<K, V>}\footnote{This is contained in the separate \lstinline{hashbrown} crate,
-which is then included in Rust's standard library.\jake{We don't impl it for RawTable now. Instead we have a hack for this where in our \lstinline{needs_finalize} method we hard code it to look for \rustc's hashmap/hashset struct. This way we only need to check if \lstinline{K,V} need a finalizer and no longer maintain a fork of hashbrown.}}, and \lstinline{BinaryHeap<T>}. Fortunately,
+\lstinline{RawTable<K, V>}\footnote{This is a white lie, though the visible effect
+is the same. \lstinline{RawTable} is contained in the separate \lstinline{hashbrown} crate
+which is then included in Rust's standard library. We previously maintained a
+fork of this, but synchronising it is painful. For now, at least, we have hacked explicit knowledge of \lstinline{RawTable}
+into the \lstinline{needs_finalize} function.}, and \lstinline{BinaryHeap<T>}. Fortunately,
 not only are these types' drop methods compatible with \lstinline{DropMethodFinalizerElidable},
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
@@ -1341,7 +1346,8 @@ running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
 Our experiment is fully repeatable and downloadable from
-\url{https://github.com/softdevteam/rustgc_paper_experiment/}\jake{Should we remove this for submission for anonymity?}.
+\emph{blinded for submission}.
+% \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 
 \subsection{Results}
@@ -1542,8 +1548,8 @@ undoubtedly exist reasonable, non-pathological, programs which will see
 performance changes outside the ranges that our results suggest. Although the \Egcrc
 experiment requires a very specific benchmark suite, our other experiments
 would probably be a good fit for a standard benchmarking suite.
-Since the benchmark suite in this paper is the largest for any GC in Rust \laurie{is that true of
-Bronze?}\jake{Yes}, it may serve as a partial basis for such a suite in the future.
+Since the benchmark suite in this paper is the largest for any GC in Rust, it
+may serve as a partial basis for such a suite in the future.
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
 `pure' allocator performance as a confounding factor, but does mean that some
@@ -1821,7 +1827,7 @@ interested readers may find that they help flesh out some details.
     the mean heap usage over time. The x-axis thus allows comparisons about
     patterns of heap usage to be made between configurations irrespective of
     their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
-    absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
+    absolute time) \jake{inspired by Blackburn et al.} \laurie{mention this in the prose and cite the appropriate paper w/page number}. The dashed and dotted
     lines represent the peak and average memory usage for each configuration
     respectively. The shaded regions represent 99\% confidence intervals for
     each configuration.}
@@ -1840,7 +1846,7 @@ interested readers may find that they help flesh out some details.
     the mean heap usage over time. The x-axis thus allows comparisons about
     patterns of heap usage to be made between configurations irrespective of
     their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
-    absolute time) \jake{inspired by Blackburn et al.}. The dashed and dotted
+    absolute time). The dashed and dotted
     lines represent the peak and average memory usage for each configuration
     respectively. The shaded regions represent 99\% confidence intervals for
     each configuration. \laurie{why is the blue line so different to that in figure 7? it looks like the resolution here is much coarser or ... ?}} \label{fig:Egcrc:individual:som-rs-bc:mem}
