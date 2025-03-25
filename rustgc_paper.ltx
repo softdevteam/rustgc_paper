@@ -369,7 +369,7 @@ relative ease.
 
 We made the following changes to \boehm. First, we disabled \boehm's parallel collector
 because, for reasons we don't fully understand, it worsens \ourgc's
-performance. Second, \boehm cannot scan pointers stored in thread locals
+performance \jake{what we do know however, is that it increases lock contention on the heap because the worker threads fight for the global alloc lock along with the mutator, almost all the extra time is spent in \lstinline{futex_wait}.}. Second, \boehm cannot scan pointers stored in thread locals
 because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
@@ -1432,6 +1432,15 @@ because the differences in memory that we actually see is not that bad) people
 want throughput here. I would argue that if you wanted low latency object
 destruction you'd be using reference counting over tracing GC anyway.
 
+
+Another observation which might help explain slowdown, and it's related to
+parallel marking. \boehm has an optimization which completely removes all
+locking in the collector if it knows it is being run in single-threaded mode.
+We also know from parallel marking we know that this lock contention is
+punishing. We therefore also suffer from this the moment a single finalizer is
+run because it lazily spawns the finalization thread (at which point boehm
+switches to lock-based allocation). This might explain some of the performance
+improvements on the benchmarks which do not run finalziers.
 
 
 
