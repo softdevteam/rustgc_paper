@@ -352,8 +352,9 @@ than most other GCs for Rust which which tend to rely, at least in part, on refe
 \subsection{Basic Implementation}
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
-Rust compiler \rustc. We forked \rustc~\rustcversion and have
-added or changed approximately 1,700 Lines of Code (LoC), with 6388 LoC added for tests. Users must opt-in
+Rust compiler \rustc. We forked \rustc~\rustcversion, adding
+or changing approximately 1,700 Lines of Code (LoC) in the core compiler,
+and adding 6388LoC of tests. Users must opt-in
 to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
 
 \begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
@@ -522,9 +523,11 @@ section, we tackle these problems in the order above, noting that we tackle prob
 \section{Finalizer Elision}
 \label{sec:elision}
 
-Finalizers are much slower to run than destructors --- running every Rust destructor
-as a GC finalizer in \ourgc causes a significant slowdown \laurie{this is a case where a `worse of' might make sense, and i think it's 4x or similar?} \jake{Use som-rs-ast Fibonnaci as the worst case scenario:} \elisionperfsomrsastnaiveworstratio$\times$
-in our benchmark suite. In this section we show how to sidestep much of this overhead.
+As we shall see in \cref{sec:evaluation}, there is a correlation between the
+number of finalizers that are run and overhead from GC (with a worst case in
+our experiment of \elisionperfsomrsastnaiveworstratio). In this section
+we show how to reduce the number of finalizers that are run, which helps
+reduce this overhead.
 
 A variety of factors contribute to the finalizer performance overhead, including:
 a queue of finalizers
@@ -1028,26 +1031,25 @@ drop method that caused an FSA error.
 
 \subsubsection{Awkward kinds of functions}
 
-There are two kinds of `awkward' functions from FSA's perspective.
+FSA can encounter two kinds of `awkward' functions.
 
 First, some functions (e.g.~due to use of trait objects, or FFIs) do not have a
 body available when FSA runs: using such a function necessarily causes an FSA
 check to fail. One common class of functions which causes this are Rust
-intrinsics (e.g.~low-level scalar operations; \lstinline{align_of},\lstinline{ptr_add} etc): we audited the most frequently used of these and
+intrinsics (e.g.~\lstinline{min_align_of} etc.): we audited the most frequently used of these and
 annotated those which are FSA-safe with a new \lstinline{rustc_fsa_safe_fn}
-attribute.
+attribute. Other functions whose bodies are unknown cause FSA to fail.
 
 Second, in most cases, FSA runs on Rust functions whose generic types have been
 replaced with concrete types (in Rust terminology, functions have been
 `monomorphised'). Sometimes, however, FSA encounters functions (e.g.~intrinsics
 or functions with certain annotations) whose generic
-types have not yet been replaced: FSA can
-still run on such functions, but unless (for reasons covered shortly) those
+types have not yet been replaced. FSA can
+still run on such functions, but will reject them unless all
 generic types imply the \lstinline{FinalizerSafe}, \lstinline{Send}, and
-\lstinline{Sync} traits, FSA must reject them \laurie{are these traits enough?
-couldn't such a function still access thread-locals in a way not captured by
-those traits? or is our comment in the previous subsubsection that we `still
-need to check for thread local accesses' wrong?}. \jake{I might be misunderstanding the question. We always look through function calls in drop. If we cant look through one, we must reject it. This is because we are checking for thread-locals. Another thing we check for explicitly actually is inline assembly}
+\lstinline{Sync} traits. Note that calling a method on a generically typed
+object will lead to FSA finding a method without a body: as in the first case
+above, this will cause FSA to fail.
 
 The common theme to both is that we wish FSA to be sound, at which
 point we forego completeness. This can cause users frustration when FSA raises
@@ -1195,8 +1197,8 @@ the exception of \binarytrees \and \regexredux, the other `benchmarks' are thems
 benchmark suites. Collectively, our suite thus contains -- depending on whether you
 count the SOM implementations collectively or separately -- 62 or 114 benchmarks.
 
-\binarytrees is allocation intensive and sufficiently simple \laurie{this isn't true of regex-redux?} \jake{We ported the rust regex library too. So IMO it wouldn't be a fair comparison to port typed arena and rust-gc because then you'd be comparing a mix of allocations} that it
-can easily be ported to a variety of shared ownership strategies.
+\binarytrees is allocation intensive and sufficiently simple that it
+can be easily and meaningfully ported to a variety of shared ownership strategies.
 \alacritty, \fd, and \ripgrep are well known Rust tools, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
 UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
@@ -1266,8 +1268,23 @@ can verify and include or remove later today}
 
 \subsubsection{Running the experiment}
 
-\laurie{for the non-gc experiments, are we using `alloy' with the GC bits turned off or ... ?}
-\jake{We're running two builds of alloy for everything: one with heaptrack, one regular one. All builds log-stats like finalizer counts etc. Even non-GC experiments}
+Our experiment can be seen as a comparison of \ourgc against `normal' Rust.
+Fortunately, \ourgc is a strict superset of `normal' Rust: only if users
+explicitly opt into GC does \ourgc really become a `GC for Rust'. This allows
+us to use a single \rustc binary, standard library, and so on, removing a
+potential confounding factor in our results. This binary includes a number of
+additional opt-in logging features we added that record additional data
+of interest (e.g.~number of finalizers).
+
+As we shall soon see, in order to understand our experiments, we needed to
+understand the memory usage of different allocation strategies over the
+lifetime of a benchmark. To do this we used heaptrack \laurie{cite}. Heaptrack
+takes a \laurie{complete snapshot of the heap?} every millisecond, tracking
+allocated chunks of memory throughout their lifetime. We had to modify both
+\boehm and heaptrack itself so that both worked correctly in the context of
+\ourgc. We added a hook into \boehm's collector so that each reclaimed object
+is reported to heaptrack. We built a second \rustgc binary when running under
+heaptrack, as it is necessarily an invasive change \laurie{why?}.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
@@ -1331,20 +1348,6 @@ because, eliding various wrappers, \lstinline{T} is either a nested
 finalizer is not required. In contrast, \ripgrep allocates a relative small portion
 of \lstinline{Gc<T>} data, but \laurie{half?} of the resulting objects require
 a finalizer.
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
-    \caption{Time series comparison of heap usage for \ripgrep. Each graph
-    shows the results of a single benchmark, across \benchmarkpexecs runs, with
-    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
-    atomic reference counting. Each run has been normalized independantly to a
-    fixed time-scale (0-1), before being aggregated to show the mean heap usage
-    over time. The x-axis thus allows comparisons about patterns of heap usage
-    to be made between configurations irrespective of their absolute time (see
-    ~\cref{fig:Egcrc:ripgrep:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
-    \label{fig:Egcrc:ripgrep:mem:profiles}
-\end{figure}
 
 This correlation surprised us: finalizers do impose some overhead on the
 mutator, but most of the costs should be borne by the (parallel) finalizer
@@ -1909,6 +1912,20 @@ interested readers may find that they help flesh out some details.
 %    bars represent 99\% confidence intervals.}
 %    \label{fig:Epremopt:som-rs:perf:individual}
 %\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
+    \caption{Time series comparison of heap usage for \ripgrep. Each graph
+    shows the results of a single benchmark, across \benchmarkpexecs runs, with
+    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
+    atomic reference counting. Each run has been normalized independantly to a
+    fixed time-scale (0-1), before being aggregated to show the mean heap usage
+    over time. The x-axis thus allows comparisons about patterns of heap usage
+    to be made between configurations irrespective of their absolute time (see
+    ~\cref{fig:Egcrc:ripgrep:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
+    \label{fig:Egcrc:ripgrep:mem:profiles}
+\end{figure}
 
 \begin{figure}[!t]
 \begin{lstlisting}[
