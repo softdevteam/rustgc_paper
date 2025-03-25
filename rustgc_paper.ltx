@@ -1323,9 +1323,9 @@ Our experiment is fully repeatable and downloadable from
 }
   \vspace{5pt}
   \caption{Performance results for the \Egcrc experiment, comparing
-  benchmarks running on \ourgc against other shared ownership approaches.
-  Times are reported in seconds with 99\% confidence intervals as a (lower--upper) range.
-  As individual benchmarks, \binarytrees and \regexredux report arithmetic means;
+  benchmarks running on \ourgc against other shared ownership approaches
+  (measuring wall-clock time in seconds with 99\% confidence
+  ranges; lower is better). As individual benchmarks, \binarytrees and \regexredux report arithmetic means;
   the remaining rows are benchmark suites that report geometric means.}
   \label{table:Ercgc:perf}
 \end{table}
@@ -1396,76 +1396,12 @@ Summarising this, we believe a fundamental message
 from our evaluation is that the more of a codebase you convert to use
 \lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
 
-Other aspects of \Egcrc require less involved explanations.
+Other aspects of \Egcrc are more straightforward.
 For example, we can see from \cref{table:Ercgc:perf} that
 \typedarena is hugely faster than other allocation strategies for \binarytrees:
 it performs a single (huge!) deallocation at the end of the benchmark.
 The heaptrack data also allowed us to tell that the JSON SOM benchmark
 has a leak, which manifests in all SOM VMs.
-
-\begin{table}[t]
-\scalebox{0.7}{%
-  \input{plots/premopt/perf_summary}
-}
-  \vspace{5pt}
-  \caption{Summary results of \Epremopt performance (the detailed breakdown for each
-  benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows
-  premature finalizer prevention turned on for all types; \emph{Opt} shows
-  optimised premature finalizer prevention (see \cref{sec:optimising_prem});
-  and \emph{None} shows premature finalizer prevention turned off.
-  \emph{None} is unsound, but provides the ultimate ceiling for \emph{Opt}'s
-  performance. All benchmarks were run 30 times with wall-clock times
-  reported. We report 99\% confidence intervals.}
-  \label{table:Epremopt:perf}
-\end{table}
-
-
-
-Another useful observation is that for our \Eelision experiment, it shows an
-interesting deferred object reclaimation pattern when we use elision. Note that
-finalizer elision's goal is to remove an object's finalizer call, and then let
-that object's memory get reclaimed later by the collector. I think this can be
-thought of really as a throughput / latency trade-off: if we want that memory
-to be reclaimed faster (i.e. better latency) then we should not elide the
-finalizer because finalizers are called before objects are swept. Elision on
-the other hand removes the work that the finalizer needs to do (as well as the
-synchronisation costs associated with it), and accepts that the object(s) that
-would be dealloc'd by the finalizer will eventually be garbage collected. This
-is evident from the traces, when programs run for long enough, the elided
-benchmarks do return to the same memory usage as their naive counterparts. So
-here, elision has decided to prioritise throughput: we get a faster mutator for
-transiently increased memory usage. I think in most cases (and at least in part
-because the differences in memory that we actually see is not that bad) people
-want throughput here. I would argue that if you wanted low latency object
-destruction you'd be using reference counting over tracing GC anyway.
-
-
-Another observation which might help explain slowdown, and it's related to
-parallel marking. \boehm has an optimization which completely removes all
-locking in the collector if it knows it is being run in single-threaded mode.
-We also know from parallel marking we know that this lock contention is
-punishing. We therefore also suffer from this the moment a single finalizer is
-run because it lazily spawns the finalization thread (at which point boehm
-switches to lock-based allocation). This might explain some of the performance
-improvements on the benchmarks which do not run finalziers.
-
-
-
-% \begin{table}[t]
-% \scalebox{0.7}{%
-%   \input{plots/premopt/mem_summary}
-% }
-%   \vspace{5pt}
-%   \caption{Summary results of \Epremopt memory (the detailed breakdown for each
-%     benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive}
-%     shows premature finalizer prevention turned on for all types; \emph{Opt}
-%     shows optimised premature finalizer prevention (see
-%     \cref{sec:optimising_prem}); and \emph{None} shows premature finalizer
-%     prevention turned off. \emph{None} is unsound, but provides the ultimate
-%     ceiling for \emph{Opt}'s performance. All benchmarks were run 30 times with
-%     average heap usage reported. We report 99\% confidence intervals.}
-%   \label{table:Epremopt:mem}
-% \end{table}
 
 \begin{table}[t]
     \centering
@@ -1474,24 +1410,75 @@ improvements on the benchmarks which do not run finalziers.
     }
       \vspace{5pt}
     \caption{
-    Summary results of \Eelision performance (the detailed breakdown for each
-    benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
-    off finalizer elision.}
-\label{fig:Eelision:perf}
+    Finalizer elision's impact on wall-clock performance
+    (times in seconds with 99\% confidence interval ranges; lower is better). As
+    expected, there is a causal link between the number of finalizers
+    (see~\cref{table:Ercgc:conversion}) elided and performance.}
+\label{table:Eelision:perf}
 \end{table}
 
-% \begin{table}[t]
-%     \centering
-%     \scalebox{0.7}{%
-%       \input{plots/elision/mem_summary}
-%     }
-%       \vspace{5pt}
-%     \caption{
-%     Summary results of \Eelision average memory usage (the detailed breakdown for each
-%     benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
-%     off finalizer elision.}
-% \label{fig:Eelision:mem}
-% \end{table}
+The results for \Eelision are shown in \cref{table:Eelision:perf}. Some
+benchmarks (e.g.~the SOM VMs) benefit significantly from finalizer elision,
+whereas for others it makes no difference. Unsurprisingly, there is a causal relationship
+between the number of finalizers elided as shown in
+\cref{table:Ercgc:conversion} and wall-clock performance as shown in
+\cref{table:Eelision:perf}.
+
+\begin{table}[t]
+    \centering
+    \scalebox{0.7}{%
+      \input{plots/elision/mem_summary}
+    }
+      \vspace{5pt}
+    \caption{
+      Finalizer elision's impact on \boehm's \laurie{what's the right term? active memory?}
+      (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
+      Finalizer elision can cause higher memory usage because
+      memory is no longer immediately reclaimed during finalization, and is batched
+      up by \boehm.}
+\label{table:Eelision:mem}
+\end{table}
+
+Surprisingly, however, finalizer elision can cause processes to consume more
+memory, as shown in \cref{table:Eelision:mem}. We were initially surprised by
+this until we checked the heaptrack data at which point we realised that
+finalizer elision changes the memory reclamation characteristics of \boehm. If,
+as is common, a finalizer deallocates an object's, \boehm immediately reclaims
+that memory (in the sense that it can reuse it, or even return it to the OS).
+When we elide finalizers that contain deallocation calls, we change when \boehm
+reclaims memory: it might reclaim it earlier than the equivalent finalizer but,
+mostly, it reclaims it much later. In general, this is likely to allow \boehm
+to operate more efficiently, in the sense that it is more likely to batch
+operations up: it is possible, though we do not see this in any noticeable way
+our data, that there might sometimes be an increase in latency.
+
+There is a second possible factor in this facet of finalizer elision's effects.
+\boehm only enters its slower multi-threading mode when it is told that another
+thread has started. Because we lazily create the finalizer thread, finalizer
+elision may sometimes delay the point when \boehm `slows down'. It is difficult
+to break this cost out separately: we suspect that it is a relatively minor
+factor.
+
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/premopt/perf_summary}
+}
+  \vspace{5pt}
+  \caption{\laurie{the columns need to be (in order): None, Naive, Optimised}
+  The effects of no, naive (or `all'), and optimised barriers to prevent
+  premature finalization. These show no statistically significant impact
+  from adding barriers (i.e.~moving from \emph{None} $\rightarrow$ \emph{Naive}),
+  but also no statistically significant advantage from optimising barriers
+  (i.e.~moving from \emph{Naive} $\rightarrow$ Optimised).}
+  \label{table:Epremopt:perf}
+\end{table}
+
+The results for \Epremopt are shown in \cref{table:Epremopt:perf}. The good
+news is that our experiment shows no statistically significant impact from
+adding barriers: the less good news is that it shows so statistically significant
+impact from optimising away unnecessary barriers. At least based on our
+benchmarks, we are forced to conclude that this optimisation is not worthwhile.
+
 
 \section{Threats to validity}
 
