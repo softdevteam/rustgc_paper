@@ -1279,12 +1279,12 @@ of interest (e.g.~number of finalizers).
 As we shall soon see, in order to understand our experiments, we needed to
 understand the memory usage of different allocation strategies over the
 lifetime of a benchmark. To do this we used heaptrack \laurie{cite}. Heaptrack
-takes a \laurie{complete snapshot of the heap?} every millisecond, tracking
+takes a complete snapshot of the heap every millisecond, tracking
 allocated chunks of memory throughout their lifetime. We had to modify both
 \boehm and heaptrack itself so that both worked correctly in the context of
 \ourgc. We added a hook into \boehm's collector so that each reclaimed object
 is reported to heaptrack. We built a second \rustgc binary when running under
-heaptrack, as it is necessarily an invasive change \laurie{why?}.
+heaptrack, as it is necessarily an invasive change \laurie{why?}\jake{because our usual alloy distribution has libgc statically linked. This is mainly for usability. We have a custom libgc fork, so if we want to use dynamic linkage we don't want the rpath to resolve to the user's system install, which it will do if they don't ldpreload it. Heaptrack requires it to be dynamically linked though so that it can replace alloc calls with its own}.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
