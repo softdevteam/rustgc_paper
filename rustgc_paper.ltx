@@ -393,9 +393,9 @@ first identified objects that need finalizing.
 
 In many GCed languages, `destructor' and `finalizer' are used as synonyms, as
 both terms refer to code run when a value's lifetime has ended. In existing GCs
-for Rust, these two terms refer to different hierarchies of code (i.e.~destructors
-and finalizers are fundamentally different). A better first approximation in
-\ourgc is that finalizers are a strict subset of destructors\jake{In that destructors can do everything that finalizers do, but finalizers can only do some of what destructors do?}. In this section we pick apart
+for Rust, these two terms refer to completely different hierarchies of code (i.e.~destructors
+and finalizers are fundamentally different). In \ourgc, in contrast, a reasonable first
+approximation is that finalizers are a strict subset of destructors. In this section we pick apart
 these differences, before describing the challenges of using destructors as
 finalizers.
 
@@ -421,8 +421,8 @@ Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
 However, doing so introduces a number of problems: (1) external libraries are
-unlikely to provide finalizers and so placing their types in a \lstinline{Gc<T>}
-tends to break RAII expectations\jake{vague, wydm?}; (2) Rust's \emph{orphan
+unlikely to provide finalizers so they must be manually implemented
+by each consumer; (2) Rust's \emph{orphan
 rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
 types defined in external libraries (i.e.~unless a library's types were
 designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
@@ -446,7 +446,7 @@ that can never be called --- what use would such a function have? It might seem
 tempting to have the \lstinline{finalize} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
 glue to be run afterwards.
-\jake{While I agree, it could be argued that this restriction is more of a guide in Rust anyway because you can unsafe \lstinline{drop_in_place} it with a pointer. This might be nitpicking though}
+
 
 \subsection{General Challenges When Using Destructors as Finalizers}
 \label{sec:general_challenges}
