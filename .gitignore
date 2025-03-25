@@ -11,3 +11,4 @@ images/*.pdf
 listings/*.out
 listings/alloy
 plots/*.pdf
+*.pdf

@@ -1350,72 +1350,69 @@ of \lstinline{Gc<T>} data, but \laurie{half?} of the resulting objects require
 a finalizer.
 
 This correlation surprised us: finalizers do impose some overhead on the
-mutator, but most of the costs should be borne by the (parallel) finalizer
-thread. To investigate further, we created additional configurations of \ourgc
-and \rustc to record memory data with heaptrack \laurie{cite} for all of our
-benchmarks.
+mutator, but we had assumed that most of the costs would be borne by the (parallel) finalizer
+thread. To investigate further, we recorded time-series data of heap
+usage with heaptrack.
 
-\cref{fig:Egcrc:ripgrep:mem:profiles} shows the data for \ripgrep. At first
-glance, this may suggest that \ourgc is leaking memory. Three very different
-factors, however, explain what is really happening. First, \ripgrep depends
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\textwidth]{ripgrep_subset.pdf}
+    \caption{A representative subset of time-series memory usage for \ripgrep.
+    Each graph shows the memory usage (in MiB) on the $y$-axis of two runs (one
+    for \ourgc, one for \lstinline{Arc<T>}) of the same benchmark: the running
+    times are normalised to the same scale on the $x$-axis. We initially
+    thought this might show a memory leak in \ourgc or our \ripgrep port.
+    In fact, it shows the consequences of `partial' porting: \ripgrep uses
+    external libraries that embed \lstinline{Arc<T>}s in \lstinline{Gc<T>}s,
+    causing (1) more finalizers to be run than might first appear necessary (2) memory to
+    be kept alive for longer than expected.}
+    \label{fig:ripgrep_subset}
+\end{figure}
+
+\cref{fig:ripgrep_subset} shows a representative subset of the data for
+\ripgrep (the complete data can be found in \cref{fig:Egcrc:ripgrep:mem:profiles}
+in the appendix). At first
+glance, this may suggest that \ourgc is leaking memory. It is not, but explaining
+why requires considering three factors. First, \ripgrep depends
 heavily on a number of external libraries which are not converted to
 \lstinline{Gc<T>}. In this instance, \ripgrep is heavily intertwined with the
-\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively --- and
-which requires a finalizer when part of a \lstinline{Gc<T>}. Second,
-\lstinline{Arc<T>} (like similar types such as \lstinline{Gc<T>}!) is often the
+\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively, and thus
+causes the wrapping \lstinline{Gc<T>} to have to run a finalizer. Second,
+\lstinline{Arc<T>} (as with similar types such as \lstinline{Gc<T>}) is often the
 entry point to a large tree of objects. When placed inside a \lstinline{Gc<T>},
-that tree of objects is kept alive for a longer period of time: only after the
+that tree of objects is kept alive for a longer period of time than normal: only after the
 finalizer is run by the finalization thread can the underlying memory be freed.
-In the interim, that memory contributes to the overall conservative marking
+Third, until finalization occurs, that memory contributes to the overall conservative marking
 overhead, even though it will shortly be freed.
 
-Summarising this in a different way, we believe the more fundamental message
+Summarising this, we believe a fundamental message
 from our evaluation is that the more of a codebase you convert to use
-\lstinline{Gc<T>}, the less the overall head tends to become.
+\lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
 
-\binarytrees uses a batch approach to allocation that is perfectly suited to
-\typedarena: it waits until the end of the benchmark to deallocate all memory
-in one go. Interestingly, despite being
-4$\times$ slower than \typedarena, \ourgc is 4.5$\times$ faster than \rustgc
-and 2$\times$ faster than \lstinline{Rc<T>} on \binarytrees. Unlike the general pattern we see with other benchmarks, \ourgc consistently uses less memory than \rc throughout the benchmark with \rc experiencing a large spike in the last phase of the benchmark. I think this is a memory leak with \rc, because of the cyclic way in which tree nodes are allocated (note though that \rc does return to 0 at the end, so i think it's being kept alive throughout the various phases and then a large destruction chain happens at the end).
+Other aspects of \Egcrc require less involved explanations.
+For example, we can see from \cref{table:Ercgc:perf} that
+\typedarena is hugely faster than other allocation strategies for \binarytrees:
+it performs a single (huge!) deallocation at the end of the benchmark.
+The heaptrack data also allowed us to tell that the JSON SOM benchmark
+has a leak, which manifests in all SOM VMs.
 
-
-\subsection{Things we learn from heaptrack}
-
-We modified both boehm and heaptrack to support allocation tracking for \ourgc.
-It uses \lstinline{LD_PRELOAD} to intercept malloc and free calls, as well as a
-\lstinline{GC_profiler_hook()} function in the collector's sweeper which is
-called on each swept object. Heaptrack gives us two bits of data here: a
-profile (or trace) showing the memory usage over time; and a summary, showing
-the total allocations, frees, leaks.
-
-For the profile, Heaptrack takes a snapshot every 1ms, which results in
-gigabytes of data for even short running benchmarks when they're run 10-30
-times.
-
-To output this data, we use heaptrack's \lstinline{heaptrack_print} tool for
-generating valgrind massif traces which are designed to be be easily parsed (as
-far as I'm aware there exists no tool to parse the raw heaptrack .zst dumps).
-The snapshot intervals in massif profiles are dynamic: it starts by taking
-frequent snapshots, and then uses exponential decay to reduce this frequency as
-the program goes on.
+\begin{table}[t]
+\scalebox{0.7}{%
+  \input{plots/premopt/perf_summary}
+}
+  \vspace{5pt}
+  \caption{Summary results of \Epremopt performance (the detailed breakdown for each
+  benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows
+  premature finalizer prevention turned on for all types; \emph{Opt} shows
+  optimised premature finalizer prevention (see \cref{sec:optimising_prem});
+  and \emph{None} shows premature finalizer prevention turned off.
+  \emph{None} is unsound, but provides the ultimate ceiling for \emph{Opt}'s
+  performance. All benchmarks were run 30 times with wall-clock times
+  reported. We report 99\% confidence intervals.}
+  \label{table:Epremopt:perf}
+\end{table}
 
 
-Here are some interesting observations we can see from the heaptrack data:
-
-It makes it very easy to see when an \rc leaks. \rc uses destructors for
-calling free which will be called at the end of the lexical scope of the last
-\rc reference. If a benchmark's heap usage with the \rc configuration does not
-return to 0 at the end, then it's leaked because Rust runs destructors on exit.
-We should be a bit careful here though, because it's possible that a program
-leaked memory some other way, unrelated to the \rc's in the program (e.g. they
-called \lstinline{std::mem::forget} or used unsafe somewhere). We can't solely
-rely on the profile graphs to say 100\% that it was an \rc that leaked because
-Box and Rc are allocated both with the global allocator and heaptrack does not
-differentiate this. \jake{Personally, I think it's pretty hard to leak memory
-in Rust if you're not using some kind of shared ownership, so in practice i
-don't think this is an issue. Though it is worth mentioning that we considered
-it}
 
 Another useful observation is that for our \Eelision experiment, it shows an
 interesting deferred object reclaimation pattern when we use elision. Note that
@@ -1436,54 +1433,23 @@ want throughput here. I would argue that if you wanted low latency object
 destruction you'd be using reference counting over tracing GC anyway.
 
 
-Another thing to note is that heaptrack profiles can be potentially misleading
-when determining if \ourgc is leaking. First, and the most obvious issue, is
-that because GC cycles happen at set points in time when the world is stopped,
-inevitably there will be a situation where the program exits before the GC was
-able to schedule the reclamation of the last bunch of objects. \boehm does not
-GC on exit (it provides limited support for this, but with explicit
-recommendation against its use and that it should be used as a debugging aid).
-The second potential issue with heaptrack profiles is that \rc allocation
-patterns which frequently oscillate between allocating and deallocating in
-quick succession will tend to appear as a straight horizontal line, whereas for
-\ourgc, this will look like a big slope as the number of allocations climbs
-until the GC threshold is reached. \jake{todo from our discussion, check the
-temporary allocations heaptrack data to see if that's what is happening with
-grmtools}. This can be a bit deceptive as you might think that \ourgc is
-leaking, when actually it's just the nature of tracing gc: it's bunching all
-the freeing to be done in one go during the sweeper.
 
-\begin{table}[t]
-\scalebox{0.7}{%
-  \input{plots/premopt/perf_summary}
-}
-  \vspace{5pt}
-  \caption{Summary results of \Epremopt performance (the detailed breakdown for each
-  benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive} shows
-  premature finalizer prevention turned on for all types; \emph{Opt} shows
-  optimised premature finalizer prevention (see \cref{sec:optimising_prem});
-  and \emph{None} shows premature finalizer prevention turned off.
-  \emph{None} is unsound, but provides the ultimate ceiling for \emph{Opt}'s
-  performance. All benchmarks were run 30 times with wall-clock times
-  reported. We report 99\% confidence intervals.}
-  \label{table:Epremopt:perf}
-\end{table}
 
-\begin{table}[t]
-\scalebox{0.7}{%
-  \input{plots/premopt/mem_summary}
-}
-  \vspace{5pt}
-  \caption{Summary results of \Epremopt memory (the detailed breakdown for each
-    benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive}
-    shows premature finalizer prevention turned on for all types; \emph{Opt}
-    shows optimised premature finalizer prevention (see
-    \cref{sec:optimising_prem}); and \emph{None} shows premature finalizer
-    prevention turned off. \emph{None} is unsound, but provides the ultimate
-    ceiling for \emph{Opt}'s performance. All benchmarks were run 30 times with
-    average heap usage reported. We report 99\% confidence intervals.}
-  \label{table:Epremopt:mem}
-\end{table}
+% \begin{table}[t]
+% \scalebox{0.7}{%
+%   \input{plots/premopt/mem_summary}
+% }
+%   \vspace{5pt}
+%   \caption{Summary results of \Epremopt memory (the detailed breakdown for each
+%     benchmark can be found in \cref{fig:Eprem_breakdown}). \emph{Naive}
+%     shows premature finalizer prevention turned on for all types; \emph{Opt}
+%     shows optimised premature finalizer prevention (see
+%     \cref{sec:optimising_prem}); and \emph{None} shows premature finalizer
+%     prevention turned off. \emph{None} is unsound, but provides the ultimate
+%     ceiling for \emph{Opt}'s performance. All benchmarks were run 30 times with
+%     average heap usage reported. We report 99\% confidence intervals.}
+%   \label{table:Epremopt:mem}
+% \end{table}
 
 \begin{table}[t]
     \centering
@@ -1498,18 +1464,18 @@ the freeing to be done in one go during the sweeper.
 \label{fig:Eelision:perf}
 \end{table}
 
-\begin{table}[t]
-    \centering
-    \scalebox{0.7}{%
-      \input{plots/elision/mem_summary}
-    }
-      \vspace{5pt}
-    \caption{
-    Summary results of \Eelision average memory usage (the detailed breakdown for each
-    benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
-    off finalizer elision.}
-\label{fig:Eelision:mem}
-\end{table}
+% \begin{table}[t]
+%     \centering
+%     \scalebox{0.7}{%
+%       \input{plots/elision/mem_summary}
+%     }
+%       \vspace{5pt}
+%     \caption{
+%     Summary results of \Eelision average memory usage (the detailed breakdown for each
+%     benchmark can be found in \cref{fig:Eelision_breakdown}. \emph{Naive} turns
+%     off finalizer elision.}
+% \label{fig:Eelision:mem}
+% \end{table}
 
 \section{Threats to validity}
 
