@@ -1306,7 +1306,7 @@ of interest (e.g.~number of finalizers).
 
 As we shall soon see, in order to understand our experiments, we needed to
 understand the memory usage of different allocation strategies over the
-lifetime of a benchmark. To do this we used heaptrack \laurie{cite}. Heaptrack
+lifetime of a benchmark. To do this we used heaptrack~\cite{wolff14heaptrack}. Heaptrack
 takes a complete snapshot of the heap every millisecond, tracking
 allocated chunks of memory throughout their lifetime. We had to modify both
 \boehm and heaptrack itself so that both worked correctly in the context of
@@ -1314,7 +1314,7 @@ allocated chunks of memory throughout their lifetime. We had to modify both
 is reported to heaptrack. We built a second \rustgc binary for heaptrack,
 since heaptrack requires the binary it is tracking to be dynamically linked
 and, normally, \rustgc and \ourgc are statically linked. There are no other
-differences between the two \rustgc builds \laurie{i assume}.
+differences between the two \rustgc builds.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
