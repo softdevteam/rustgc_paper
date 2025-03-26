@@ -1253,7 +1253,7 @@ from these source locations during a benchmark's execution.
   \lstinline{Gc<T>} in our ported \alacritty. \lstinline{rc::Weak} (and its
   \lstinline{Arc<T>} cousin \texttt{sync::Weak} show how often programs that
   use reference counting have to resort to juggling strong and weak counts to
-  express shared ownership. \laurie{what is the last column showing?}
+    express shared ownership. \laurie{what is the last column showing?}\jake{This shows the number of Ts in a \lstinline{Gc<T>} whose finalizers can be elided. It's a compile-time value rather than a per object runtime one. if you think it's misleading, i can remove it}
   }
 \label{tab:conversion:static}
 \end{table}
@@ -1477,7 +1477,7 @@ finalizer elision still has a notable performance impact irrespective of whether
     }
       \vspace{5pt}
     \caption{
-      Finalizer elision's impact on \boehm's \laurie{what's the right term? active memory?}
+        Finalizer elision's impact on \boehm's \laurie{what's the right term? active memory?}\jake{This is showing the average heap consumption of the benchmark}
       (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
       Finalizer elision can cause higher memory usage because
       memory is no longer immediately reclaimed during finalization, and is batched
