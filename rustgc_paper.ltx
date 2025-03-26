@@ -1551,7 +1551,7 @@ performance changes outside the ranges that our results suggest. Although the \E
 experiment requires a very specific benchmark suite, our other experiments
 would probably be a good fit for a standard benchmarking suite.
 Since the benchmark suite in this paper is the largest for any GC in Rust, it
-may serve as a partial basis for such a suite in the future.
+may serve as a partial basis for such a suite in the future.\jake{I think its also worth pointing out here that partial conversion of existing benchmarks, and also the fact that they may be mixing Arcs and Rcs with Gc unknowingly via the use of third-party crates deep in the dependency chain will no doubt colour our results}
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
 `pure' allocator performance as a confounding factor, but does mean that some
