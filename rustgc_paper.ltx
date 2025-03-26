@@ -1745,13 +1745,10 @@ interested readers may find that they help flesh out some details.
   \input{plots/gcvs/mem_summary}
 }
   \vspace{5pt}
-  \caption{Memory results for the \Egcrc experiment, comparing benchmarks
-    running on \ourgc against other shared ownership approaches. With the
-    exception of \binarytrees, which we ported to several approaches, most
-    compare \ourgc with one other shared ownership approach. All benchmarks
-    were run 30 times with average heap usage reported. We record heap usage
-    using KDE heaptrack, which track individual allocations throughout the
-    lifetime of a program. We report 99\% confidence intervals.}
+  \caption{Peak memory consumption in our benchmark suite. As expected, \ourgc
+  tends to use more memory because \boehm only occasionally returns memory
+  to the operating system.
+  }
   \label{table:Ercgc:mem}
 \end{table}
 
