@@ -122,10 +122,14 @@ extends Rust's static analyses to reject programs whose destructors are not
 provably safe to be used as finalizers.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust:
-an example of its use is shown in \cref{fig:first_example}.
-Although \ourgc is not production ready, it has good enough performance
-(across a number of benchmarks, its performance is \jake{geomean over whole suite}) and
-other polish (e.g.~good quality error messages) that we believe it shows
+an example of its use is shown in \cref{fig:first_example}. As shown
+in our evaluation (\cref{sec:evaluation}), the overhead of \ourgc
+varies from zero to, in the worst case, several times slower. Perhaps
+surprisingly, our results suggest that as more of a codebase is ported to
+\lstinline{Gc<T>} the overhead trends towards zero.
+Although \ourgc is not production ready, its performance is hopefully
+good enough, and it is sufficiently polished (e.g.~good quality error messages)
+in other ways that it may show
 a plausible path forwards for those who may wish to follow it. Furthermore,
 although \ourgc is necessarily tied to Rust, a reasonable guess is that many of the
 techniques in this paper, particularly those related to finalization, will
@@ -1747,7 +1751,7 @@ interested readers may find that they help flesh out some details.
   \label{alg:barrier_removal}
 \end{algorithm}
 
-\begin{table}[t]
+\begin{table}[h]
 \scalebox{0.7}{%
   \input{plots/gcvs/mem_summary}
 }
@@ -1893,20 +1897,20 @@ interested readers may find that they help flesh out some details.
     \label{fig:Egcrc:fd:mem:profiles}
 \end{figure}
 
-\begin{figure}[htbp!]
-    \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/binary-trees/profiles/binary-trees.pdf}
-    \caption{Time series comparison of heap usage for \binarytrees. The graph
-    shows the results across \benchmarkpexecs runs, with four configurations:
-    \gc, -- which uses \ourgc; \arc -- which uses atomic reference counting;
-    \rustgc; and typed arena -- the default. Each run has been normalized
-    independantly to a fixed time-scale (0-1), before being aggregated to show
-    the mean heap usage over time. The x-axis thus allows comparisons about
-    patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:binarytrees:perf:individual} for
-    absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
-    \label{fig:Egcrc:binarytrees:mem:profiles}
-\end{figure}
+% \begin{figure}[htbp!]
+%     \centering
+%     \includegraphics[width=1\textwidth]{plots/gcvs/binary-trees/profiles/binary-trees.pdf}
+%     \caption{Time series comparison of heap usage for \binarytrees. The graph
+%     shows the results across \benchmarkpexecs runs, with four configurations:
+%     \gc, -- which uses \ourgc; \arc -- which uses atomic reference counting;
+%     \rustgc; and typed arena -- the default. Each run has been normalized
+%     independantly to a fixed time-scale (0-1), before being aggregated to show
+%     the mean heap usage over time. The x-axis thus allows comparisons about
+%     patterns of heap usage to be made between configurations irrespective of
+%     their absolute time (see ~\cref{fig:Egcrc:binarytrees:perf:individual} for
+%     absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
+%     \label{fig:Egcrc:binarytrees:mem:profiles}
+% \end{figure}
 %\begin{figure}[htbp!]
 %    \centering
 %    \begin{subfigure}{\textwidth}
