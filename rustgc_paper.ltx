@@ -796,7 +796,7 @@ treating both equally in this section.
 
 In this section we introduce Finalizer Safety Analysis (FSA), which prevents
 a type \lstinline{T}'s destructor being used as a finalizer if it is not
-safe to do so. FSA is best thought of as a form of abstract interpretation: it
+safe to do so. FSA is a form of abstract interpretation: it
 analyses a Rust program using its Control Flow Graph (CFG), safely
 approximating its finalization properties. We introduce the three main
 components of FSA first before bringing it all together.
@@ -909,12 +909,7 @@ say that a negative implementation of an auto-trait \emph{pollutes} containing
 types.
 
 Our new auto trait is \lstinline{FinalizerSafe} with a single
-a negative implementation on \lstinline{Gc<T>}:
-
-\begin{lstrustsmall}
-impl<T> !FinalizerSafe for Gc<T> {}
-\end{lstrustsmall}
-
+a negative implementation \texttt{impl<T>} \lstinline{!FinalizerSafe for Gc<T>}.
 This naturally handles transitively reachable code, allowing FSA itself to only
 check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
@@ -991,6 +986,57 @@ synchronises all memory between threads already.
 
 \subsection{Putting it all together}
 
+\begin{algorithm}[t]
+  \small
+  \captionof{algorithm}{Finalizer safety analysis}
+  \label{alg:fsa}
+  \begin{algorithmic}[1]
+    \Function{FinalizerSafetyAnalysis}{\textit{func}}
+      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
+            \State $t \gets$ \textit{basic\_block.terminator}
+            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
+                \State \textbf{continue}
+            \EndIf
+            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
+            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
+              \State \textbf{continue}
+            \EndIf
+            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
+            \State \Call{EmitReferenceError}{}
+            \Else
+            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
+              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
+            \EndFor
+            \EndIf
+      \EndFor
+\EndFunction
+\State{}
+    \Function{CheckDropMethodSafety}{\textit{drop}}
+    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
+    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
+      \State \Return
+    \EndIf
+      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
+        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
+            \ForEach {$\textit{projection} \in \textit{statement}$}
+              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
+                  \State \Call{EmitFinalizerUnsafeError}{}
+              \EndIf
+            \EndFor
+        \EndFor
+      \EndFor
+
+\EndFunction
+\State{}
+  \Function{IsFinalizerSafe}{\textit{ty}}
+    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
 FSA integrates the seemingly separate components presented above into one. It
 iterates over every function in a Rust program analysing destructors of types
 that are used in \lstinline{Gc<T>}.
@@ -1061,56 +1107,6 @@ FSA. Our aim is that users should rarely need to resort to this escape hatch,
 but there are valid idioms of use where we found it necessary.
 
 
-\begin{algorithm}[t]
-  \small
-  \captionof{algorithm}{Finalizer safety analysis}
-  \label{alg:fsa}
-  \begin{algorithmic}[1]
-    \Function{FinalizerSafetyAnalysis}{\textit{func}}
-      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
-            \State $t \gets$ \textit{basic\_block.terminator}
-            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
-                \State \textbf{continue}
-            \EndIf
-            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
-            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
-              \State \textbf{continue}
-            \EndIf
-            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
-            \State \Call{EmitReferenceError}{}
-            \Else
-            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
-              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
-            \EndFor
-            \EndIf
-      \EndFor
-\EndFunction
-\State{}
-    \Function{CheckDropMethodSafety}{\textit{drop}}
-    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
-    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
-      \State \Return
-    \EndIf
-      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
-        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
-            \ForEach {$\textit{projection} \in \textit{statement}$}
-              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-            \EndFor
-        \EndFor
-      \EndFor
-
-\EndFunction
-\State{}
-  \Function{IsFinalizerSafe}{\textit{ty}}
-    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
-\EndFunction
-\end{algorithmic}
-\end{algorithm}
 
 
 \begin{figure}[tb]
