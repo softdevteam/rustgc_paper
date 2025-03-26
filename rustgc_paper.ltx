@@ -1387,7 +1387,7 @@ numbers of \lstinline{Gc<T>} objects, but requires no finalizers. This is
 because, once intermediate wrappers are elided, the \lstinline{T}'s it uses are always either a nested
 \lstinline{Gc<T>} or an integer type --- since neither has a destructor, a
 finalizer is not required. In contrast, \ripgrep allocates a relative small portion
-of \lstinline{Gc<T>} data, but \laurie{half?} of the resulting objects require
+of \lstinline{Gc<T>} data, but 26.51\% of the resulting objects require
 a finalizer.
 
 The magnitude of this effect surprised us: finalizers do impose some overhead on the
