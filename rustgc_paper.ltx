@@ -1378,11 +1378,7 @@ Our experiment is fully repeatable and downloadable from
   \input{plots/conversion}%
 }
   \vspace{5pt}
-    \caption{\laurie{which run of a benchmark did we take this from? i guess it
-    was taken from a normal rustc run, which is why yksom isn't here? although
-    then i can't work out what the ``by gc directly'' column means}
-      How many objects of different kinds are allocated by different benchmarks?
-      \laurie{why don't the percentages add up (in general anywhere near) to 100\%? for example, we only appear to record 0.21\% of alacritty's allocations judging by this table. i guess it's using other smart pointers or ...?}}
+    \caption{Conversion table. This shows the runtime totals of different kinds of heap allocations. Finalizers registered are how many finalizers were unable to be elided. gcpct and gcpctextra \jake{please help me name these im stuck} explain heap coverage: gcpct is the percentage of the total allocations for the benchmark(s) which are explicitly allocated Gc objects. gcpctextra is the percentage of the total allocations which are either a GC, or owned by a GC (i.e. managed by the collector). }
   \label{table:Ercgc:conversion}
 \end{table}
 
