@@ -7,7 +7,7 @@ LATEX_FILES = rustgc_paper.ltx
 
 PLOTS = $(patsubst %.svg,%.pdf, $(shell find . -type f -name "*.svg"))
 
-all: rustgc_paper.pdf
+all: appendices.pdf main.pdf rustgc_paper.pdf
 
 clean:
 	rm -f ${PLOTS}
@@ -19,6 +19,10 @@ rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt expe
 	bibtex rustgc_paper
 	pdflatex rustgc_paper.ltx
 	pdflatex rustgc_paper.ltx
+
+appendices.pdf main.pdf: rustgc_paper.pdf
+	pdfjam -o main.pdf rustgc_paper.pdf 1-24
+	pdfjam -o appendices.pdf rustgc_paper.pdf 25-
 
 rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	set -e; \
