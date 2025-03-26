@@ -1171,7 +1171,8 @@ but there are valid idioms of use where we found it necessary.
   above -- most of which are themselves a suite of benchmarks -- and alter
   them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
   etc.). \binarytrees and \regexredux are classic stand-alone GC benchmarks;
-  the middle portion of the table shows a variety of `normal' Rust programs;
+  the other `benchmarks' represent benchmark suites (e.g.~\ripgrep contains
+  13 benchmarks). The middle portion of the table shows a variety of `normal' Rust programs;
   the bottom portion of the program shows three implementations of the SOM
   programming language.}
 \label{tab:benchmarks}
@@ -1197,23 +1198,24 @@ up, we carried out three experiments:
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
-want to compare programs using existing shared ownership approaches such as \lstinline{Rc<T>} against
-\lstinline{Gc<T>}. We searched through roughly the 100 most popular
+want to compare programs using existing shared ownership approaches (e.g.~\lstinline{Rc<T>} against
+\lstinline{Gc<T>}). We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates.
-\cref{tab:benchmarks} shows our eventual benchmark suite: note that, with
-the exception of \binarytrees \and \regexredux, the other `benchmarks' are themselves
-benchmark suites. Collectively, our suite thus contains -- depending on whether you
-count the SOM implementations collectively or separately -- 62 or 114 benchmarks.
+\cref{tab:benchmarks} shows the resulting suite: note that, except
+for \binarytrees and \regexredux, the `benchmarks' are themselves
+benchmark suites. Collectively, our suite contains -- depending on whether you
+count the SOM implementations' (identical) benchmark suites collectively or
+separately -- 62 or 114 benchmarks.
 
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
-\alacritty, \fd, and \ripgrep are well known Rust tools, all
+\alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
-UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
+UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>} \laurie{looking at table 2, it seems that we ported less than we didn't port? or is there another explanation for all the \lstinline{Arc<T>}s in alacritty?}.
 \grmtools is a parsing library which uses \lstinline{Rc<T>} extensively
 in error recovery: we benchmarked it
-using 28KLoC of Java source code to which we injected errors.
+using 28KLoC of real Java source code into which we injected errors.
 
 Our suite includes three SOM VMs. SOM is a small, but complete,
 language in the Smalltalk mould, which has a wide variety of implementations. \somrsast
@@ -1232,29 +1234,42 @@ we variously compare performance against: \lstinline{Rc<T>} and
 \rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
 (a non-GC memory arena\cite{chiovoloni15typed}).
 
+\cref{tab:conversion:static} shows a source-level view of relevant properties
+of our benchmark suite, which gives an approximate idea of porting effort. It
+is worth emphasising -- as we shall see in the dynamic view of benchmark runs
+in~\cref{table:Ercgc:conversion} -- that the number of source locations of
+various types does not in any way correspond to the number of objects created
+from these source locations during a benchmark's execution.
 
-\subsubsection{Static conversion data}
-
-\begin{table}[h]
+\begin{table}[t]
+\small
 \centering
 \begin{tabular}{lrrrrrr}
-\hline
-Benchmark & Gcs & Rcs & Arcs & Weaks & Arcweaks & Elidable Finalizers \\
-\hline
-\yksom & 464 & 21 & 18 & 0 & 0 & 292 \\
-\grmtools & 299 & 1686 & 139 & 2 & 21 & 2310 \\
-\fd & 7 & 19 & 402 & 0 & 1 & 4 \\
-\ripgrep & 104 & 27 & 222 & 2 & 2 & 88 \\
+\toprule
+  & \texttt{Gc<T>} & \texttt{Rc<T>} & \texttt{Arc<T>} & \texttt{rc::Weak} & \texttt{sync::Weak} & Elidable Finalizers \\
+\midrule
 \binarytrees & 2 & 0 & 0 & 0 & 0 & 0 \\
 \regexredux & 108 & 0 & 109 & 0 & 0 & 31 \\
+\midrule
 \alacritty & 107 & 1904 & 7546 & 45 & 1925 & 1533 \\
-\hline
+\fd & 7 & 19 & 402 & 0 & 1 & 4 \\
+\grmtools & 299 & 1686 & 139 & 2 & 21 & 2310 \\
+\ripgrep & 104 & 27 & 222 & 2 & 2 & 88 \\
+\midrule
+\yksom & 464 & 21 & 18 & 0 & 0 & 292 \\
+\bottomrule
 \end{tabular}
-\caption{table showing the number of types of each shared object in each benchmark. This shows how many gc types we were able to convert. Because these are static, they do not correspond to the number of actual objects at runtime.}
+  \vspace{5pt}
+  \caption{\laurie{where are the som-rs's?}
+    The number of source-level locations of relevant types in our
+  benchmark suite. For example, there are 107 source-level instances of
+  \lstinline{Gc<T>} in our ported \alacritty. \lstinline{rc::Weak} (and its
+  \lstinline{Arc<T>} cousin \texttt{sync::Weak} show how often programs that
+  use reference counting have to resort to juggling strong and weak counts to
+  express shared ownership. \laurie{what is the last column showing?}
+  }
 \label{tab:conversion:static}
 \end{table}
-
-
 
 
 \subsubsection{What we couldn't include in the benchmark suite}
@@ -1285,7 +1300,7 @@ important portions of the program's structure have been designed with the
 flexibilities and limitations of existing APIs in mind: adapting them may
 be no small effort.
 
-We also ported RustPython, but were unable to faithfully implement Python-level
+We also ported RustPython, but were unable to adjust it to faithfully implement Python-level
 destructors. In essence, in RustPython's default configuration, its
 representation of objects is not compatible with FSA. This means that we can
 not run Python \lstinline{__del__} methods in the finalizer thread. Although
@@ -1301,20 +1316,20 @@ Fortunately, \ourgc is a strict superset of `normal' Rust: only if users
 explicitly opt into GC does \ourgc really become a `GC for Rust'. This allows
 us to use a single \rustc binary, standard library, and so on, removing a
 potential confounding factor in our results. This binary includes a number of
-additional opt-in logging features we added that record additional data
+additional, opt-in, logging features that record additional data
 of interest (e.g.~number of finalizers).
 
 As we shall soon see, in order to understand our experiments, we needed to
 understand the memory usage of different allocation strategies over the
-lifetime of a benchmark. To do this we used heaptrack~\cite{wolff14heaptrack}. Heaptrack
+lifetime of a benchmark. To do this we used heaptrack~\cite{wolff14heaptrack}. heaptrack
 takes a complete snapshot of the heap every millisecond, tracking
 allocated chunks of memory throughout their lifetime. We had to modify both
-\boehm and heaptrack itself so that both worked correctly in the context of
+\boehm and heaptrack itself so that they worked correctly in the context of
 \ourgc. We added a hook into \boehm's collector so that each reclaimed object
-is reported to heaptrack. We built a second \rustgc binary for heaptrack,
+is reported to heaptrack. We built a second \rustc binary for heaptrack,
 since heaptrack requires the binary it is tracking to be dynamically linked
-and, normally, \rustgc and \ourgc are statically linked. There are no other
-differences between the two \rustgc builds.
+and, normally, \rustc and \ourgc are statically linked. There are no other
+differences between the two \rustc builds.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
@@ -1326,7 +1341,9 @@ be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): we thus use \boehm as the allocator for all
 benchmarks.
 
-We ran each benchmark in our suite 30 times reporting 99\% confidence intervals.
+We ran each benchmark in our suite 30 times reporting means and 99\% confidence intervals
+(note: that for individual benchmarks we report the arithmetic mean, and for benchmark
+suites the geometric mean).
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
 utility. The SOM benchmarks are run using its conventional \emph{rebench} tool;
 we adjusted \emph{rebench} to use \lstinline{time} for consistency with our
@@ -1359,7 +1376,7 @@ Our experiment is fully repeatable and downloadable from
   \input{plots/conversion}%
 }
   \vspace{5pt}
-    \caption{Conversion table}
+    \caption{Conversion table \laurie{two questions: where is yksom? why don't the percentages add up (in general anywhere near) to 100\%? for example, we only appear to record 0.21\% of alacritty's allocations judging by this table. i guess it's using other smart pointers or ...?}}
   \label{table:Ercgc:conversion}
 \end{table}
 
