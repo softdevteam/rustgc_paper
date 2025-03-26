@@ -1199,7 +1199,7 @@ separately -- 62 or 114 benchmarks.
 can be easily and meaningfully ported to a variety of shared ownership strategies.
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
-UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>} \laurie{looking at table 2, it seems that we ported less than we didn't port? or is there another explanation for all the \lstinline{Arc<T>}s in alacritty?}. \jake{The numbers in this table are counting everytime we encounter an \lstinline{Arc} type during compilation. These could exist in any of the dependency tree as well as the alacritty binary itself. It becomes quite difficult to know in isolation}
+UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
 \grmtools is a parsing library which uses \lstinline{Rc<T>} extensively
 in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
@@ -1249,8 +1249,9 @@ from these source locations during a benchmark's execution.
   \vspace{5pt}
   \caption{\laurie{where are the som-rs's?}
     The number of source-level locations of relevant types in our
-  benchmark suite. For example, there are 107 source-level instances of
-  \lstinline{Gc<T>} in our ported \alacritty. \lstinline{rc::Weak} (and its
+  benchmark suite, including dependencies. For example, there are 107 source-level instances of
+  \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s and \lstinline{Arc<T>}s come from
+  (direct or indirect) libraries. \lstinline{rc::Weak} (and its
   \lstinline{Arc<T>} cousin \texttt{sync::Weak} show how often programs that
   use reference counting have to resort to juggling strong and weak counts to
     express shared ownership. \laurie{what is the last column showing?}\jake{This shows the number of Ts in a \lstinline{Gc<T>} whose finalizers can be elided. It's a compile-time value rather than a per object runtime one. if you think it's misleading, i can remove it}
@@ -1477,7 +1478,7 @@ finalizer elision still has a notable performance impact irrespective of whether
     }
       \vspace{5pt}
     \caption{
-        Finalizer elision's impact on \boehm's \laurie{what's the right term? active memory?}\jake{This is showing the average heap consumption of the benchmark}
+        Finalizer elision's impact on heap size
       (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
       Finalizer elision can cause higher memory usage because
       memory is no longer immediately reclaimed during finalization, and is batched
