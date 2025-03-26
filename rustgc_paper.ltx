@@ -1249,7 +1249,7 @@ from these source locations during a benchmark's execution.
   benchmark suite, including dependencies. For example, 107 source-level types are used
   in \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s and \lstinline{Arc<T>}s come from
   (direct or indirect) libraries. \lstinline{rc::Weak} (and its
-  \lstinline{Arc<T>} cousin \texttt{sync::Weak} show how often programs that
+  \lstinline{Arc<T>} cousin \texttt{sync::Weak}) show how often programs that
   use reference counting have to resort to juggling strong and weak counts to
     express shared ownership.
   }
