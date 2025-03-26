@@ -1361,7 +1361,14 @@ Our experiment is fully repeatable and downloadable from
   \input{plots/conversion}%
 }
   \vspace{5pt}
-    \caption{Conversion table. This shows the runtime totals of different kinds of heap allocations. Finalizers registered are how many finalizers were unable to be elided. gcpct and gcpctextra \jake{please help me name these im stuck} explain heap coverage: gcpct is the percentage of the total allocations for the benchmark(s) which are explicitly allocated Gc objects. gcpctextra is the percentage of the total allocations which are either a GC, or owned by a GC (i.e. managed by the collector). }
+    \caption{
+    Statistics about benchmarks at run-time. `Allocated' shows how
+    many \lstinline{Gc<T>} (etc.) objects were allocated. `GC Memory' shows
+    what proportion of the heap is directly or indirectly (via an embedded
+    smart pointer) allocated via \lstinline{Gc<T>}. `Finalizers' shows how many
+    finalizers were actually run and those that would have been run without
+    finalizer elision.
+  }
   \label{table:Ercgc:conversion}
 \end{table}
 
