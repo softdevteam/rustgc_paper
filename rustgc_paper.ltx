@@ -1363,41 +1363,44 @@ Our experiment is fully repeatable and downloadable from
   \input{plots/gcvs/perf_summary}
 }
   \vspace{5pt}
-  \caption{Performance results for the \Egcrc experiment, comparing
+  \caption{Wall-clock results for the \Egcrc experiment, comparing
   benchmarks running on \ourgc against other shared ownership approaches
   (measuring wall-clock time in seconds with 99\% confidence
   ranges; lower is better). As individual benchmarks, \binarytrees and \regexredux report arithmetic means;
   the remaining rows are benchmark suites that report geometric means.}
   \label{table:Ercgc:perf}
-\end{table}
 
-\begin{table}[t]
 \scalebox{0.7}{%
   \input{plots/conversion}%
 }
   \vspace{5pt}
-    \caption{Conversion table \laurie{two questions: where is yksom? why don't the percentages add up (in general anywhere near) to 100\%? for example, we only appear to record 0.21\% of alacritty's allocations judging by this table. i guess it's using other smart pointers or ...?}}
+    \caption{\laurie{which run of a benchmark did we take this from? i guess it
+    was taken from a normal rustc run, which is why yksom isn't here? although
+    then i can't work out what the ``by gc directly'' column means}
+      How many objects of different kinds are allocated by different benchmarks?
+      \laurie{why don't the percentages add up (in general anywhere near) to 100\%? for example, we only appear to record 0.21\% of alacritty's allocations judging by this table. i guess it's using other smart pointers or ...?}}
   \label{table:Ercgc:conversion}
 \end{table}
 
-Starting with \Egcrc, wall-clock times for benchmarks can be found
+
+Starting with \Egcrc, wall-clock performance be found
 in~\cref{table:Ercgc:perf}, which we suggest interpreting in conjunction with
 the `quantity of memory' data found in \cref{table:Ercgc:conversion}. The broad
-story we can see from this data is that \ourgc has (when confidence intervals
-are taken into account) similar performance to other memory allocation
+story we can see from this data is that \ourgc has, when confidence intervals
+are taken into account, similar performance to other memory allocation
 approaches when few finalizers are run.
 
 However, there is a notable correlation between the quantity of finalizers and
 additional overhead in \ourgc. We can see the contrast between these two cases
 using two different benchmark suites as exemplars. \grmtools allocates large
 numbers of \lstinline{Gc<T>} objects, but requires no finalizers. This is
-because, eliding various wrappers, \lstinline{T} is either a nested
+because, once intermediate wrappers are elided, the \lstinline{T}'s it uses are always either a nested
 \lstinline{Gc<T>} or an integer type --- since neither has a destructor, a
 finalizer is not required. In contrast, \ripgrep allocates a relative small portion
 of \lstinline{Gc<T>} data, but \laurie{half?} of the resulting objects require
 a finalizer.
 
-This correlation surprised us: finalizers do impose some overhead on the
+The magnitude of this effect surprised us: finalizers do impose some overhead on the
 mutator, but we had assumed that most of the costs would be borne by the (parallel) finalizer
 thread. To investigate further, we recorded time-series data of heap
 usage with heaptrack.
@@ -1420,28 +1423,30 @@ usage with heaptrack.
 \cref{fig:ripgrep_subset} shows a representative subset of the data for
 \ripgrep (the complete data can be found in \cref{fig:Egcrc:ripgrep:mem:profiles}
 in the appendix). At first
-glance, this may suggest that \ourgc is leaking memory. It is not, but explaining
+glance, this may suggest that \ourgc is leaking memory. It is not, but understanding
 why requires considering three factors. First, \ripgrep depends
 heavily on a number of external libraries which are not converted to
 \lstinline{Gc<T>}. In this instance, \ripgrep is heavily intertwined with the
-\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively, and thus
-causes the wrapping \lstinline{Gc<T>} to have to run a finalizer. Second,
+\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively. In a number
+of cases, potentially many levels deep, a \lstinline{Gc<T>} can end up owning
+a \lstinline{Arc<T>}, which then requires the \lstinline{Gc<T>} to have to
+run a finalizer. Second,
 \lstinline{Arc<T>} (as with similar types such as \lstinline{Gc<T>}) is often the
 entry point to a large tree of objects. When placed inside a \lstinline{Gc<T>},
 that tree of objects is kept alive for a longer period of time than normal: only after the
 finalizer is run by the finalization thread can the underlying memory be freed.
-Third, until finalization occurs, that memory contributes to the overall conservative marking
-overhead, even though it will shortly be freed.
+Third, until finalization occurs, that memory contributes to the conservative marking
+overhead, even though it will soon be freed.
 
-Summarising this, we believe a fundamental message
-from our evaluation is that the more of a codebase you convert to use
+Summarising this, these results suggest a counter-intuitive
+rule: the more of a codebase you convert to use
 \lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
 
 Other aspects of \Egcrc are more straightforward.
 For example, we can see from \cref{table:Ercgc:perf} that
 \typedarena is hugely faster than other allocation strategies for \binarytrees:
 it performs a single (huge!) deallocation at the end of the benchmark.
-The heaptrack data also allowed us to tell that the JSON SOM benchmark
+Very differently, the heaptrack data allowed us to spot that the JSON SOM benchmark
 has a leak, which manifests in all SOM VMs.
 
 \begin{table}[t]
@@ -1454,16 +1459,25 @@ has a leak, which manifests in all SOM VMs.
     Finalizer elision's impact on wall-clock performance
     (times in seconds with 99\% confidence interval ranges; lower is better). As
     expected, there is a causal link between the number of finalizers
-    (see~\cref{table:Ercgc:conversion}) elided and performance.}
+    elided (see~\cref{table:Ercgc:conversion}) and wall-clock performance.}
 \label{table:Eelision:perf}
 \end{table}
 
-The results for \Eelision are shown in \cref{table:Eelision:perf}. Some
+The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
 benchmarks (e.g.~the SOM VMs) benefit significantly from finalizer elision,
 whereas for others it makes no difference. Unsurprisingly, there is a causal relationship
 between the number of finalizers elided as shown in
 \cref{table:Ercgc:conversion} and wall-clock performance as shown in
 \cref{table:Eelision:perf}.
+
+We can use the results of \cref{table:Eelision:perf} to infer an answer to
+another question. Because we lazily create the finalizer thread, we may change
+\boehm's performance characteristics, because it only enters a slower
+multi-threading mode when it is told that another thread has started. Those
+benchmarks that have no finalizers may thus benefit significantly from this.
+We can see from \fd's results, where many, but not all, finalizers are elided, that
+finalizer elision still has a notable performance impact irrespective of whether
+\boehm has entered its multi-threading mode or not.
 
 \begin{table}[t]
     \centering
@@ -1481,24 +1495,17 @@ between the number of finalizers elided as shown in
 \end{table}
 
 Surprisingly, however, finalizer elision can cause processes to consume more
-memory, as shown in \cref{table:Eelision:mem}. We were initially surprised by
-this until we checked the heaptrack data at which point we realised that
+memory, as shown in \cref{table:Eelision:mem}. The heaptrack data allowed
+us to uncover why this happen:
 finalizer elision changes the memory reclamation characteristics of \boehm. If,
-as is common, a finalizer deallocates an object's, \boehm immediately reclaims
+as is common, a finalizer deallocates an object's backing memory, \boehm immediately reclaims
 that memory (in the sense that it can reuse it, or even return it to the OS).
 When we elide finalizers that contain deallocation calls, we change when \boehm
 reclaims memory: it might reclaim it earlier than the equivalent finalizer but,
 mostly, it reclaims it much later. In general, this is likely to allow \boehm
 to operate more efficiently, in the sense that it is more likely to batch
-operations up: it is possible, though we do not see this in any noticeable way
-our data, that there might sometimes be an increase in latency.
+reclamation tasks.
 
-There is a second possible factor in this facet of finalizer elision's effects.
-\boehm only enters its slower multi-threading mode when it is told that another
-thread has started. Because we lazily create the finalizer thread, finalizer
-elision may sometimes delay the point when \boehm `slows down'. It is difficult
-to break this cost out separately: we suspect that it is a relatively minor
-factor.
 
 \begin{table}[t]
 \scalebox{0.7}{%
