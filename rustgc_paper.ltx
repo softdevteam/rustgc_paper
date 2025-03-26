@@ -126,10 +126,10 @@ an example of its use is shown in \cref{fig:first_example}. As shown
 in our evaluation (\cref{sec:evaluation}), the overhead of \ourgc
 varies from zero to, in the worst case, several times slower. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
-\lstinline{Gc<T>} the overhead trends towards zero.
-Although \ourgc is not production ready, its performance is hopefully
+\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
+Although \ourgc is not production ready, its performance is arguably
 good enough, and it is sufficiently polished (e.g.~good quality error messages)
-in other ways that it may show
+in other ways for it to show
 a plausible path forwards for those who may wish to follow it. Furthermore,
 although \ourgc is necessarily tied to Rust, a reasonable guess is that many of the
 techniques in this paper, particularly those related to finalization, will
@@ -196,9 +196,9 @@ A common way of expressing shared ownership is to use
 the reference counting type \lstinline{Rc<T>} from Rust's
 standard library. For many data-structures, this is a reasonable
 solution, but some forms of shared ownership require
-juggling strong and weak counts. This not complicates the program
-(see~\cref{fig:rc_example}) and often leads to bugs where
-values live shorter or longer than intended.
+juggling strong and weak counts. This complicates programs
+(see~\cref{fig:rc_example}) and can cause problems when
+values live for shorter or longer than intended.
 
 A different solution is to store values in a vector and use
 integer indices into that vector. Such indices are morally closer to
@@ -238,7 +238,7 @@ unfamiliar or unintuitive. We mostly use the same terminology
 as~\cite{jones23garbage}, the major parts of which we define here.
 
 A program which uses GC is split between the \emph{mutator} (the user's program) and
-the \emph{collector} (the GC itself). At any given point in time, a particular thread is either
+the \emph{collector} (the GC itself). At any given point in time, a thread is either
 running as a mutator or a collector. In our context, all threads
 run as a collector at least sometimes (for reasons that will become apparent
 later, some threads always run as a collector).
@@ -296,9 +296,9 @@ types that enable \emph{interior mutability} (e.g.~\lstinline{RefCell<T>} or
 One feature that \ourgc explicitly supports is the ability in Rust to
 cast references to raw pointers and back again. This can occur in two main
 ways. \lstinline{Gc<T>} can be dereferenced to \lstinline{&T} which
-can then, as with any other reference, be converted to \lstinline{*const T}
+can then, as with any other reference, be converted to \texttt{*const T}
 (i.e.~a C-esque pointer to T). \lstinline{Gc<T>} also supports the common Rust
-functions (\lstinline{into_raw}) and back (\lstinline{from_raw}), which wrap
+functions (\lstinline{into_raw} and \lstinline{from_raw}) which wrap
 the object-to-pointer conversion in a slightly higher-level API. The ability to
 convert references to raw pointers is used in many places (e.g.~Rust's standard
 C Foreign Function Interface (FFI)).
@@ -317,10 +317,10 @@ Having acknowledged that pointers can be `disguised' as integers, it is then
 inevitable that \ourgc must be a conservative GC: if a machine word's integer
 value, when considered as a pointer, falls within a GCed block of memory,
 then that block itself is considered reachable (and is transitively scanned).
-Since a conservative GC cannot know if a word is really a pointer, or just happens to be a sequence of
-bits that happens to also be a valid pointer, this over-approximates the
+Since a conservative GC cannot know if a word is really a pointer, or is a random sequence of
+bits that happens to be the same as a valid pointer, this over-approximates the
 \emph{live set} (i.e.~the blocks that the GC will not reclaim). Typically
-the false detection rate is too low to be a worry (see e.g.~a Java study which measures
+the false detection rate is very low (see e.g.~a Java study which measures
 it at under 0.01\% of the live set~\cite{shahriyar14fast}).
 
 Conservative GC occupies a grey zone in programming language semantics: in most
@@ -372,8 +372,8 @@ for \ourgc, we expect that our techniques will apply to other conservative GCs w
 relative ease.
 
 We made the following changes to \boehm. First, we disabled \boehm's parallel collector
-because it worsens \ourgc's performance. We don't have a good explanation for
-this: we observe significant lock contention within \boehm during GC
+because it worsens \ourgc's performance. It is unclear to us why this happens:
+we observe significant lock contention within \boehm during GC
 collections, but have not correlated this with a cause.
 Second, \boehm cannot scan pointers stored in thread locals
 because these are platform dependent. Fortunately, \rustc uses LLVM's
@@ -388,8 +388,8 @@ to register new threads with \boehm.
 We made one conceptually larger -- though only 60LoC -- change to \boehm,
 making it run all finalizers on a
 separate thread (see~\cref{sec:general_challenges,sec:fsa_finalizer_thread} for
-motivation). We lazily create a thread dedicated to this once the collector has
-first identified objects that need finalizing.
+motivation). We lazily create a thread dedicated to this as soon as the collector has
+identified an object that requires finalization.
 
 
 \section{Destructors and Finalizers}
@@ -406,10 +406,10 @@ finalizers.
 When a value in Rust is \emph{dropped} (i.e.~the value's owner went out of lexical
 scope) its destructor is automatically run. Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
-automatically inserted \emph{drop glue}. Drop methods are optional; users
+automatically inserted \emph{drop glue}. Drop methods are optional and users
 can provide one for a type by implementing the \lstinline{Drop} trait's \lstinline{drop}
 method. Drop glue recursively calls destructors of contained types (e.g.~fields
-in a \lstinline{struct}). Although it is common usage to conflate `destructor' in
+in a \texttt{struct}). Although it is common usage to conflate `destructor' in
 Rust with drop methods, drop glue is an integral part of a Rust destructor:
 we therefore use `destructor' as the umbrella term for both drop methods and drop glue.
 
@@ -425,7 +425,7 @@ Where the former have the \lstinline{Drop} trait, the later typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
 However, doing so introduces a number of problems: (1) external libraries are
-unlikely to provide finalizers so they must be manually implemented
+unlikely to provide finalizers, so they must be manually implemented
 by each consumer; (2) Rust's \emph{orphan
 rule}~\cite[Section~6.12]{rustlangref} prevents one implementing traits for
 types defined in external libraries (i.e.~unless a library's types were
@@ -441,7 +441,7 @@ Doing so is tedious but not conceptually difficult.
 
 Problem \#3 has partial solutions: for example, ~\cite{manish15rustgc} uses the
 \lstinline{Trace} macro to generate \emph{finalizer glue} (the finalizer equivalent of drop glue) for
-\lstinline{struct} fields. This runs into an unsolvable variant of problem \#2:
+\texttt{struct} fields. This runs into an unsolvable variant of problem \#2:
 types in external libraries will not implement this trait and cannot be
 recursively scanned for finalizer glue.
 
@@ -462,7 +462,7 @@ have different, and sometimes incompatible, properties. The best
 guide to these differences, and the resulting problems, is~\cite{boehm03destructors},
 supplemented by later work by some of the same authors on support
 for GC in the C++ specification~\cite{boehm09garbage}\footnote{These features
-were added to the C+11 specification but removed in C++23.}
+were added to the C+11 specification but removed in C++23.}.
 
 An obvious difference between destructors and finalizers is \emph{when} both
 are run. Where C++ and Rust define
@@ -481,7 +481,7 @@ deadlocks~\cite[section~3.3]{boehm03destructors} if a finalizer tries to access
 a resource that the mutator expects to have exclusive access too.
 When such problems affect destructors in normal Rust code, it is the clear result of programmer error, since they should
 have taken into account the predictable execution point of destructors. However, since
-finalizers have no such predictable execution point, there is no way
+finalizers do not have a predictable execution point, there is no way
 to safely access shared resources if they are run on the same thread.
 The only way to avoid this is to run
 finalizers on a non-mutator thread: however, not all Rust types / destructors
