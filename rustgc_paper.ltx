@@ -1244,15 +1244,14 @@ from these source locations during a benchmark's execution.
 \bottomrule
 \end{tabular}
   \vspace{5pt}
-  \caption{\laurie{where are the som-rs's?}
+  \caption{
     The number of source-level locations of relevant types in our
   benchmark suite, including dependencies. For example, 107 source-level types are used
   in \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s and \lstinline{Arc<T>}s come from
   (direct or indirect) libraries. \lstinline{rc::Weak} (and its
   \lstinline{Arc<T>} cousin \texttt{sync::Weak} show how often programs that
   use reference counting have to resort to juggling strong and weak counts to
-    express shared ownership. `Elidable Finalizers' shows how 
-    \laurie{what is the last column showing?}\jake{This shows the number of Ts in a \lstinline{Gc<T>} whose finalizers can be elided. It's a compile-time value rather than a per object runtime one. if you think it's misleading, i can remove it}\laurie{let's nuke it}
+    express shared ownership.
   }
 \label{tab:conversion:static}
 \end{table}
@@ -1463,7 +1462,7 @@ has a leak, which manifests in all SOM VMs.
       up by \boehm.}
 \label{table:Eelision:mem}
 
-\vspace{-18pt}
+\vspace{-14pt}
 \end{table}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
