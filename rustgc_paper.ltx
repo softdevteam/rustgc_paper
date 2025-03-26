@@ -654,20 +654,7 @@ impl<T> Gc<T> {
   }
 }
 \end{lstlisting}
-\end{figure}
 
-\cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsinc
-\lstinline{needs_finalizer} we added to implement \cref{alg:elision}. The
-intrinsic is evaluated at compile-time: its result can be inlined into \lstinline{Gc::new},
-allowing the associated conditional to be removed too. In other words --
-compiler optimisations allowing -- the `does this specific type require a
-finalizer?' check has no run-time overhead.
-
-
-\section{Premature Finalizer Prevention}
-\label{sec:premature_finalize_prevention}
-
-\begin{figure}[tb]
 \begin{lstlisting}[
   language=Rust,
   basicstyle=\footnotesize\ttfamily,
@@ -694,6 +681,17 @@ fn main()  {
 }
 \end{lstlisting}
 \end{figure}
+
+\cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsinc
+\lstinline{needs_finalizer} we added to implement \cref{alg:elision}. The
+intrinsic is evaluated at compile-time: its result can be inlined into \lstinline{Gc::new},
+allowing the associated conditional to be removed too. In other words --
+compiler optimisations allowing -- the `does this specific type require a
+finalizer?' check has no run-time overhead.
+
+
+\section{Premature Finalizer Prevention}
+\label{sec:premature_finalize_prevention}
 
 Most of us assume that finalizers are always run later than the
 equivalent destructor would have run, but they can sometimes run
