@@ -770,7 +770,7 @@ solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
 optimise values of other types as it so wishes. However, our approach still
 imposes a performance overhead on code that uses
 \lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
-\jake{TODO: worst}. We attempted to optimise premature finalization as follows,
+\jake{TODO: worst}.\jake{These are statistically significant. So i think this part needs rephrasing} We attempted to optimise premature finalization as follows,
 though as we shall see in \cref{sec:evaluation} our benchmark suite as a whole
 does not meaningfully benefit from doing so.
 
