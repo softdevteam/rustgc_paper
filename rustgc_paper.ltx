@@ -1762,10 +1762,7 @@ interested readers may find that they help flesh out some details.
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/som/perf.pdf}
     \caption{Results of a performance evaluation of \somrsast and \somrsbc
-    using with two configurations: Gc, -- which uses \ourgc; and Rc -- which
-    uses single-threaded reference counting. Each benchmark is run for
-    \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    using two configurations.}
 \label{fig:Egcrc:som:perf:individual}
 \end{figure}
 
@@ -1774,43 +1771,28 @@ interested readers may find that they help flesh out some details.
     \centering
     \includegraphics[width=0.5\textwidth]{plots/gcvs/alacritty/perf.pdf}
     \caption{Results of a performance evaluation of \alacritty
-    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
-    uses atomic reference counting. Each benchmark is run for
-    \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    using two configurations.}
 \label{fig:Egcrc:alacritty:perf:individual}
 \end{figure}
 
 \begin{figure}[htbp!]
     \centering
     \includegraphics[width=0.5\textwidth]{plots/gcvs/fd/perf.pdf}
-    \caption{Results of a performance evaluation of \fd
-    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
-    uses atomic reference counting. Each benchmark is run for
-    \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    \caption{Results of a performance evaluation of \fd.}
 \label{fig:Egcrc:fd:perf:individual}
 \end{figure}
 
 \begin{figure}[htbp!]
     \centering
     \includegraphics[width=0.6\textwidth]{plots/gcvs/ripgrep/perf.pdf}
-    \caption{Results of a performance evaluation of \ripgrep
-    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
-    uses atomic reference counting. Each benchmark is run for
-    \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    \caption{Results of a performance evaluation of \ripgrep.}
 \label{fig:Egcrc:ripgrep:perf:individual}
 \end{figure}
 
 \begin{figure}[htbp!]
     \centering
     \includegraphics[width=0.6\textwidth]{plots/gcvs/grmtools/perf.pdf}
-    \caption{Results of a performance evaluation of \grmtools
-    using two configurations: Gc, -- which uses \ourgc; and Arc -- which
-    uses atomic reference counting. Each benchmark is run for
-    \benchmarkpexecs process executions, where the error bars represent 99\%
-    confidence intervals.}
+    \caption{Results of a performance evaluation of \grmtools.}
 \label{fig:Egcrc:grmtools:perf:individual}
 \end{figure}
 
@@ -1822,18 +1804,7 @@ interested readers may find that they help flesh out some details.
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/som/profiles/som-rs-ast.pdf}
     \caption{Time series comparison of heap usage for the SOM benchmark suite
-    on \somrsast -- a SOM AST interpreter. Each graph shows the results of a
-    single benchmark, across \benchmarkpexecs runs, with two configurations:
-    \gc, -- which uses \ourgc; and \rc -- which uses
-    single-threaded reference counting. Each run has been normalized
-    independantly to a fixed time-scale (0-1), before being aggregated to show
-    the mean heap usage over time. The x-axis thus allows comparisons about
-    patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
-    absolute time) \jake{inspired by Blackburn et al.} \laurie{mention this in the prose and cite the appropriate paper w/page number}. The dashed and dotted
-    lines represent the peak and average memory usage for each configuration
-    respectively. The shaded regions represent 99\% confidence intervals for
-    each configuration.}
+    on \somrsast.}
     \label{fig:Egcrc:som-rs-ast:mem:profiles}
 \end{figure}
 
@@ -1841,45 +1812,20 @@ interested readers may find that they help flesh out some details.
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/som/profiles/som-rs-bc.pdf}
     \caption{Time series comparison of heap usage for the SOM benchmark suite
-    on \somrsbc -- a SOM bytecode interpreter. Each graph shows the results of
-    a single benchmark, across \benchmarkpexecs runs, with two configurations:
-    \gc, -- which uses \ourgc; and \rc -- which uses
-    single-threaded reference counting. Each run has been normalized
-    independantly to a fixed time-scale (0-1), before being aggregated to show
-    the mean heap usage over time. The x-axis thus allows comparisons about
-    patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:som:perf:individual} for
-    absolute time). The dashed and dotted
-    lines represent the peak and average memory usage for each configuration
-    respectively. The shaded regions represent 99\% confidence intervals for
-    each configuration. \laurie{why is the blue line so different to that in figure 7? it looks like the resolution here is much coarser or ... ?}} \label{fig:Egcrc:individual:som-rs-bc:mem}
+    on \somrsbc.} \label{fig:Egcrc:individual:som-rs-bc:mem}
 \end{figure}
 
 \begin{figure}[htbp!]
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/grmtools/profiles/grmtools.pdf}
-    \caption{Time series comparison of heap usage for grmtools. Each graph
-    shows the results of a single benchmark, across \benchmarkpexecs runs, with
-    two configurations: \gc, -- which uses \ourgc; and \rc -- which uses
-    single-threaded reference counting. Each run has been normalized
-    independantly to a fixed time-scale (0-1), before being aggregated to show
-    the mean heap usage over time. The x-axis thus allows comparisons about
-    patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:grmtools:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.\laurie{the eclipse figure looks like alloy is leaking?!}}}
+    \caption{Time series comparison of heap usage for \grmtools.}
     \label{fig:Egcrc:grmtools:mem:profiles}
 \end{figure}
 
 \begin{figure}[htbp!]
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/fd/profiles/fd.pdf}
-    \caption{Time series comparison of heap usage for \fd. Each graph
-    shows the results of a single benchmark, across \benchmarkpexecs runs, with
-    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
-    atomic reference counting. Each run has been normalized
-    independantly to a fixed time-scale (0-1), before being aggregated to show
-    the mean heap usage over time. The x-axis thus allows comparisons about
-    patterns of heap usage to be made between configurations irrespective of
-    their absolute time (see ~\cref{fig:Egcrc:fd:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing.}}
+    \caption{Time series comparison of heap usage for \fd.}
     \label{fig:Egcrc:fd:mem:profiles}
 \end{figure}
 
@@ -1924,14 +1870,7 @@ interested readers may find that they help flesh out some details.
 \begin{figure}[t]
     \centering
     \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
-    \caption{Time series comparison of heap usage for \ripgrep. Each graph
-    shows the results of a single benchmark, across \benchmarkpexecs runs, with
-    two configurations: \gc, -- which uses \ourgc; and \arc -- which uses
-    atomic reference counting. Each run has been normalized independantly to a
-    fixed time-scale (0-1), before being aggregated to show the mean heap usage
-    over time. The x-axis thus allows comparisons about patterns of heap usage
-    to be made between configurations irrespective of their absolute time (see
-    ~\cref{fig:Egcrc:ripgrep:perf:individual} for absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
+    \caption{Time series comparison of heap usage for \ripgrep.}
     \label{fig:Egcrc:ripgrep:mem:profiles}
 \end{figure}
 
