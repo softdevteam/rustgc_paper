@@ -999,24 +999,16 @@ synchronises all memory between threads already.
             \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
               \State \textbf{continue}
             \EndIf
-            \If { \NOT \Call{ImplementsTrait}{\textit{ty}, \textit{ReferenceFree}}}
-            \State \Call{EmitReferenceError}{}
-            \Else
             \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
               \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
                   \State \Call{EmitFinalizerUnsafeError}{}
               \EndIf
-              \State \Call{CheckDropMethodSafety}{\textit{drop\_method}}
+              \State \Call{CheckFunctionSafety}{\textit{drop\_method}}
             \EndFor
-            \EndIf
       \EndFor
 \EndFunction
 \State{}
-    \Function{CheckDropMethodSafety}{\textit{drop}}
-    \State $ty \gets$ \Call{GetTyOfDropValue}{\textit{drop}}
-    \If {\Call{IsFinalizerSafe}{\textit{ty}}}
-      \State \Return
-    \EndIf
+    \Function{CheckFunctionSafety}{\textit{drop}}
       \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
         \ForEach {$\textit{statement} \in \textit{basic\_block}$}
             \ForEach {$\textit{projection} \in \textit{statement}$}
@@ -1024,6 +1016,9 @@ synchronises all memory between threads already.
                   \State \Call{EmitFinalizerUnsafeError}{}
               \EndIf
             \EndFor
+            \If{\Call{IsFunctionCall}{\textit{basic\_block.terminator}}}
+              \State \Call{CheckFunctionSafety}{\textit{basic\_block.terminator}}
+           \EndIf
         \EndFor
       \EndFor
 
