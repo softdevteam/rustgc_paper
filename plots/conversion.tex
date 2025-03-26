@@ -1,8 +1,8 @@
 \begin{tabular}{lrrrrrrrrr}
 \toprule
-& \multicolumn{4}{c}{Allocated} & \multicolumn{2}{c}{GC Ratios} & \multicolumn{2}{c}{Optimizations} \\
+	& \multicolumn{4}{c}{Allocated (\#)} & \multicolumn{2}{c}{GC Memory (\%)} & \multicolumn{2}{c}{Finalizers (\#)} \\
 \cmidrule(lr){2-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
-Suite & Gc & Arc & Rc & Box & gcr & gcrt & Registered & Elided \\
+Suite & Gc & Arc & Rc & Box & Direct & Transitive & Registered & Elided \\
 \midrule
 \binarytrees & 3.2M & 0 & 0 & 13 & 98.82\% & 100.00\% & 0 & 0\\
 \regexredux & 78 & 0 & 0 & 3.1K & 1.66\% & 33.92\% & 24 & 96\\
