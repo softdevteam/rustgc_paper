@@ -1037,6 +1037,23 @@ synchronises all memory between threads already.
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[tb]
+  \begin{center}
+\lstinputlisting[
+  language={},
+    basicstyle=\fontsize{7.6pt}{7pt}\ttfamily,
+    xleftmargin=6pt,
+    numbers=none,
+    caption={The compiler error produced by \ourgc for the example
+    in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
+    note that both the use of a type with a FSA-incompatible drop method (`has
+    a drop method') and the line in the drop method (`caused by the
+    expression') are highlighted to the user.},
+    label={fig:finalizer_cycle_err}
+]{listings/finalization_cycle.stderr}
+  \end{center}
+\end{figure}
+
 FSA integrates the seemingly separate components presented above into one. It
 iterates over every function in a Rust program analysing destructors of types
 that are used in \lstinline{Gc<T>}.
@@ -1105,26 +1122,6 @@ therefore provide a per-value escape hatch with the \lstinline{unsafe FinalizerU
 type. Values wrapped in this type are considered safe to use at all points in
 FSA. Our aim is that users should rarely need to resort to this escape hatch,
 but there are valid idioms of use where we found it necessary.
-
-
-
-
-\begin{figure}[tb]
-  \begin{center}
-\lstinputlisting[
-  language={},
-    basicstyle=\fontsize{7.6pt}{7pt}\ttfamily,
-    xleftmargin=6pt,
-    numbers=none,
-    caption={The compiler error produced by \ourgc for the example
-    in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
-    note that both the use of a type with a FSA-incompatible drop method (`has
-    a drop method') and the line in the drop method (`caused by the
-    expression') are highlighted to the user.},
-    label={fig:finalizer_cycle_err}
-]{listings/finalization_cycle.stderr}
-  \end{center}
-\end{figure}
 
 
 \section{Performance Evaluation}
@@ -1454,6 +1451,18 @@ has a leak, which manifests in all SOM VMs.
     expected, there is a causal link between the number of finalizers
     elided (see~\cref{table:Ercgc:conversion}) and wall-clock performance.}
 \label{table:Eelision:perf}
+
+    \scalebox{0.7}{%
+      \input{plots/elision/mem_summary}
+    }
+      \vspace{5pt}
+    \caption{
+        Finalizer elision's impact on heap size
+      (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
+      Finalizer elision can cause higher memory usage because
+      memory is no longer immediately reclaimed during finalization, and is batched
+      up by \boehm.}
+\label{table:Eelision:mem}
 \end{table}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
@@ -1471,21 +1480,6 @@ benchmarks that have no finalizers may thus benefit significantly from this.
 We can see from \fd's results, where many, but not all, finalizers are elided, that
 finalizer elision still has a notable performance impact irrespective of whether
 \boehm has entered its multi-threading mode or not.
-
-\begin{table}[t]
-    \centering
-    \scalebox{0.7}{%
-      \input{plots/elision/mem_summary}
-    }
-      \vspace{5pt}
-    \caption{
-        Finalizer elision's impact on heap size
-      (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
-      Finalizer elision can cause higher memory usage because
-      memory is no longer immediately reclaimed during finalization, and is batched
-      up by \boehm.}
-\label{table:Eelision:mem}
-\end{table}
 
 Surprisingly, however, finalizer elision can cause processes to consume more
 memory, as shown in \cref{table:Eelision:mem}. The heaptrack data allowed
