@@ -539,15 +539,14 @@ A variety of factors contribute to the finalizer performance overhead, including
 a queue of finalizers
 must be maintained, whereas destructors can be run immediately; finalizers run
 some time after the last access of a value making cache misses more likely; and
-(as we shall see in~\cref{sec:evaluation}) finalizers cause objects to live for longer
-(e.g.~leading to increased marking overhead).
+finalizers cause objects to live for longer (e.g.~leading to increased marking overhead).
 Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that it is missing optimisations which would overcome all of this overhead.
 
 Instead, whenever possible, \ourgc \emph{elides} finalizers so that they do not need to be run at all.
-We are able to do this because (1) \boehm is responsible for all allocations and
-will, if necessary GC allocations even if they are not directly wrapped in a \lstinline{Gc<T>} (2) many Rust destructors
+We are able to do this because: (1) \boehm is responsible for all allocations and
+will, if necessary GC allocations even if they are not directly wrapped in a \lstinline{Gc<T>}; and (2) many Rust destructors
 only free memory which \boehm will do -- though often later in time -- anyway.
 
 Consider the standard Rust type \lstinline{Box<T>} which heap allocates space for a value;
@@ -561,9 +560,7 @@ a single heap.
 
 When used as a finalizer,
 \lstinline{Box<T>}'s drop method is thus unneeded, as the underlying memory will
-naturally be freed by \boehm anyway\footnote{Indeed, since the drop method only
-calls \lstinline{deallocate}, any resulting finalizer would cause the underlying
-allocation to live longer than if the finalizer was not present!}
+naturally be freed by \boehm anyway.
 This means that there is no need to run a finalizer for a type such as
 \lstinline{Gc<Box<u8>>} at all, and the finalizer can be statically elided. However,
 we can not elide a finalizer for a type such as
@@ -601,32 +598,26 @@ not require corresponding finalizers and elides them. It does so conservatively,
 and deals correctly with drop glue.
 
 \label{dropmethodfinalizerelidable}
-\cref{alg:elision} says that any type which implements
+As shown in \cref{alg:elision}, any type which implements
 the \lstinline{Drop} trait requires finalization unless it also implements the
 new \lstinline{DropMethodFinalizerElidable} \emph{marker trait} (i.e.~a
 trait without methods). This trait can be
 used by a programmer to signify that a type's drop method need
 not be called if the type is placed inside a \lstinline{Gc<T>}. The `Drop'
 part of the trait name is deliberate (i.e.~it is not a simplification of
-`destructor'): it allows the programmer to reason about a type locally.
+`destructor') as it allows the programmer to reason about a type locally
+(i.e.~without considering drop glue or concrete type paramaters).
 If the type has a transitively reachable field
 whose type implements the \lstinline{Drop} trait but not the
 \lstinline{DropMethodFinalizerElidable} trait, then then the top-level type
-still requires finalization. This not only checks drop glue, but allows the
-programmer to reason about type parameters without knowing
-the concrete types passed to those parameters.
+still requires finalization.
 
 Even though neither normal Rust destructors or \ourgc finalizers are guaranteed
 to run, a program whose destructors or finalizers never run would probably not
 be usable (leaking resources such as memory, deadlocking, and so on). We
 therefore make \lstinline{DropMethodFinalizerElidable} an unsafe
 trait, because implementing it inappropriately is likely to lead to undesired
--- though not incorrect! -- behaviour at run-time. To implement it one therefore
-needs to opt in to unsafe Rust:
-
-\begin{lstrustsmall}
-unsafe impl<T> DropMethodFinalizerElidable for Box<T> {}
-\end{lstrustsmall}
+-- though not incorrect! -- behaviour at run-time.
 
 \ourgc modifies the standard Rust library to implement
 \lstinline{DropMethodFinalizerElidable} on the following types: \lstinline{Box<T>},
@@ -665,7 +656,7 @@ impl<T> Gc<T> {
 \end{lstlisting}
 \end{figure}
 
-\cref{listing:elision_in_rustc} shows the new \lstinline{const} compiler intrinsinc
+\cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsinc
 \lstinline{needs_finalizer} we added to implement \cref{alg:elision}. The
 intrinsic is evaluated at compile-time: its result can be inlined into \lstinline{Gc::new},
 allowing the associated conditional to be removed too. In other words --
