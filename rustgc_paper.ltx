@@ -1394,17 +1394,16 @@ usage with heaptrack.
 
 \begin{figure}[t]
     \centering
-    \vspace{-15pt}
+    \vspace{-25pt}
     \includegraphics[width=1\textwidth]{ripgrep_subset.pdf}
     \caption{A representative subset of time-series memory usage for \ripgrep.
-    Each graph shows the memory usage (in MiB) on the $y$-axis of two runs (one
-    for \ourgc, one for \lstinline{Arc<T>}) of the same benchmark: the running
-    times are normalised to the same scale on the $x$-axis. We initially
-    thought this might show a memory leak in \ourgc or our \ripgrep port.
+    Each plot shows the memory usage (in MiB) on the $y$-axis of two runs (one
+    for \ourgc, one for \lstinline{Arc<T>}) of a benchmark: the $x$-axis normalises
+    running times. We initially thought was a memory leak in \ourgc or our \ripgrep port.
     In fact, it shows the consequences of `partial' porting: \ripgrep uses
     external libraries that embed \lstinline{Arc<T>}s in \lstinline{Gc<T>}s,
-    causing (1) more finalizers to be run than might first appear necessary (2) memory to
-    be kept alive for longer than expected.}
+    causing more finalizers to be run, and memory to be kept alive for longer, than might be expected.
+    }
     \label{fig:ripgrep_subset}
 \end{figure}
 
@@ -1461,6 +1460,8 @@ has a leak, which manifests in all SOM VMs.
       memory is no longer immediately reclaimed during finalization, and is batched
       up by \boehm.}
 \label{table:Eelision:mem}
+
+\vspace{-18pt}
 \end{table}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
@@ -1501,9 +1502,10 @@ reclamation tasks.
   The effects of premature finalization fences on wall-clock performance. \emph{None} is unsound but shows
   the maximum possible performance from removing fences; \emph{Naive} inserts
   all possible fences; and \emph{Optimised} inserts fences when necessary.
-  Unfortunately, when confidence intervals are taken into account, there
-  no statistically significant differences between any of the three approaches.}
+  When confidence intervals are taken into account there
+  no statistically significant differences between the approaches.}
   \label{table:Epremopt:perf}
+\vspace{-18pt}
 \end{table}
 
 The results for \Epremopt are shown in \cref{table:Epremopt:perf}. We create
