@@ -1551,14 +1551,17 @@ The closest analogue we know of is the evolving research literature on memory
 models which, in a sense, modern GC is a superset of.
 
 Any performance judgements we make are necessarily contingent on our particular
-benchmark suite. We cannot say, for example, that finalizer elision will always
-improve performance by the \laurie{X\%}\jake{Which value do you want here? The absolute best improvment or the average?} we see in our experiment: there
+benchmark suite, including the proportion of benchmarks that we ported. For
+example, we did not port external libraries to use \lstinline{Gc<T>} so many
+benchmarks use a variety of allocation strategies. Even had we ported
+everything, we would not be able to say, for example, that finalizer elision will always
+improve performance by exactly the factor we see in our experiment: there
 undoubtedly exist reasonable, non-pathological, programs which will see
 performance changes outside the ranges that our results suggest. Although the \Egcrc
 experiment requires a very specific benchmark suite, our other experiments
 would probably be a good fit for a standard benchmarking suite.
 Since the benchmark suite in this paper is the largest for any GC in Rust, it
-may serve as a partial basis for such a suite in the future.\jake{I think its also worth pointing out here that partial conversion of existing benchmarks, and also the fact that they may be mixing Arcs and Rcs with Gc unknowingly via the use of third-party crates deep in the dependency chain will no doubt colour our results}
+may serve as a partial basis for such a suite in the future.
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
 `pure' allocator performance as a confounding factor, but does mean that some
