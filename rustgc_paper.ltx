@@ -1228,17 +1228,19 @@ from these source locations during a benchmark's execution.
 \centering
 \begin{tabular}{lrrrrrr}
 \toprule
-  & \texttt{Gc<T>} & \texttt{Rc<T>} & \texttt{Arc<T>} & \texttt{rc::Weak} & \texttt{sync::Weak} & Elidable Finalizers \\
+  & \texttt{Gc<T>} & \texttt{Rc<T>} & \texttt{Arc<T>} & \texttt{rc::Weak} & \texttt{sync::Weak} \\
 \midrule
-\binarytrees & 2 & 0 & 0 & 0 & 0 & 0 \\
-\regexredux & 108 & 0 & 109 & 0 & 0 & 31 \\
+\binarytrees & 2 & 0 & 0 & 0 & 0 \\
+\regexredux & 108 & 0 & 109 & 0 & 0 \\
 \midrule
-\alacritty & 107 & 1904 & 7546 & 45 & 1925 & 1533 \\
+\alacritty & 107 & 1904 & 7546 & 45 & 1925 \\
 \fd & 7 & 19 & 402 & 0 & 1 & 4 \\
-\grmtools & 299 & 1686 & 139 & 2 & 21 & 2310 \\
-\ripgrep & 104 & 27 & 222 & 2 & 2 & 88 \\
+\grmtools & 299 & 1686 & 139 & 2 & 21 \\
+\ripgrep & 104 & 27 & 222 & 2 & 2 \\
 \midrule
-\yksom & 464 & 21 & 18 & 0 & 0 & 292 \\
+\somrsast & 206 & 17 & 18 & 0 & 0 \\
+\somrsbc & 464 & 21 & 18 & 0 & 0 \\
+\yksom & 668 & 251 & 0 & 3 & 0 \\
 \bottomrule
 \end{tabular}
   \vspace{5pt}
