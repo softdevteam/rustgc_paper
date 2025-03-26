@@ -114,7 +114,7 @@ static guarantees. We thus gain a better GC for
 Rust \emph{and} solutions to open GC problems. Our solutions, in order, are:
 (1) \emph{finalizer elision} statically optimises away finalizers if the
 underlying destructor duplicates the GC's work;
-(2) \emph{premature finalizer prevention} automatically inserts barriers to prevent
+(2) \emph{premature finalizer prevention} automatically inserts fences to prevent
 the GC from being `tricked' into collecting values before they are dead;
 (3) we run finalizers on a separate thread; and
 (4) \emph{finalizer safety analysis}
@@ -758,17 +758,13 @@ finalization. It also naturally solves a performance problem with the suggested 
 for C++ in~\cite[Solution~1]{boehm07optimization}, which requires keeping alive
 all pointers, no matter their type, for their full scope. By definition, our
 solution only keeps alive \lstinline{Gc<T>} values: the compiler is free to
-optimise values of other types as it so wishes. However, our approach still
-imposes a performance overhead on code that uses
-\lstinline{Gc<T>}: in the worst case in our benchmark suite, the overhead is
-\jake{TODO: worst}.\jake{These are statistically significant. So i think this part needs rephrasing} We attempted to optimise premature finalization as follows,
-though as we shall see in \cref{sec:evaluation} our benchmark suite as a whole
-does not meaningfully benefit from doing so.
+optimise values of other types as it so wishes. However, on an
+artificial microbenchmark we observed a noticeable overhead from our
+fence insertion.
 
-Our optimisation rests on the observation that if a finalizer can be
-elided, there is no finalizer to be called prematurely, and no need for
-such values to be kept alive. We can then avoid generating drop methods
-for \lstinline{Gc<T>} types that do not require finalization,
+We thus implemented a simple optimisation: we only insert fences for a
+\lstinline{Gc<T>} if it has a finalizer. Intuitively, it seems that
+we should not generate drop methods in such cases,
 but this is difficult to do directly inside \rustc. Instead,
 we suppress calls to the drop methods of such types: the two approaches
 are functionally equivalent, though ours
@@ -1398,6 +1394,7 @@ usage with heaptrack.
 
 \begin{figure}[t]
     \centering
+    \vspace{-15pt}
     \includegraphics[width=1\textwidth]{ripgrep_subset.pdf}
     \caption{A representative subset of time-series memory usage for \ripgrep.
     Each graph shows the memory usage (in MiB) on the $y$-axis of two runs (one
@@ -1503,20 +1500,25 @@ reclamation tasks.
   \input{plots/premopt/perf_summary}
 }
   \vspace{5pt}
-  \caption{\laurie{the columns need to be (in order): None, Naive, Optimised}
-  The effects of no, naive (or `all'), and optimised barriers to prevent
-  premature finalization. These show no statistically significant impact
-  from adding barriers (i.e.~moving from \emph{None} $\rightarrow$ \emph{Naive}),
-  but also no statistically significant advantage from optimising barriers
-  (i.e.~moving from \emph{Naive} $\rightarrow$ Optimised).}
+  \caption{
+  The effects of premature finalization fences on wall-clock performance. \emph{None} is unsound but shows
+  the maximum possible performance from removing fences; \emph{Naive} inserts
+  all possible fences; and \emph{Optimised} inserts fences when necessary.
+  Unfortunately, when confidence intervals are taken into account, there
+  no statistically significant differences between any of the three approaches.}
   \label{table:Epremopt:perf}
 \end{table}
 
-The results for \Epremopt are shown in \cref{table:Epremopt:perf}. The good
-news is that our experiment shows no statistically significant impact from
-adding barriers: the less good news is that it shows so statistically significant
-impact from optimising away unnecessary barriers. At least based on our
-benchmarks, we are forced to conclude that this optimisation is not worthwhile.
+The results for \Epremopt are shown in \cref{table:Epremopt:perf}. We create
+three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
+but allows us to approximate (allowing for possible vagaries from running
+unsound code!) the best possible situation for fence removal. \emph{Naive}
+inserts all possible fences. \emph{Optimised} inserts only necessary fences.
+Unfortunately, once confidence intervals are taken into account, there are
+simply no statistically significant results for this experiment. It is
+impossible for us to say whether this is an artefact of benchmarking `noise' or
+whether real benchmarks really are not meaningfully affected by fence insertion
+or removal.
 
 
 \section{Threats to validity}
