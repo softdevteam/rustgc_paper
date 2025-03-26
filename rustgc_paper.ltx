@@ -1207,7 +1207,7 @@ separately -- 62 or 114 benchmarks.
 can be easily and meaningfully ported to a variety of shared ownership strategies.
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
-UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>} \laurie{looking at table 2, it seems that we ported less than we didn't port? or is there another explanation for all the \lstinline{Arc<T>}s in alacritty?}.
+UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>} \laurie{looking at table 2, it seems that we ported less than we didn't port? or is there another explanation for all the \lstinline{Arc<T>}s in alacritty?}. \jake{The numbers in this table are counting everytime we encounter an \lstinline{Arc} type during compilation. These could exist in any of the dependency tree as well as the alacritty binary itself. It becomes quite difficult to know in isolation}
 \grmtools is a parsing library which uses \lstinline{Rc<T>} extensively
 in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
