@@ -1796,18 +1796,17 @@ interested readers may find that they help flesh out some details.
 \label{fig:Egcrc:grmtools:perf:individual}
 \end{figure}
 
+
+
 \clearpage
-
-\subsection{Memory}
-
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
 \begin{landscape}
-
 \begin{figure}[htbp!]
     \centering
-    \vspace{-5pt}
+    \vspace{-15pt}
     \hspace{-0.49cm}
-    \includegraphics[height=0.28\textwidth]{plots/gcvs/som/perf/som-rs-ast.pdf}
-    \vspace{-10pt}
+    \includegraphics[height=0.30\textwidth]{plots/gcvs/som/perf/som-rs-ast.pdf}
+    \vspace{-25pt}
     \caption{Wall-clock results for the \Egcrc experiment, comparing \ourgc
     (blue) and \lstinline{Rc<T>} (orange) on the SOM language benchmarks with
     an otherwise identical build of \somrsast (an AST interpreter). \somrsast's
@@ -1818,26 +1817,28 @@ interested readers may find that they help flesh out some details.
     \lstinline{Gc<T>} and \lstinline{Rc<T>} in the same configuration. Each
     benchmark was run \benchmarkpexecs times, and we report 99\% confidence
     intervals. The dashed lines show the geometric means for \lstinline{Rc<T>} and \ourgc.}
-    \vspace{-5pt}
-\end{figure}
-\begin{figure}[htbp!]
-    \centering
-    \vspace{-10pt}
-    \hspace{-0.3cm}
-    \includegraphics[height=0.370\textwidth, keepaspectratio]{plots/gcvs/som/profiles/som-rs-ast.pdf}
     \vspace{-15pt}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \hspace{-0.52cm}
+    \includegraphics[height=0.475\textwidth, keepaspectratio]{plots/gcvs/som/profiles/som-rs-ast.pdf}
+    \vspace{-7pt}
     \caption{Time-series memory usage of the above experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
     on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Rc<T>} (orange). The $x$-axis normalises running times. The dashed lines
     shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
     improve visualization clarity, interpolation was applied to reduce
-    resolution, smoothing out the data and making broader memory usage patterns
+    resolution, making broader memory usage patterns
     more apparent. The shaded regions represent the 99\% confidence intervals.
     Note that -- while helpful for seeing high-level usage trends -- this
     interpolation technique can obscure more frequent GC pauses that would
     appear as sharp oscillating spikes in memory usage.}
     \label{fig:Egcrc:som-rs-ast:mem:profiles}
+    \vspace*{-20pt}
 \end{figure}
 \end{landscape}
+\clearpage
+\restoregeometry
 
 \begin{landscape}
 \begin{figure}[htbp!]
@@ -1866,7 +1867,7 @@ interested readers may find that they help flesh out some details.
     on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Rc<T>} (orange). The $x$-axis normalises running times. The dashed lines
     shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
     improve visualization clarity, interpolation was applied to reduce
-    resolution, smoothing out the data and making broader memory usage patterns
+    resolution, making broader memory usage patterns
     more apparent. The shaded regions represent the 99\% confidence intervals.
     Note that -- while helpful for seeing high-level usage trends -- this
     interpolation technique can obscure more frequent GC pauses that would
