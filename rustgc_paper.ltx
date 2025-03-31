@@ -1756,47 +1756,109 @@ interested readers may find that they help flesh out some details.
 
 \section{Individual plots for experiment \Egcrc}
 
-\subsection{Performance}
-
 \begin{figure}[htbp!]
     \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/som/perf.pdf}
-    \caption{Results of a performance evaluation of \somrsast and \somrsbc
-    using two configurations.}
-\label{fig:Egcrc:som:perf:individual}
-\end{figure}
-
-
-\begin{figure}[htbp!]
-    \centering
-    \includegraphics[width=0.5\textwidth]{plots/gcvs/alacritty/perf.pdf}
-    \caption{Results of a performance evaluation of \alacritty
-    using two configurations.}
+    \includegraphics[width=1\textwidth, keepaspectratio]{plots/gcvs/grmtools/perf/grmtools.pdf}
+    \caption{Wall-clock results for the \Egcrc experiment, comparing \ourgc
+    (blue) and \lstinline{Rc<T>} (orange) on the \grmtools benchmark, which
+    measures the time taken for \grmtools to parse the first 1,000 source files
+    of four mature open-source Java projects. To account for the fact that most
+    \lstinline{Rc<T>} objects are allocated during the syntax error recovery
+    stage of parsing, we use a random seed to introduce a number of common
+    syntax errors into each source file before running the benchmarks. For
+    \ourgc, every \lstinline{Rc<T>} object was converted to a \lstinline{Gc<T>}
+    object. In total, across all benchmarks, 349M heap objects were allocated, with 86\% managed by \lstinline{Rc<T>} (or \lstinline{Gc<T>}, in the case of \ourgc).
+    Each benchmark was run \benchmarkpexecs times, and we report 99\%
+    confidence intervals. The vertical dashed lines show the geometric means
+    for \lstinline{Rc<T>} and \ourgc.}
 \label{fig:Egcrc:alacritty:perf:individual}
 \end{figure}
-
-\begin{figure}[htbp!]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\textwidth]{plots/gcvs/fd/perf.pdf}
-    \caption{Results of a performance evaluation of \fd.}
-\label{fig:Egcrc:fd:perf:individual}
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs/grmtools/profiles/grmtools.pdf}
+    \caption{Time-series memory usage of the \Egcrc experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
+    on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Rc<T>} (orange). The $x$-axis normalises running times. The dashed lines
+    shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
+    improve visualization clarity, interpolation was applied to reduce
+    resolution, making broader memory usage patterns
+    more apparent. The shaded regions represent the 99\% confidence intervals.
+    Note that -- while helpful for seeing high-level usage trends -- this
+    interpolation technique can obscure more frequent GC pauses that would
+    appear as sharp oscillating spikes in memory usage.}
+    \label{fig:Egcrc:grmtools:mem:profiles}
 \end{figure}
 
+\clearpage
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
+\begin{landscape}
 \begin{figure}[htbp!]
     \centering
-    \includegraphics[width=0.6\textwidth]{plots/gcvs/ripgrep/perf.pdf}
-    \caption{Results of a performance evaluation of \ripgrep.}
+    \includegraphics[height=0.3\textwidth, keepaspectratio]{plots/gcvs/alacritty/perf/alacritty.pdf}
+    \caption{Wall-clock results for the \Egcrc experiment, comparing
+    \alacritty's performance on its own \emph{vtebench} benchmark suite when
+    built using two configurations: \ourgc (blue) and \lstinline{Arc<T>}
+    (orange). Each benchmark is a shell script designed to stress a specific
+    part of a terminal emulator. Due to difficulties migrating
+    \lstinline{Arc<T>} in many parts of the codebase, only 4\% of \lstinline{Arc<T>} objects were converted
+    to use \lstinline{Gc<T>} for \ourgc. \ourgc thus contains a mix of
+    \lstinline{Arc<T>} and \lstinline{Gc<T>} objects, with \lstinline{Gc<T>}
+    managing (mostly indirectly) 6.36\% of the total heap. Each
+    benchmark was run \benchmarkpexecs times, and we report 99\% confidence
+    intervals. The vertical dashed lines show the geometric means for
+    \lstinline{Arc<T>} and \ourgc.}
+\label{fig:Egcrc:alacritty:perf:individual}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[height=0.3\textwidth,keepaspectratio]{plots/gcvs/alacritty/profiles/alacritty.pdf}
+    \caption{Time-series memory usage of the above experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
+    on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Arc<T>} (orange). The $x$-axis normalises running times. The dashed lines
+    shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
+    improve visualization clarity, interpolation was applied to reduce
+    resolution, making broader memory usage patterns
+    more apparent. The shaded regions represent the 99\% confidence intervals.
+    Note that -- while helpful for seeing high-level usage trends -- this
+    interpolation technique can obscure more frequent GC pauses that would
+    appear as sharp oscillating spikes in memory usage.}
+    \label{fig:Egcrc:alacritty:mem:profiles}
+\end{figure}
+\end{landscape}
+\clearpage
+\restoregeometry
+
+\clearpage
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
+\begin{landscape}
+\begin{figure}[htbp!]
+    \centering
+    \vspace{-15pt}
+    \hspace{-0.6cm}
+    \includegraphics[height=0.33\textwidth, keepaspectratio]{plots/gcvs/ripgrep/perf/ripgrep.pdf}
+    \caption{Wall-clock results for the \Egcrc experiment, comparing the performance of \ripgrep (a Rust grep replacement) when built with \ourgc
+    (blue) and \lstinline{Arc<T>} (orange). Each benchmark invokes \ripgrep over the Linux source code with different
+    arguments in order to find various string patterns.  Although the source location for every \lstinline{Arc<T>} in \ripgrep was converted to \lstinline{Gc<T>}, \ourgc remains a partial port due to \ripgrep's use of external libraries which embed additional \lstinline{Arc<T>}s. After conversion, 14.42\% of the total heap objects were managed by \lstinline{Gc<T>}. Each benchmark was run \benchmarkpexecs times, and we
+    report 99\% confidence intervals. The dashed lines show the geometric means
+    for \lstinline{Arc<T>} and \ourgc.}
 \label{fig:Egcrc:ripgrep:perf:individual}
 \end{figure}
-
-\begin{figure}[htbp!]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{plots/gcvs/grmtools/perf.pdf}
-    \caption{Results of a performance evaluation of \grmtools.}
-\label{fig:Egcrc:grmtools:perf:individual}
+    \hspace{-0.5cm}
+    \includegraphics[height=0.3\textwidth,keepaspectratio]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
+    \caption{Time-series memory usage of the above experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
+    on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Arc<T>} (orange). The $x$-axis normalises running times. The dashed lines
+    shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
+    improve visualization clarity, interpolation was applied to reduce
+    resolution, making broader memory usage patterns
+    more apparent. The shaded regions represent the 99\% confidence intervals.
+    Note that -- while helpful for seeing high-level usage trends -- this
+    interpolation technique can obscure more frequent GC pauses that would
+    appear as sharp oscillating spikes in memory usage.}
+    \label{fig:Egcrc:som-rs-ast:mem:profiles}
 \end{figure}
-
-
+\end{landscape}
+\clearpage
+\restoregeometry
 
 \clearpage
 \newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
@@ -1840,13 +1902,15 @@ interested readers may find that they help flesh out some details.
 \clearpage
 \restoregeometry
 
+\clearpage
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
 \begin{landscape}
 \begin{figure}[htbp!]
     \centering
-    \vspace{-30pt}
-    \hspace{-3cm}
-    \includegraphics[height=0.28\textwidth]{plots/gcvs/som/perf/som-rs-bc.pdf}
-    \vspace{-10pt}
+    \vspace{-15pt}
+    \hspace{-0.49cm}
+    \includegraphics[height=0.30\textwidth]{plots/gcvs/som/perf/som-rs-bc.pdf}
+    \vspace{-25pt}
     \caption{Wall-clock results for the \Egcrc experiment, comparing \ourgc
     (blue) and \lstinline{Rc<T>} (orange) on the SOM language benchmarks with
     an otherwise identical build of \somrsbc (a bytecode interpreter). In
@@ -1857,12 +1921,11 @@ interested readers may find that they help flesh out some details.
     for \lstinline{Rc<T>} and \ourgc.}
     \vspace{-5pt}
 \end{figure}
-\begin{figure}[htbp!]
+\begin{figure}[H]
     \centering
-    \vspace{-10pt}
-    \hspace{-2.5cm}
-    \includegraphics[height=0.40\textwidth, keepaspectratio]{plots/gcvs/som/profiles/som-rs-bc.pdf}
-    \vspace{-15pt}
+    \hspace{-0.52cm}
+    \includegraphics[height=0.475\textwidth, keepaspectratio]{plots/gcvs/som/profiles/som-rs-bc.pdf}
+    \vspace{-7pt}
     \caption{Time-series memory usage of the above experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
     on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Rc<T>} (orange). The $x$-axis normalises running times. The dashed lines
     shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
@@ -1873,67 +1936,50 @@ interested readers may find that they help flesh out some details.
     interpolation technique can obscure more frequent GC pauses that would
     appear as sharp oscillating spikes in memory usage.}
     \label{fig:Egcrc:som-rs-ast:mem:profiles}
+    \vspace*{-20pt}
 \end{figure}
 \end{landscape}
+\clearpage
+\restoregeometry
 
+\clearpage
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=2cm}
+\begin{landscape}
 \begin{figure}[htbp!]
     \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/grmtools/profiles/grmtools.pdf}
-    \caption{Time series comparison of heap usage for \grmtools.}
-    \label{fig:Egcrc:grmtools:mem:profiles}
+    %\vspace{-15pt}
+    \hspace{-0.5cm}
+    \includegraphics[height=0.375\textwidth, keepaspectratio]{plots/gcvs/fd/perf/fd.pdf}
+    \caption{Wall-clock results for the \Egcrc experiment, comparing the
+    performance of \fd (a Unix find replacement) when built with \ourgc (blue)
+    and \lstinline{Arc<T>} (orange). Each benchmark invokes \fd over the \rustc source code with different
+    arguments in order to find various file patterns. Although the source location for every
+    \lstinline{Arc<T>} in \fd was converted to \lstinline{Gc<T>}, \ourgc
+    remains a partial port due to \fd's use of external libraries which embed
+    additional \lstinline{Arc<T>}s. After conversion, only 4\% of the total
+    heap objects were managed by \lstinline{Gc<T>}. Each benchmark was run
+    \benchmarkpexecs times, and we report 99\% confidence intervals. The dashed
+    lines show the geometric means for \lstinline{Arc<T>} and \ourgc.}
+\label{fig:Egcrc:fd:perf:individual}
 \end{figure}
-
-\begin{figure}[htbp!]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/fd/profiles/fd.pdf}
-    \caption{Time series comparison of heap usage for \fd.}
+    %\hspace{-0.5cm}
+    \includegraphics[height=0.165\textwidth,keepaspectratio]{plots/gcvs/fd/profiles/fd.pdf}
+    \caption{Time-series memory usage of the above experiment. Each plot shows a single benchmark, with the memory usage (in MiB)
+    on the $y$-axis of the two runs: \ourgc (blue); and \lstinline{Arc<T>} (orange). The $x$-axis normalises running times. The dashed lines
+    shows the mean usage over the whole run. As above, each benchmark was run \benchmarkpexecs times, and to
+    improve visualization clarity, interpolation was applied to reduce
+    resolution, making broader memory usage patterns
+    more apparent. The shaded regions represent the 99\% confidence intervals.
+    Note that -- while helpful for seeing high-level usage trends -- this
+    interpolation technique can obscure more frequent GC pauses that would
+    appear as sharp oscillating spikes in memory usage.}
     \label{fig:Egcrc:fd:mem:profiles}
 \end{figure}
-
-% \begin{figure}[htbp!]
-%     \centering
-%     \includegraphics[width=1\textwidth]{plots/gcvs/binary-trees/profiles/binary-trees.pdf}
-%     \caption{Time series comparison of heap usage for \binarytrees. The graph
-%     shows the results across \benchmarkpexecs runs, with four configurations:
-%     \gc, -- which uses \ourgc; \arc -- which uses atomic reference counting;
-%     \rustgc; and typed arena -- the default. Each run has been normalized
-%     independantly to a fixed time-scale (0-1), before being aggregated to show
-%     the mean heap usage over time. The x-axis thus allows comparisons about
-%     patterns of heap usage to be made between configurations irrespective of
-%     their absolute time (see ~\cref{fig:Egcrc:binarytrees:perf:individual} for
-%     absolute time).\jake{FIXME: The formatting for this figure needs fixing}}
-%     \label{fig:Egcrc:binarytrees:mem:profiles}
-% \end{figure}
-%\begin{figure}[htbp!]
-%    \centering
-%    \begin{subfigure}{\textwidth}
-%    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-ast/perf.pdf}
-%    \caption{\somrsast}
-%    \label{fig:Epremopt:som-rs-ast:perf:individual}
-%    \end{subfigure}
-%    \begin{subfigure}{\textwidth}
-%    \includegraphics[width=1\textwidth]{plots/premopt/som-rs-bc/perf.pdf}
-%    \caption{\somrsbc}
-%    \label{fig:Epremopt:som-rs-bc:perf:individual}
-%    \end{subfigure}
-%    \begin{subfigure}{\textwidth}
-%    \includegraphics[width=1\textwidth]{plots/premopt/yksom/perf.pdf}
-%    \caption{\yksom}
-%    \label{fig:Epremopt:yksom:perf:individual}
-%    \end{subfigure}
-%    \caption{Results of a performance evaluation of \somrsast, \somrsbc, and
-%    \yksom using three configurations: \bnone; \bopt; and \bnaive. Each
-%    benchmark is run for \benchmarkpexecs process executions, where the error
-%    bars represent 99\% confidence intervals.}
-%    \label{fig:Epremopt:som-rs:perf:individual}
-%\end{figure}
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[width=1\textwidth]{plots/gcvs/ripgrep/profiles/ripgrep.pdf}
-    \caption{Time series comparison of heap usage for \ripgrep.}
-    \label{fig:Egcrc:ripgrep:mem:profiles}
-\end{figure}
+\end{landscape}
+\clearpage
+\restoregeometry
 
 \begin{figure}[!t]
 \begin{lstlisting}[
