@@ -12,3 +12,5 @@ listings/*.out
 listings/alloy
 plots/*.pdf
 *.pdf
+arxiv/
+arxiv.zip
