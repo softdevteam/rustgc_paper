@@ -1804,8 +1804,8 @@ interested readers may find that they help flesh out some details.
     \lstinline{Arc<T>} and \lstinline{Gc<T>} objects, with \lstinline{Gc<T>}
     managing (mostly indirectly) 6.36\% of the total heap. Each
     benchmark was run \benchmarkpexecs times, and we report 99\% confidence
-    intervals. The vertical dashed lines show the geometric means for
-    \lstinline{Arc<T>} and \ourgc \laurie{there are no vertical lines. i guess horizontal is meant? i could only tell that there were two lines when i zoomed *right* in! i would probably remove them to avoid confusion or explain in the caption that they're on top of each other}.}
+    intervals. The overlapping horizontal dashed lines show the geometric means for
+    \lstinline{Arc<T>} and \ourgc.}
 \label{fig:Egcrc:alacritty:perf:individual}
 \end{figure}
 \begin{figure}[H]
