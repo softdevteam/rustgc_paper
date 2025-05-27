@@ -57,10 +57,10 @@ succinct as a GCed equivalent, but ownership is too inflexible to express
 \emph{shared ownership} for data-structures that require multiple owners
 (e.g.~doubly linked lists).
 Workarounds such as reference counting impose an extra burden on the programmer,
-make mistakes more likely, and often come with a performance penalty.
+make mistakes more likely, and often come with a performance penalty\jake{we should rephrase the part about the performance penalty as per reviewer feedback. The results do not show that GC solves the performance penalty so this feels misleading.}.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
-(e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
+(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
 introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
@@ -235,7 +235,7 @@ of creating new ones, suggests that a substantial subset might benefit from GC.
 
 GC is a venerable field and has accumulated terminology that can seem
 unfamiliar or unintuitive. We mostly use the same terminology
-as~\cite{jones23garbage}, the major parts of which we define here.
+as~\citet{jones23garbage}, the major parts of which we define here.
 
 A program which uses GC is split between the \emph{mutator} (the user's program) and
 the \emph{collector} (the GC itself). At any given point in time, a thread is either
@@ -248,7 +248,7 @@ mutator code are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects that are not reachable
-from the roots can then be \emph{reclaimed}. In contrast, a reference counting GC does
+from the roots can then be \emph{reclaimed}. In contrast, a pure reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
 in most GC literature, henceforth we use `GC' to mean `tracing GC' (and not
 reference counting or the like) unless we explicitly say otherwise.
@@ -421,7 +421,7 @@ implement their own drop methods.
 
 Finalizers are an important concept for most non-Rust GCs, subsuming the notion of destructors.
 However, existing GCs for Rust are forced to have distinct notions of destructors and finalizers.
-Where the former have the \lstinline{Drop} trait, the later typically have
+Where the former have the \lstinline{Drop} trait, the latter typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
 However, doing so introduces a number of problems: (1) external libraries are
@@ -439,7 +439,7 @@ they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalizers on those instead~\cite[Section~19.3]{klabnik18rust}.
 Doing so is tedious but not conceptually difficult.
 
-Problem \#3 has partial solutions: for example, ~\cite{manish15rustgc} uses the
+Problem \#3 has partial solutions: for example, ~\citet{manish15rustgc} uses the
 \lstinline{Trace} macro to generate \emph{finalizer glue} (the finalizer equivalent of drop glue) for
 \texttt{struct} fields. This runs into an unsolvable variant of problem \#2:
 types in external libraries will not implement this trait and cannot be
@@ -555,8 +555,8 @@ We can then make two observations. First,
 \lstinline{Box<T>}'s drop method solely consists of a \lstinline{deallocate}
 call. Second, while we informally say
 that \lstinline{Box<T>} allocates on the `heap' and \lstinline{Gc<T>} allocates
-on the `GC heap', all allocations in \ourgc are made through \boehm and stored in
-a single heap.
+on the `GC heap', all allocations in \ourgc are made through \boehm and stored in the same
+heap.
 
 When used as a finalizer,
 \lstinline{Box<T>}'s drop method is thus unneeded, as the underlying memory will
@@ -682,7 +682,7 @@ fn main()  {
 \end{lstlisting}
 \end{figure}
 
-\cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsinc
+\cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsic
 \lstinline{needs_finalizer} we added to implement \cref{alg:elision}. The
 intrinsic is evaluated at compile-time: its result can be inlined into \lstinline{Gc::new},
 allowing the associated conditional to be removed too. In other words --
@@ -1256,7 +1256,7 @@ from these source locations during a benchmark's execution.
 
 \subsubsection{What we couldn't include in the benchmark suite}
 
-We tried porting porting 10 other programs that are not included in our
+We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
 eventual benchmark suite, we briefly report why those other programs have
 been excluded.
@@ -1488,6 +1488,20 @@ reclaims memory: it might reclaim it earlier than the equivalent finalizer but,
 mostly, it reclaims it much later. In general, this is likely to allow \boehm
 to operate more efficiently, in the sense that it is more likely to batch
 reclamation tasks.
+
+The performance penalty of finalizers can also be attributed to Alloy's use of
+a dedicated finalization thread. This is spun up lazily the after the first GC
+cycle where finalizable objects are observed. Internally, Boehm does a bunch of
+course-grained allocation locking, almost every API to the GC will acquire a
+global allocator lock in some way.
+
+\boehm uses an optimisation to avoid this kind of locking: if there’s only ever
+one mutator thread, it will no-op calls to \lstinline{LOCK()} /
+\lstinline{UNLOCK()}. However, introducing a second thread (such as a dedicated
+finalization thread) activates these locks, incurring synchronization costs.
+This means that even with low finalization counts, the performance impact of
+finalizers isn’t proportional to their quantity as even a single finalizer
+triggers the synchronization penalty.
 
 
 \begin{table}[t]
