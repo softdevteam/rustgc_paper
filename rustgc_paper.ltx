@@ -1489,19 +1489,15 @@ mostly, it reclaims it much later. In general, this is likely to allow \boehm
 to operate more efficiently, in the sense that it is more likely to batch
 reclamation tasks.
 
-The performance penalty of finalizers can also be attributed to Alloy's use of
-a dedicated finalization thread. This is spun up lazily the after the first GC
-cycle where finalizable objects are observed. Internally, Boehm does a bunch of
-course-grained allocation locking, almost every API to the GC will acquire a
-global allocator lock in some way.
-
-\boehm uses an optimisation to avoid this kind of locking: if there’s only ever
-one mutator thread, it will no-op calls to \lstinline{LOCK()} /
-\lstinline{UNLOCK()}. However, introducing a second thread (such as a dedicated
-finalization thread) activates these locks, incurring synchronization costs.
-This means that even with low finalization counts, the performance impact of
-finalizers isn’t proportional to their quantity as even a single finalizer
-triggers the synchronization penalty.
+The performance penalty of finalizers is partly a function of \ourgc's
+use of a separate finalizer thread and \bdwgc's somewhat old-fashioned
+approach to multi-threading. As soon as \bdwgc is informed of the existence
+of an extra thread in a process, it changes behaviour: all subsequent calls
+to \bdwgc acquire a single global lock. As well as the inherent costs of
+locking and unlocking, this means that the finalizer thread sometimes
+causes the mutator thread to pause. It is probable that a GC designed with
+multi-threading in mind from its inception would incur lower overheads
+in this regard.
 
 
 \begin{table}[t]
