@@ -1998,4 +1998,31 @@ fn main() {
 \end{lstlisting}
 \end{figure}
 
+\clearpage
+
+\section{New Results}
+
+\begin{table}
+\scalebox{0.7}{%
+  \input{plots/premopt_summary}
+}
+  \vspace{5pt}
+  \caption{Wall-clock and user time results for each benchmark suite for the
+    \Epremopt experiment. We create three configuration of \ourgc. \emph{None},
+    our baseline configuration, which has no fences, and thus is unsound, but
+    allows us to approximate (allowing for possible vagaries from running
+    unsound code!) the best possible situation for fence removal. \emph{Naive}
+    inserts all possible fences. \emph{Optimised} inserts only necessary
+    fences. Geometric mean wall-clock and user times for the baseline
+    \emph{None} configuration are provided; both values are in milliseconds
+    (ms). Subsequent rows show ratios (×) of other configurations relative to
+    the baseline. Each benchmark in the suite was run for 10 iterations. We
+    provide 99\% confidence intervals. Bold values indicate the best (lowest)
+    time observed for each suite. \textsuperscript{\dag}Denotes results that
+    are not statistically distinguishable from the baseline (their
+    confidence intervals overlap) }
+  \label{table:Ercgc:perf}
+\end{table}
+
+
 \end{document}

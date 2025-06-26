@@ -1,0 +1,13 @@
+\begin{tabular}{l l r@{\hspace{0.5em}}l r@{\hspace{0.5em}}l}
+\toprule
+Suite & Configuration & \multicolumn{2}{c}{WALLCLOCK} & \multicolumn{2}{c}{USER} \\
+\midrule
+som-rs-ast & som-rs-ast-premopt-none & \textbf{817.76} & \scriptsize\textcolor{gray!80}{[781.48, 855.74]} & \textbf{809.55} & \scriptsize\textcolor{gray!80}{[773.30, 847.51]} \\
+ & som-rs-ast-default & 1.01×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.95, 1.08]} & 1.01×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.96, 1.09]} \\
+ & som-rs-ast-premopt-naive & 1.01×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.95, 1.07]} & 1.00×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.95, 1.07]} \\
+\midrule
+som-rs-bc & som-rs-bc-premopt-none & \textbf{237.93} & \scriptsize\textcolor{gray!80}{[226.62, 249.81]} & \textbf{234.58} & \scriptsize\textcolor{gray!80}{[223.28, 246.46]} \\
+ & som-rs-bc-default & 1.05×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.99, 1.13]} & 1.06×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.99, 1.13]} \\
+ & som-rs-bc-premopt-naive & 1.01×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.94, 1.08]} & 1.01×\textsuperscript{\dag} & \scriptsize\textcolor{gray!80}{[0.94, 1.08]} \\
+\bottomrule
+\end{tabular}
