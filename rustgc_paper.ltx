@@ -1490,10 +1490,10 @@ to operate more efficiently, in the sense that it is more likely to batch
 reclamation tasks.
 
 The performance penalty of finalizers is partly a function of \ourgc's
-use of a separate finalizer thread and \bdwgc's somewhat old-fashioned
-approach to multi-threading. As soon as \bdwgc is informed of the existence
+use of a separate finalizer thread and \boehm's somewhat old-fashioned
+approach to multi-threading. As soon as \boehm is informed of the existence
 of an extra thread in a process, it changes behaviour: all subsequent calls
-to \bdwgc acquire a single global lock. As well as the inherent costs of
+to \boehm acquire a single global lock. As well as the inherent costs of
 locking and unlocking, this means that the finalizer thread sometimes
 causes the mutator thread to pause. It is probable that a GC designed with
 multi-threading in mind from its inception would incur lower overheads
