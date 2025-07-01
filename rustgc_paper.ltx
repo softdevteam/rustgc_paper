@@ -1958,6 +1958,26 @@ interested readers may find that they help flesh out some details.
 \clearpage
 \restoregeometry
 
+\section*{Individual plots for experiment \Epremopt}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=1\textwidth, keepaspectratio]{plots/premopt-grmtools-wallclock.pdf}
+    \caption{Wall-clock results for \grmtools on the \Epremopt experiment. Each
+    benchmark was run \benchmarkpexecs times, and we report 99\% confidence
+    intervals.}
+\label{fig:Epremopt:grmtools:wallclock:individual}
+\end{figure}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=1\textwidth, keepaspectratio]{plots/premopt-grmtools-user.pdf}
+    \caption{User-time results for \grmtools on the \Epremopt experiment. Each
+    benchmark was run \benchmarkpexecs times, and we report 99\% confidence
+    intervals.}
+\label{fig:Epremopt:grmtools:user:individual}
+\end{figure}
+
 \begin{figure}[!t]
 \begin{lstlisting}[
   language=Rust,
