@@ -2003,6 +2003,20 @@ interested readers may find that they help flesh out some details.
 \label{fig:Epremopt:grmtools:user:individual}
 \end{figure}
 
+\section*{Individual plots for experiment \Eelision}
+
+\begin{figure}[htbp!]
+    \centering
+    \includegraphics[width=1\textwidth,
+    keepaspectratio]{plots/elision-grmtools.pdf} \caption{Performance
+    results for \grmtools on the \Epremopt experiment. We show the results of
+    our elision optimization's wall-clock time and user time normalized to a
+    baseline of no elision. The horizontal dashed lines show the geometric mean
+    values of each measurement. Each benchmark was run \benchmarkpexecs times,
+    and we report 99\% confidence intervals. \jake{Obviously the styling of this could do with some improvement, but functionally I think we're converging on a presentation style addresses reviewer comments. One thing I'm not so certain about is the grouping of the different measurements so closely together (wallclock / user) because at a glance it looks you should be comparing their bar heights, but they are not directly comparible and are different metrics entirely. We could separate this differently using a facet-plot style, duplicating the number of benchmarks on the X axis, but for suites like SOM this creates way too much visual noise as there are 26 different benchmarks.}}
+\label{fig:Epremopt:grmtools:user:individual}
+\end{figure}
+
 \begin{figure}[!t]
 \begin{lstlisting}[
   language=Rust,
