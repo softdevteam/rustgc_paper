@@ -11,13 +11,15 @@ Rust, called \ourgc. Unlike previous
 approaches to GC in Rust, \ourgc maps existing Rust destructors to
 finalizers: this makes GC in Rust natural to use but introduces surprising
 soundness, performance, and ergonomic problems. \ourgc provides solutions for
-each of these problems.
+    each of these problems.\jake{One reviewer wanted an expanded abstract with more spoilers from the paper}
 \end{abstract}
 
 \maketitle
 
 
 \section{Introduction}
+
+\jake{A reviewer said: I think you should explicitly answer ``does Rust need a GC?'' at the start of your paper. Your answer may be nuanced / ambiguous, but the question needs to be clear, and the considerations made in answering it need to also be very clear.}
 
 \begin{figure}[t]
 \lstinputlisting[
@@ -60,7 +62,7 @@ Workarounds such as reference counting impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty\jake{we should rephrase the part about the performance penalty as per reviewer feedback. The results do not show that GC solves the performance penalty so this feels misleading.}.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
-(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
+(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}) \jake{switch to named citations}. Most
 introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
@@ -133,7 +135,7 @@ in other ways for it to show
 a plausible path forwards for those who may wish to follow it. Furthermore,
 although \ourgc is necessarily tied to Rust, a reasonable guess is that many of the
 techniques in this paper, particularly those related to finalization, will
-generalise to other ownership-based languages.
+generalise to other ownership-based languages. \jake{Address a comment: Writing "a reasonable guess" is not helpful for me as reader. Writing something like "because ownership being a crucial part of FSA" would tell me why there may be a chance for generality.}
 
 This paper is divided into four main parts: GC and Rust background (\cref{sec:background});
 \ourgc's basic design (\cref{sec:alloy_design}); destructor and finalizer challenges
@@ -251,7 +253,7 @@ for reachable objects from a program's roots: objects that are not reachable
 from the roots can then be \emph{reclaimed}. In contrast, a pure reference counting GC does
 not scan memory, and thus cannot free objects that form a cycle. As is common
 in most GC literature, henceforth we use `GC' to mean `tracing GC' (and not
-reference counting or the like) unless we explicitly say otherwise.
+reference counting or the like) unless we explicitly say otherwise. \jake{We need to fix this and make the distinction between research literature and common implementation parlance.}
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}. We use the term `GC value' to refer both to the pointer wrapped in a
@@ -510,6 +512,20 @@ Rust force users to manually implement: cleaners impose restrictions
 to make finalizers less problematic where existing \lstinline{Finalize} traits
 mostly do not.
 
+\jake{as part of our feedback, we need to explicitly discuss and present the issues around finalizations semantics, as learned from other languages.This should take the form of a) explicit acknowledgement of the issue of this as a solution (as per the JEP) b) explain why such an undesirable solution is unavoidable (if it is) c) clearly explain how the problems with finalization semantics relate to destructor semantics which Rust has already bought into (i.e. exactly how much introducing this approach makes things worse or not). I have added our notes on the JEP below}
+
+
+The JEP’s concerns are: latency; unconstrained behaviour; implicit registration; and unspecified threading / finalization ordering.
+
+Unlike Java, finalizers in Alloy cannot execute arbitrary code (i.e. Alloy finalizers do not have unconstrained behaviour) because of FSA. In other words, FSA deliberately constrains finalizer behaviour. For example, FSA makes object resurrection impossible (unless the user uses unsafe, at which point anything in Rust is possible, though not all things are wise). There is a trade-off: because FSA aims for soundness, it is not complete, and necessarily rejects some correct finalizers.
+
+Alloy defaults to per-`struct` finalization, but users can turn that off per-object with \lstinline{GC::new_unfinalizable}. We did not find a place for this in the initial submissions, though the existence of this API can be inferred from its mirror image \lstinline{GC::new_finalizable} in Listing 3.
+
+As in Java, Alloy runs finalizers on a separate thread, in an arbitrary order. FSA prevents one problem that this causes Java: GCed objects cannot access other GCed objects in finalizers, which solves some finalization ordering issues.
+
+%%%%%%%%
+
+
 Our desire that \ourgc should use existing Rust destructors as finalizers whenever
 possible may seem out of reach. As alluded to above, in a proposal for GC
 for C++, the desire was ruled out as the
@@ -708,7 +724,7 @@ implementation surprises (see e.g.~this example in
 Java~\cite{shipilev20local}). Second, most compiler optimisations are
 `GC unaware', so optimisations such as scalar
 replacement can change the point in a program when GCed values appear to be
-finalizable.
+finalizable. \jake{We need to scope this to gcc and LLVM}
 
 In our context, it is trivial to define premature finalization as a (dynamic) finalizer
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
@@ -784,6 +800,8 @@ more formal version of this algorithm.
 
 \section{Finalizer Safety Analysis}
 \label{sec:fsa}
+
+\jake{Reviewer comment: Could you name the soundness properties that FSA needs in the intro to sec. 7?}
 
 In this section we address two high-level problems: running finalizers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
@@ -1256,6 +1274,8 @@ from these source locations during a benchmark's execution.
 
 \subsubsection{What we couldn't include in the benchmark suite}
 
+\jake{There was a suggestion that these should be a table with reasons or relegated to an appendix.}
+
 We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
 eventual benchmark suite, we briefly report why those other programs have
@@ -1581,6 +1601,8 @@ experiments if and when that arrives.
 \section{Related work}
 \label{sec:related_work}
 
+\jake{We had a reviewer comment about the placement of this section.}
+
 In this paper we hope to have given sufficient background on GC and the use
 of destructors and finalizers in general. In this section we mostly survey the major
 parts of the GC for Rust landscape more widely. Our survey is
@@ -1602,7 +1624,7 @@ manish16gc}. Over time these efforts dwindled, and those interested in GC for Ru
 
 One of the earliest user-level GC for Rust libraries is
 \rustbacon~\citep{rustbacon}, an implementation of the well-known GC
-algorithm~\citep{bacon01concurrent}. This provides a type \lstinline{Cc<T>}
+algorithm~\citep{bacon01concurrent}. \jake{It's suggested that we should instead say an implementation of the trial deletion mechanism that Bacon and Rajan used to collect cycles} This provides a type \lstinline{Cc<T>}
 which is similar in intention to \ourgc's \lstinline{Gc<T>}, though using
 reference counting and manually invoked cycle detection via the
 \lstinline{collect_cycles} function. In order for this function to correctly
@@ -1701,6 +1723,9 @@ for a rendering engine: \ourgc currently makes no pretences to being low latency
 
 
 \section{Conclusions}
+
+\jake{add a discussion thats sums up the overall benefits/drawbacks of this particular approach, possibly depending on specific scenarios/use cases, and perhaps outlines directions for future work from a conceptional perspective, i.e., possible design directions that could be investigated
+}
 
 We introduced a novel design for GC in Rust that, by taking advantage of Rust's
 unusual static guarantees, also solves some classical GC finalizer problems. We
