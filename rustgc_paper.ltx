@@ -2059,6 +2059,57 @@ fn main() {
 
 \section{New Results}
 
+\section*{Individual plots for experiment \Egcrc}
+
+\begin{figure}[htbp!]
+    \centering
+
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs-som-rs-ast.pdf}
+    \caption{The relative wall-clock performance of \ourgc vs \rc reference
+    counting on the SOM language benchmark suite with \somrsast (an AST
+    interpreter). The performance ratios are normalized to \rc with the
+    jemalloc allocator (baseline = 1.0). Blue bars represent Alloy performance,
+    orange bars show Rc<T> with BDW allocator for controlled comparison across
+    memory management systems. Results show the arithmetic mean of
+    \benchmarkpexecs iterations per benchmark with 99\% confidence intervals.
+    The solid vertical lines show the geometric mean ratios across all
+    benchmarks for each configuration, with shaded regions representing the
+    99\% confidence intervals.}
+\label{fig:Epremopt:som-rs-ast:wall:individual}
+\end{figure}
+
+\clearpage
+
+\section*{Individual plots for experiment \Epremopt}
+
+\begin{figure}[htbp!]
+    \centering
+
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/premopt-som-rs-ast-wallclock.pdf}
+    \caption{The relative wall-clock performance of the \Epremopt experiment on \somrsast.}
+\label{fig:Epremopt:som-rs-ast:wall:individual}
+\end{figure}
+
+\clearpage
+
+\section*{Individual plots for experiment \Eelision}
+
+\begin{figure}[htbp!]
+    \centering
+
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/elision-som-rs-ast-wallclock.pdf}
+    \caption{Performance speedup of finalizer elision on the \somrsast suite.
+    We show the relative wall-clock times normalized to a naive \ourgc
+    configuration running no finalizer elision at all. The horizontal dashed
+    lines show the geometric mean values. Each benchmark was run
+    \benchmarkpexecs times, and we report 99\% confidence intervals both for
+    individual benchmarks, and as the shaded regions on the geometric mean
+    lines.}
+\label{fig:Epremopt:som-rs-ast:wall:individual}
+\end{figure}
+
+\clearpage
+
 \begin{table}
 \scalebox{0.7}{%
   \input{plots/premopt_summary}
