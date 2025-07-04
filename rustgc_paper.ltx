@@ -8,18 +8,20 @@
 makes expressing data-structures that require shared ownership awkward,
 inefficient, or both. In this paper we explore a new design for, and implementation of, GC in
 Rust, called \ourgc. Unlike previous
-approaches to GC in Rust, \ourgc maps existing Rust destructors to
-finalizers: this makes GC in Rust natural to use but introduces surprising
-soundness, performance, and ergonomic problems. \ourgc provides solutions for
-    each of these problems.\jake{One reviewer wanted an expanded abstract with more spoilers from the paper}
+approaches to GC in Rust, \ourgc allows existing Rust destructors to be automatically
+used as GC finalizers: this makes \ourgc integrate better with existing Rust code
+than previous solutions but introduces surprising soundness, performance, and
+ergonomic problems. \ourgc provides novel solutions for the core problems:
+\emph{finalizer safety analysis} rejects unsound destructors from
+automatically being reused as finalizers; \emph{finalizer elision} optimises
+away unnecessary finalizers; and \emph{premature finalizer prevention}
+ensures that finalizers are only run when it is provably safe to do so.
 \end{abstract}
 
 \maketitle
 
 
 \section{Introduction}
-
-\jake{A reviewer said: I think you should explicitly answer ``does Rust need a GC?'' at the start of your paper. Your answer may be nuanced / ambiguous, but the question needs to be clear, and the considerations made in answering it need to also be very clear.}
 
 \begin{figure}[t]
 \lstinputlisting[
@@ -125,17 +127,20 @@ provably safe to be used as finalizers.
 
 These solutions are implemented as part of \ourgc, a new GC for Rust:
 an example of its use is shown in \cref{fig:first_example}. As shown
-in our evaluation (\cref{sec:evaluation}), the overhead of \ourgc
+in our evaluation (\cref{sec:evaluation}), when we control for the
+conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
 varies from zero to, in the worst case, several times slower. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
 \ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
 Although \ourgc is not production ready, its performance is arguably
 good enough, and it is sufficiently polished (e.g.~good quality error messages)
-in other ways for it to show
-a plausible path forwards for those who may wish to follow it. Furthermore,
-although \ourgc is necessarily tied to Rust, a reasonable guess is that many of the
-techniques in this paper, particularly those related to finalization, will
-generalise to other ownership-based languages. \jake{Address a comment: Writing "a reasonable guess" is not helpful for me as reader. Writing something like "because ownership being a crucial part of FSA" would tell me why there may be a chance for generality.}
+in other ways for it (1) to show a plausible path forwards for those who may
+wish to follow it (2) to allow others to evaluate whether GC for Rust is a good
+idea in their minds or not. Furthermore, although \ourgc as an implementation
+is necessarily tied to Rust, most of the novel techniques rely on properties of
+affine types and ownership that we believe are more generic. It seems likely to
+us that many of the techniques in this paper would thus generalise to other
+ownership-based language, as and when such they emerge.
 
 This paper is divided into four main parts: GC and Rust background (\cref{sec:background});
 \ourgc's basic design (\cref{sec:alloy_design}); destructor and finalizer challenges
