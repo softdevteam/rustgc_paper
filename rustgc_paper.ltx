@@ -64,7 +64,7 @@ Workarounds such as reference counting impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty\jake{we should rephrase the part about the performance penalty as per reviewer feedback. The results do not show that GC solves the performance penalty so this feels misleading.}.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
-(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}) \jake{switch to named citations}. Most
+(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
 introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.

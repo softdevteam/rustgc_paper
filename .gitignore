@@ -14,3 +14,7 @@ plots/*.pdf
 *.pdf
 arxiv/
 arxiv.zip
+diff.*
+submitted.ltx
+rustgc_paper_for_diff.ltx
+texput.log

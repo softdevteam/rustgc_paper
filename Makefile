@@ -41,7 +41,7 @@ ARXIV_FILES = softdev.sty \
 
 ARXIV_BASE=arxiv
 
-all: appendices.pdf main.pdf rustgc_paper.pdf
+all: appendices.pdf main.pdf rustgc_paper.pdf diff.pdf
 
 rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex plots/gcvs/perf_summary.tex
 	pdflatex rustgc_paper.ltx
@@ -60,6 +60,15 @@ rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	  grep -v "%&${@:_preamble.fmt=}" ${@:_preamble.fmt=.ltx} >> $${tmpltx}; \
 	  pdftex -ini -jobname="${@:.fmt=}" "&pdflatex" mylatexformat.ltx $${tmpltx}; \
 	  rm $${tmpltx}
+
+diff.pdf: rustgc_paper.pdf
+	git show oopsla_submission:rustgc_paper.ltx > submitted.ltx
+	sed '/begin.acks/,/end.acks/d' rustgc_paper.ltx > rustgc_paper_for_diff.ltx
+	latexdiff submitted.ltx rustgc_paper_for_diff.ltx > diff.ltx
+	pdflatex diff.ltx
+	bibtex diff
+	pdflatex diff.ltx
+	pdflatex diff.ltx
 
 bib.bib: softdevbib/softdev.bib local.bib
 	softdevbib/bin/prebib softdevbib/softdev.bib > bib.bib
