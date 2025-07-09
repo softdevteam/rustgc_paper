@@ -1,0 +1,60 @@
+\begin{tabular}{c l l l r@{\hspace{0.5em}}l r@{\hspace{0.5em}}l }
+\toprule
+\multirow{2}{*}{Suite} & \multirow{2}{*}{Benchmark} & \multicolumn{2}{c}{\# Collections} & \multicolumn{2}{c}{Time Spent Marking} & \multicolumn{2}{c}{Total GC Pause Time} \\
+ &  & Before & After  & Before (ms) & Ratio & Before (ms) & Ratio \\
+\midrule
+\multirow{26}{*}[0pt]{\rotatebox{90}{som-rs-ast}} & bounce & 303 & 462 & 1019.7\scriptsize\color{gray!80}{±115.4} & 0.23×\scriptsize\color{gray!80}{±0.04} & 1637.4\scriptsize\color{gray!80}{±130.5} & 0.15×\scriptsize\color{gray!80}{±0.02} \\
+ & bubblesort & 841 & 224 & 1345.0\scriptsize\color{gray!80}{±115.4} & 0.15×\scriptsize\color{gray!80}{±0.02} & 2256.5\scriptsize\color{gray!80}{±172.4} & 0.10×\scriptsize\color{gray!80}{±0.01} \\
+ & deltablue & 243 & 70 & 2005.2\scriptsize\color{gray!80}{±106.7} & 0.17×\scriptsize\color{gray!80}{±0.01} & 2781.8\scriptsize\color{gray!80}{±119.8} & 0.12×\scriptsize\color{gray!80}{±0.01} \\
+ & dispatch & 816 & 577 & 708.1\scriptsize\color{gray!80}{±26.6} & 0.23×\scriptsize\color{gray!80}{±0.02} & 1480.0\scriptsize\color{gray!80}{±37.9} & 0.13×\scriptsize\color{gray!80}{±0.01} \\
+ & fannkuch & 237 & 342 & 1648.4\scriptsize\color{gray!80}{±33.2} & 0.13×\scriptsize\color{gray!80}{±0.01} & 2219.9\scriptsize\color{gray!80}{±41.5} & 0.10×\scriptsize\color{gray!80}{±0.01} \\
+ & fibonacci & 322 & 800 & 13268.9\scriptsize\color{gray!80}{±2056.1} & 0.03×\scriptsize\color{gray!80}{±0.00} & 15810.9\scriptsize\color{gray!80}{±2327.4} & 0.02×\scriptsize\color{gray!80}{±0.00} \\
+ & fieldloop & 588 & 331 & 506.3\scriptsize\color{gray!80}{±33.9} & 0.18×\scriptsize\color{gray!80}{±0.02} & 967.6\scriptsize\color{gray!80}{±49.0} & 0.11×\scriptsize\color{gray!80}{±0.01} \\
+ & graphsearch & 143 & 38 & 820.9\scriptsize\color{gray!80}{±28.6} & 0.16×\scriptsize\color{gray!80}{±0.01} & 1069.7\scriptsize\color{gray!80}{±33.2} & 0.12×\scriptsize\color{gray!80}{±0.01} \\
+ & integerloop & 713 & 354 & 630.4\scriptsize\color{gray!80}{±66.5} & 0.17×\scriptsize\color{gray!80}{±0.03} & 1275.2\scriptsize\color{gray!80}{±95.2} & 0.09×\scriptsize\color{gray!80}{±0.01} \\
+ & jsonsmall & 380 & 129 & 2288.9\scriptsize\color{gray!80}{±475.8} & 0.19×\scriptsize\color{gray!80}{±0.04} & 3309.9\scriptsize\color{gray!80}{±554.2} & 0.14×\scriptsize\color{gray!80}{±0.02} \\
+ & list & 657 & 205 & 945.8\scriptsize\color{gray!80}{±141.2} & 0.14×\scriptsize\color{gray!80}{±0.03} & 1557.0\scriptsize\color{gray!80}{±193.9} & 0.09×\scriptsize\color{gray!80}{±0.02} \\
+ & loop & 751 & 404 & 830.9\scriptsize\color{gray!80}{±117.0} & 0.20×\scriptsize\color{gray!80}{±0.04} & 1477.1\scriptsize\color{gray!80}{±193.9} & 0.12×\scriptsize\color{gray!80}{±0.02} \\
+ & mandelbrot & 557 & 299 & 826.3\scriptsize\color{gray!80}{±156.3} & 0.17×\scriptsize\color{gray!80}{±0.04} & 1311.9\scriptsize\color{gray!80}{±201.8} & 0.12×\scriptsize\color{gray!80}{±0.03} \\
+ & nbody & 274 & 90 & 945.1\scriptsize\color{gray!80}{±87.6} & 0.06×\scriptsize\color{gray!80}{±0.01} & 1165.2\scriptsize\color{gray!80}{±95.0} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & pagerank & 261 & 167 & 474.6\scriptsize\color{gray!80}{±50.4} & 0.26×\scriptsize\color{gray!80}{±0.03} & 735.2\scriptsize\color{gray!80}{±73.0} & 0.18×\scriptsize\color{gray!80}{±0.02} \\
+ & permute & 480 & 216 & 1161.0\scriptsize\color{gray!80}{±280.6} & 0.19×\scriptsize\color{gray!80}{±0.06} & 1758.9\scriptsize\color{gray!80}{±327.1} & 0.13×\scriptsize\color{gray!80}{±0.03} \\
+ & queens & 290 & 323 & 2021.5\scriptsize\color{gray!80}{±597.5} & 0.18×\scriptsize\color{gray!80}{±0.06} & 2773.9\scriptsize\color{gray!80}{±648.9} & 0.14×\scriptsize\color{gray!80}{±0.04} \\
+ & quicksort & 344 & 276 & 2346.3\scriptsize\color{gray!80}{±107.5} & 0.08×\scriptsize\color{gray!80}{±0.01} & 3438.8\scriptsize\color{gray!80}{±122.9} & 0.06×\scriptsize\color{gray!80}{±0.01} \\
+ & recurse & 1136 & 1169 & 1052.8\scriptsize\color{gray!80}{±79.4} & 0.34×\scriptsize\color{gray!80}{±0.03} & 2028.7\scriptsize\color{gray!80}{±112.9} & 0.20×\scriptsize\color{gray!80}{±0.02} \\
+ & richards & 459 & 1551 & 61760.3\scriptsize\color{gray!80}{±9678.6} & 0.01×\scriptsize\color{gray!80}{±0.00} & 71052.9\scriptsize\color{gray!80}{±11116.9} & 0.01×\scriptsize\color{gray!80}{±0.00} \\
+ & sieve & 237 & 393 & 678.1\scriptsize\color{gray!80}{±45.1} & 0.25×\scriptsize\color{gray!80}{±0.03} & 1264.9\scriptsize\color{gray!80}{±63.8} & 0.15×\scriptsize\color{gray!80}{±0.01} \\
+ & storage & 199 & 117 & 784.5\scriptsize\color{gray!80}{±93.4} & 0.19×\scriptsize\color{gray!80}{±0.03} & 1295.6\scriptsize\color{gray!80}{±99.9} & 0.12×\scriptsize\color{gray!80}{±0.01} \\
+ & sum & 750 & 352 & 797.9\scriptsize\color{gray!80}{±94.3} & 0.16×\scriptsize\color{gray!80}{±0.03} & 1460.4\scriptsize\color{gray!80}{±143.2} & 0.10×\scriptsize\color{gray!80}{±0.02} \\
+ & towers & 417 & 298 & 653.0\scriptsize\color{gray!80}{±78.8} & 0.23×\scriptsize\color{gray!80}{±0.03} & 1050.8\scriptsize\color{gray!80}{±114.8} & 0.15×\scriptsize\color{gray!80}{±0.02} \\
+ & treesort & 146 & 38 & 1839.3\scriptsize\color{gray!80}{±301.6} & 0.16×\scriptsize\color{gray!80}{±0.03} & 2254.3\scriptsize\color{gray!80}{±331.8} & 0.13×\scriptsize\color{gray!80}{±0.02} \\
+ & whileloop & 509 & 163 & 570.8\scriptsize\color{gray!80}{±55.5} & 0.17×\scriptsize\color{gray!80}{±0.03} & 1023.8\scriptsize\color{gray!80}{±90.1} & 0.11×\scriptsize\color{gray!80}{±0.02} \\
+\midrule
+\multirow{26}{*}[0pt]{\rotatebox{90}{som-rs-bc}} & bounce & 943 & 589 & 506.6\scriptsize\color{gray!80}{±49.9} & 0.14×\scriptsize\color{gray!80}{±0.02} & 999.7\scriptsize\color{gray!80}{±75.8} & 0.09×\scriptsize\color{gray!80}{±0.02} \\
+ & bubblesort & 911 & 729 & 457.6\scriptsize\color{gray!80}{±28.5} & 0.17×\scriptsize\color{gray!80}{±0.01} & 898.4\scriptsize\color{gray!80}{±35.9} & 0.11×\scriptsize\color{gray!80}{±0.01} \\
+ & deltablue & 956 & 241 & 1086.3\scriptsize\color{gray!80}{±36.2} & 0.08×\scriptsize\color{gray!80}{±0.00} & 1835.1\scriptsize\color{gray!80}{±60.5} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & dispatch & 3452 & 840 & 1352.6\scriptsize\color{gray!80}{±234.8} & 0.05×\scriptsize\color{gray!80}{±0.01} & 2070.5\scriptsize\color{gray!80}{±290.9} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & fannkuch & 1642 & 747 & 719.3\scriptsize\color{gray!80}{±185.5} & 0.11×\scriptsize\color{gray!80}{±0.03} & 1243.1\scriptsize\color{gray!80}{±233.4} & 0.08×\scriptsize\color{gray!80}{±0.02} \\
+ & fibonacci & 1924 & 1152 & 875.3\scriptsize\color{gray!80}{±107.6} & 0.13×\scriptsize\color{gray!80}{±0.02} & 1625.7\scriptsize\color{gray!80}{±136.4} & 0.09×\scriptsize\color{gray!80}{±0.01} \\
+ & fieldloop & 1438 & 560 & 581.8\scriptsize\color{gray!80}{±136.3} & 0.09×\scriptsize\color{gray!80}{±0.02} & 978.5\scriptsize\color{gray!80}{±173.8} & 0.07×\scriptsize\color{gray!80}{±0.01} \\
+ & graphsearch & 196 & 42 & 350.5\scriptsize\color{gray!80}{±36.1} & 0.05×\scriptsize\color{gray!80}{±0.01} & 535.7\scriptsize\color{gray!80}{±40.4} & 0.04×\scriptsize\color{gray!80}{±0.01} \\
+ & integerloop & 2803 & 723 & 1083.8\scriptsize\color{gray!80}{±190.1} & 0.06×\scriptsize\color{gray!80}{±0.01} & 1676.9\scriptsize\color{gray!80}{±237.1} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & jsonsmall & 690 & 250 & 1321.9\scriptsize\color{gray!80}{±545.2} & 0.06×\scriptsize\color{gray!80}{±0.03} & 2095.1\scriptsize\color{gray!80}{±623.4} & 0.04×\scriptsize\color{gray!80}{±0.02} \\
+ & list & 1335 & 630 & 962.1\scriptsize\color{gray!80}{±492.2} & 0.07×\scriptsize\color{gray!80}{±0.05} & 1487.6\scriptsize\color{gray!80}{±555.5} & 0.06×\scriptsize\color{gray!80}{±0.03} \\
+ & loop & 2938 & 769 & 1134.3\scriptsize\color{gray!80}{±238.4} & 0.06×\scriptsize\color{gray!80}{±0.01} & 1761.8\scriptsize\color{gray!80}{±295.1} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & mandelbrot & 1601 & 528 & 654.8\scriptsize\color{gray!80}{±135.4} & 0.08×\scriptsize\color{gray!80}{±0.02} & 1055.3\scriptsize\color{gray!80}{±171.5} & 0.07×\scriptsize\color{gray!80}{±0.01} \\
+ & nbody & 558 & 189 & 273.6\scriptsize\color{gray!80}{±36.0} & 0.09×\scriptsize\color{gray!80}{±0.02} & 479.6\scriptsize\color{gray!80}{±46.8} & 0.07×\scriptsize\color{gray!80}{±0.01} \\
+ & pagerank & 185 & 80 & 164.1\scriptsize\color{gray!80}{±2.6} & 0.13×\scriptsize\color{gray!80}{±0.01} & 341.7\scriptsize\color{gray!80}{±9.6} & 0.08×\scriptsize\color{gray!80}{±0.02} \\
+ & permute & 1215 & 701 & 550.1\scriptsize\color{gray!80}{±76.7} & 0.13×\scriptsize\color{gray!80}{±0.02} & 1003.2\scriptsize\color{gray!80}{±97.3} & 0.09×\scriptsize\color{gray!80}{±0.01} \\
+ & queens & 1120 & 868 & 591.3\scriptsize\color{gray!80}{±119.7} & 0.16×\scriptsize\color{gray!80}{±0.04} & 1122.3\scriptsize\color{gray!80}{±126.4} & 0.11×\scriptsize\color{gray!80}{±0.01} \\
+ & quicksort & 789 & 678 & 458.1\scriptsize\color{gray!80}{±26.7} & 0.18×\scriptsize\color{gray!80}{±0.01} & 1082.1\scriptsize\color{gray!80}{±40.3} & 0.10×\scriptsize\color{gray!80}{±0.00} \\
+ & recurse & 1869 & 948 & 1295.7\scriptsize\color{gray!80}{±1104.7} & 0.06×\scriptsize\color{gray!80}{±0.20} & 2036.1\scriptsize\color{gray!80}{±1317.9} & 0.05×\scriptsize\color{gray!80}{±0.06} \\
+ & richards & 4430 & 2603 & 2685.7\scriptsize\color{gray!80}{±490.2} & 0.14×\scriptsize\color{gray!80}{±0.03} & 4854.6\scriptsize\color{gray!80}{±602.1} & 0.10×\scriptsize\color{gray!80}{±0.01} \\
+ & sieve & 588 & 270 & 348.4\scriptsize\color{gray!80}{±18.1} & 0.14×\scriptsize\color{gray!80}{±0.01} & 783.0\scriptsize\color{gray!80}{±28.9} & 0.07×\scriptsize\color{gray!80}{±0.00} \\
+ & storage & 254 & 116 & 785.1\scriptsize\color{gray!80}{±92.2} & 0.04×\scriptsize\color{gray!80}{±0.01} & 1169.5\scriptsize\color{gray!80}{±99.7} & 0.04×\scriptsize\color{gray!80}{±0.00} \\
+ & sum & 2660 & 744 & 1042.7\scriptsize\color{gray!80}{±196.4} & 0.06×\scriptsize\color{gray!80}{±0.01} & 1631.6\scriptsize\color{gray!80}{±247.1} & 0.05×\scriptsize\color{gray!80}{±0.01} \\
+ & towers & 667 & 373 & 316.5\scriptsize\color{gray!80}{±42.0} & 0.14×\scriptsize\color{gray!80}{±0.02} & 568.9\scriptsize\color{gray!80}{±54.7} & 0.10×\scriptsize\color{gray!80}{±0.01} \\
+ & treesort & 317 & 163 & 213.9\scriptsize\color{gray!80}{±15.2} & 0.15×\scriptsize\color{gray!80}{±0.02} & 442.5\scriptsize\color{gray!80}{±20.2} & 0.09×\scriptsize\color{gray!80}{±0.01} \\
+ & whileloop & 3724 & 612 & 1377.6\scriptsize\color{gray!80}{±121.7} & 0.04×\scriptsize\color{gray!80}{±0.00} & 2020.8\scriptsize\color{gray!80}{±151.4} & 0.03×\scriptsize\color{gray!80}{±0.00} \\
+\bottomrule
+\end{tabular}
