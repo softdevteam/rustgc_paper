@@ -2069,21 +2069,36 @@ fn main() {
 \begin{figure}[htbp!]
     \centering
 
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs-som-rs-ast.pdf}
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_individual1.pdf}
     \caption{The relative wall-clock performance of \ourgc vs \rc reference
-    counting on the SOM language benchmark suite with \somrsast (an AST
-    interpreter). The performance ratios are normalized to \rc with the
-    jemalloc allocator (baseline = 1.0). Blue bars represent Alloy performance,
-    orange bars show Rc<T> with BDW allocator for controlled comparison across
-    memory management systems. Results show the arithmetic mean of
-    \benchmarkpexecs iterations per benchmark with 99\% confidence intervals.
-    The solid vertical lines show the geometric mean ratios across all
-    benchmarks for each configuration, with shaded regions representing the
-    99\% confidence intervals.}
-\label{fig:Epremopt:som-rs-ast:wall:individual}
+    counting across each benchmark in each suite. The performance ratios are
+    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
+    represent Alloy performance, orange bars show Rc<T> with BDW allocator for
+    controlled comparison across memory management systems. Results show the
+    arithmetic mean of \benchmarkpexecs iterations per benchmark with 99\%
+    confidence intervals. The solid vertical lines show the geometric mean
+    ratios across all benchmarks for each configuration, with shaded regions
+    representing the 99\% confidence intervals.}
+\label{fig:Egcvs:individual}
 \end{figure}
 
 \clearpage
+
+\begin{figure}[htbp!]
+    \centering
+
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_individual2.pdf}
+    \caption{The relative wall-clock performance of \ourgc vs \rc reference
+    counting across each benchmark in each suite. The performance ratios are
+    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
+    represent Alloy performance, orange bars show Rc<T> with BDW allocator for
+    controlled comparison across memory management systems. Results show the
+    arithmetic mean of \benchmarkpexecs iterations per benchmark with 99\%
+    confidence intervals. The solid vertical lines show the geometric mean
+    ratios across all benchmarks for each configuration, with shaded regions
+    representing the 99\% confidence intervals.}
+\label{fig:Egcvs:individual}
+\end{figure}
 
 \section*{Individual plots for experiment \Epremopt}
 
