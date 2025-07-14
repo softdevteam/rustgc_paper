@@ -2073,11 +2073,10 @@ fn main() {
     \caption{The relative wall-clock performance of \ourgc vs \rc reference
     counting across each benchmark in each suite. The performance ratios are
     normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
-    represent Alloy performance, orange bars show Rc<T> with BDW allocator for
-    controlled comparison across memory management systems. Results show the
-    arithmetic mean of \benchmarkpexecs iterations per benchmark with 99\%
+    represent Alloy performance, orange bars show \rc with gcmalloc to control for the allocator.
+    Each bar shows the arithmetic mean of a single benchmark for \benchmarkpexecs iterations with 99\%
     confidence intervals. The solid vertical lines show the geometric mean
-    ratios across all benchmarks for each configuration, with shaded regions
+    ratios for all benchmarks for each configuration, with shaded regions
     representing the 99\% confidence intervals.}
 \label{fig:Egcvs:individual}
 \end{figure}
