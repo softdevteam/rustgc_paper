@@ -61,7 +61,7 @@ succinct as a GCed equivalent, but ownership is too inflexible to express
 \emph{shared ownership} for data-structures that require multiple owners
 (e.g.~doubly linked lists).
 Workarounds such as reference counting impose an extra burden on the programmer,
-make mistakes more likely, and often come with a performance penalty\jake{we should rephrase the part about the performance penalty as per reviewer feedback. The results do not show that GC solves the performance penalty so this feels misleading.}.
+make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
 (e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
@@ -136,10 +136,11 @@ Although \ourgc is not production ready, its performance is arguably
 good enough, and it is sufficiently polished (e.g.~good quality error messages)
 in other ways for it (1) to show a plausible path forwards for those who may
 wish to follow it (2) to allow others to evaluate whether GC for Rust is a good
-idea in their minds or not. Furthermore, although \ourgc as an implementation
-is necessarily tied to Rust, most of the novel techniques rely on properties of
-affine types and ownership that we believe are more generic. It seems likely to
-us that many of the techniques in this paper would thus generalise to other
+idea or not. Furthermore, although \ourgc as an implementation
+is necessarily tied to Rust, most of the novel techniques in this paper rely on
+general properties of affine types and ownership. Although we do not wish
+to claim generality without evidence, it seems likely that
+many of the techniques in this paper will generalise to other
 ownership-based language, as and when such they emerge.
 
 This paper is divided into four main parts: GC and Rust background (\cref{sec:background});
@@ -411,7 +412,15 @@ these differences, before describing the challenges of using destructors as
 finalizers.
 
 When a value in Rust is \emph{dropped} (i.e.~the value's owner went out of lexical
-scope) its destructor is automatically run. Rust destructors are formed of two
+scope) its destructor is automatically run. Rust's destructors enable a style
+of programming that originated in C++ called RAII (Resource Acquisition Is
+Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a value is dropped,
+the underlying resources it possesses (e.g.~file handles or heap memory) are
+released. Destructors are used frequently in Rust code \laurie{jake: we need a
+figure here. for example, across our benchmarks, there are XYZ destructors, or
+XYZ\% of structs have destructors, or similar}.
+
+Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
 automatically inserted \emph{drop glue}. Drop methods are optional and users
 can provide one for a type by implementing the \lstinline{Drop} trait's \lstinline{drop}
@@ -420,14 +429,9 @@ in a \texttt{struct}). Although it is common usage to conflate `destructor' in
 Rust with drop methods, drop glue is an integral part of a Rust destructor:
 we therefore use `destructor' as the umbrella term for both drop methods and drop glue.
 
-Rust's destructors enable a style of programming that originated in C++ called RAII (Resource
-Acquisition Is Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a
-value is dropped, the underlying resources it possesses (e.g.~file handles or heap memory)
-are released. Drop methods are not only used frequently, but programmers regularly
-implement their own drop methods.
-
-Finalizers are an important concept for most non-Rust GCs, subsuming the notion of destructors.
-However, existing GCs for Rust are forced to have distinct notions of destructors and finalizers.
+Because destructors are used frequently in Rust code, it is inevitable that
+GCs for Rust need to provide support for finalizers. However, existing GCs
+for Rust are forced to have unusually distinct notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the latter typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
