@@ -2104,14 +2104,18 @@ fn main() {
 
 \clearpage
 
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
 \begin{table}
-\scalebox{0.7}{%
-  \input{plots/gcvs_table}
-}
-  \vspace{5pt}
-    \caption{Geomean perf data normalized to \rc baseline. \jake{todo caption}}
-  \label{table:Ercgc:perf}
+\centering
+\setlength{\tabcolsep}{10pt}
+\resizebox{!}{0.4\paperheight}{\input{plots/gcvs_perf_raw}}
+\vspace{5pt}
+\caption{Raw wall-clock and user time results for each benchmark in seconds.
+    Each value shows the arithmetic mean of a single benchmark for
+    \benchmarkpexecs iterations with 99\% confidence intervals. Refer to
+    \cref{fig:Egcvs:individual} for a relative comparison.}
 \end{table}
+\restoregeometry
 
 \section*{Individual plots for experiment \Epremopt}
 
