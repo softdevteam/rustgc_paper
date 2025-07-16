@@ -1758,6 +1758,60 @@ Steve Klabnik and Andy Wingo for comments.
 
 \appendix
 
+\section*{Experiment \Egcrc results}
+
+In this appendix, we provide supplementary plots for the \Egcrc experiment -- a
+comparison of \ourgc with Rust's reference counting.
+
+\begin{table}[h]
+\scalebox{0.9}{%
+  \input{tables/gcvs_perf_summary}
+}
+  \vspace{5pt}
+  \caption{Wall-clock and user time results for each benchmark suite for the
+    \Egcrc experiment. Geometric mean wall-clock and user times for each
+    configuration are provided; both values are in seconds. We also provide the
+    ratios (×) of other configurations relative to the baseline (Reference
+    counting with jemalloc). Each benchmark in the suite was run for
+    \benchmarkpexecs iterations. We provide 99\% confidence intervals.}
+  \label{table:Ercgc:perf:summary}
+\end{table}
+
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
+\begin{figure}[htbp!]
+    \centering
+
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_perf.pdf}
+    \caption{The relative wall-clock performance of \ourgc vs \rc reference
+    counting across each benchmark in each suite. The performance ratios are
+    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
+    represent Alloy performance, orange bars show \rc with gcmalloc to control for the allocator.
+    Each bar shows the arithmetic mean of a single benchmark for \benchmarkpexecs iterations with 99\%
+    confidence intervals. The solid vertical lines show the geometric mean
+    ratios for all benchmarks for each configuration, with shaded regions
+    representing the 99\% confidence intervals.}
+\label{fig:Egcvs:individual}
+\end{figure}
+\restoregeometry
+
+\clearpage
+
+
+\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
+\begin{table}
+\centering
+\setlength{\tabcolsep}{10pt}
+\resizebox{!}{0.4\paperheight}{\input{tables/gcvs_perf_individual}}
+\vspace{5pt}
+\caption{Raw wall-clock and user time results for each benchmark in seconds.
+    Each value shows the arithmetic mean of a single benchmark for
+    \benchmarkpexecs iterations with 99\% confidence intervals. Refer to
+    \cref{fig:Egcvs:individual} for a relative comparison.}
+\end{table}
+\restoregeometry
+
+\clearpage
+
 \section*{Further details}
 
 In this appendix, we show additional formal algorithms and additional plots.
@@ -1788,18 +1842,6 @@ interested readers may find that they help flesh out some details.
 \end{algorithmic}
   \label{alg:barrier_removal}
 \end{algorithm}
-
-\begin{table}[h]
-\scalebox{0.7}{%
-  \input{plots/gcvs/mem_summary}
-}
-  \vspace{5pt}
-  \caption{Peak memory consumption in our benchmark suite. As expected, \ourgc
-  tends to use more memory because \boehm only occasionally returns memory
-  to the operating system.
-  }
-  \label{table:Ercgc:mem}
-\end{table}
 
 \clearpage
 
@@ -1841,54 +1883,6 @@ fn main() {
 
 \clearpage
 
-\section*{Individual plots for experiment \Egcrc}
-
-\begin{figure}[htbp!]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_individual1.pdf}
-    \caption{The relative wall-clock performance of \ourgc vs \rc reference
-    counting across each benchmark in each suite. The performance ratios are
-    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
-    represent Alloy performance, orange bars show \rc with gcmalloc to control for the allocator.
-    Each bar shows the arithmetic mean of a single benchmark for \benchmarkpexecs iterations with 99\%
-    confidence intervals. The solid vertical lines show the geometric mean
-    ratios for all benchmarks for each configuration, with shaded regions
-    representing the 99\% confidence intervals.}
-\label{fig:Egcvs:individual}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[htbp!]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_individual2.pdf}
-    \caption{The relative wall-clock performance of \ourgc vs \rc reference
-    counting across each benchmark in each suite. The performance ratios are
-    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
-    represent Alloy performance, orange bars show \rc with gcmalloc to control for the allocator.
-    Each bar shows the arithmetic mean of a single benchmark for \benchmarkpexecs iterations with 99\%
-    confidence intervals. The solid vertical lines show the geometric mean
-    ratios for all benchmarks for each configuration, with shaded regions
-    representing the 99\% confidence intervals.}
-\label{fig:Egcvs:individual}
-\end{figure}
-
-\clearpage
-
-\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
-\begin{table}
-\centering
-\setlength{\tabcolsep}{10pt}
-\resizebox{!}{0.4\paperheight}{\input{plots/gcvs_perf_raw}}
-\vspace{5pt}
-\caption{Raw wall-clock and user time results for each benchmark in seconds.
-    Each value shows the arithmetic mean of a single benchmark for
-    \benchmarkpexecs iterations with 99\% confidence intervals. Refer to
-    \cref{fig:Egcvs:individual} for a relative comparison.}
-\end{table}
-\restoregeometry
 
 \section*{Individual plots for experiment \Epremopt}
 

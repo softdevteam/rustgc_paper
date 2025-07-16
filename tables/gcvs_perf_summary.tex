@@ -1,0 +1,34 @@
+\begin{tabular}{l l r@{\hspace{3pt}}l r@{\hspace{3pt}}l r@{\hspace{3pt}}l r@{\hspace{3pt}}l}
+\toprule
+Suite & Config & \multicolumn{4}{c}{Wallclock-time} & \multicolumn{4}{c}{User-time} \\
+ &  & \multicolumn{2}{c}{Time (seconds)} & \multicolumn{2}{c}{Ratio} & \multicolumn{2}{c}{Time (seconds)} & \multicolumn{2}{c}{Ratio} \\
+\midrule
+alacritty & RC \texttt{[jemalloc]} & 0.39 & \scriptsize\textcolor{gray!60}{[0.36,0.43]} & - &  & 0.27 & \scriptsize\textcolor{gray!60}{[0.23,0.31]} & - &  \\
+ & Alloy \texttt{[default]} & 0.41 & \scriptsize\textcolor{gray!60}{[0.38,0.45]} & 1.03$\times$ & \scriptsize\textcolor{gray!60}{[0.87,1.25]} & 0.28 & \scriptsize\textcolor{gray!60}{[0.24,0.34]} & 1.05$\times$ & \scriptsize\textcolor{gray!60}{[0.75,1.48]} \\
+ & RC \texttt{[gcmalloc]} & 0.40 & \scriptsize\textcolor{gray!60}{[0.38,0.43]} & 1.02$\times$ & \scriptsize\textcolor{gray!60}{[0.87,1.21]} & 0.27 & \scriptsize\textcolor{gray!60}{[0.23,0.31]} & 1.01$\times$ & \scriptsize\textcolor{gray!60}{[0.72,1.35]} \\
+\midrule
+fd & RC \texttt{[jemalloc]} & 0.28 & \scriptsize\textcolor{gray!60}{[0.25,0.34]} & - &  & 0.13 & \scriptsize\textcolor{gray!60}{[0.10,0.16]} & - &  \\
+ & Alloy \texttt{[default]} & 0.33 & \scriptsize\textcolor{gray!60}{[0.28,0.39]} & 1.17$\times$ & \scriptsize\textcolor{gray!60}{[0.83,1.55]} & 0.16 & \scriptsize\textcolor{gray!60}{[0.13,0.21]} & 1.29$\times$ & \scriptsize\textcolor{gray!60}{[0.81,2.15]} \\
+ & RC \texttt{[gcmalloc]} & 0.31 & \scriptsize\textcolor{gray!60}{[0.27,0.35]} & 1.08$\times$ & \scriptsize\textcolor{gray!60}{[0.80,1.41]} & 0.16 & \scriptsize\textcolor{gray!60}{[0.12,0.19]} & 1.21$\times$ & \scriptsize\textcolor{gray!60}{[0.77,1.93]} \\
+\midrule
+grmtools & RC \texttt{[jemalloc]} & 2.89 & \scriptsize\textcolor{gray!60}{[2.82,2.97]} & - &  & 2.77 & \scriptsize\textcolor{gray!60}{[2.70,2.85]} & - &  \\
+ & Alloy \texttt{[default]} & 2.95 & \scriptsize\textcolor{gray!60}{[2.87,3.02]} & 1.02$\times$ & \scriptsize\textcolor{gray!60}{[0.97,1.07]} & 2.81 & \scriptsize\textcolor{gray!60}{[2.74,2.86]} & 1.01$\times$ & \scriptsize\textcolor{gray!60}{[0.96,1.06]} \\
+ & RC \texttt{[gcmalloc]} & 3.10 & \scriptsize\textcolor{gray!60}{[3.01,3.18]} & 1.07$\times$ & \scriptsize\textcolor{gray!60}{[1.01,1.13]} & 2.98 & \scriptsize\textcolor{gray!60}{[2.91,3.07]} & 1.08$\times$ & \scriptsize\textcolor{gray!60}{[1.02,1.14]} \\
+\midrule
+ripgrep & RC \texttt{[jemalloc]} & 1.43 & \scriptsize\textcolor{gray!60}{[1.36,1.51]} & - &  & 0.51 & \scriptsize\textcolor{gray!60}{[0.47,0.56]} & - &  \\
+ & Alloy \texttt{[default]} & 1.54 & \scriptsize\textcolor{gray!60}{[1.47,1.62]} & 1.08$\times$ & \scriptsize\textcolor{gray!60}{[0.97,1.19]} & 0.62 & \scriptsize\textcolor{gray!60}{[0.57,0.68]} & 1.21$\times$ & \scriptsize\textcolor{gray!60}{[1.03,1.45]} \\
+ & RC \texttt{[gcmalloc]} & 1.46 & \scriptsize\textcolor{gray!60}{[1.39,1.53]} & 1.02$\times$ & \scriptsize\textcolor{gray!60}{[0.92,1.12]} & 0.54 & \scriptsize\textcolor{gray!60}{[0.49,0.58]} & 1.04$\times$ & \scriptsize\textcolor{gray!60}{[0.88,1.24]} \\
+\midrule
+som-rs-ast & RC \texttt{[jemalloc]} & 0.58 & \scriptsize\textcolor{gray!60}{[0.56,0.60]} & - &  & 0.57 & \scriptsize\textcolor{gray!60}{[0.55,0.60]} & - &  \\
+ & Alloy \texttt{[default]} & 0.84 & \scriptsize\textcolor{gray!60}{[0.81,0.88]} & 1.46$\times$ & \scriptsize\textcolor{gray!60}{[1.34,1.56]} & 0.83 & \scriptsize\textcolor{gray!60}{[0.80,0.87]} & 1.45$\times$ & \scriptsize\textcolor{gray!60}{[1.34,1.58]} \\
+ & RC \texttt{[gcmalloc]} & 0.73 & \scriptsize\textcolor{gray!60}{[0.70,0.75]} & 1.26$\times$ & \scriptsize\textcolor{gray!60}{[1.15,1.34]} & 0.72 & \scriptsize\textcolor{gray!60}{[0.70,0.75]} & 1.26$\times$ & \scriptsize\textcolor{gray!60}{[1.17,1.37]} \\
+\midrule
+som-rs-bc & RC \texttt{[jemalloc]} & 0.23 & \scriptsize\textcolor{gray!60}{[0.22,0.24]} & - &  & 0.23 & \scriptsize\textcolor{gray!60}{[0.22,0.24]} & - &  \\
+ & Alloy \texttt{[default]} & 0.26 & \scriptsize\textcolor{gray!60}{[0.25,0.27]} & 1.11$\times$ & \scriptsize\textcolor{gray!60}{[1.03,1.19]} & 0.25 & \scriptsize\textcolor{gray!60}{[0.24,0.26]} & 1.11$\times$ & \scriptsize\textcolor{gray!60}{[1.03,1.20]} \\
+ & RC \texttt{[gcmalloc]} & 0.27 & \scriptsize\textcolor{gray!60}{[0.26,0.29]} & 1.18$\times$ & \scriptsize\textcolor{gray!60}{[1.10,1.28]} & 0.27 & \scriptsize\textcolor{gray!60}{[0.26,0.28]} & 1.18$\times$ & \scriptsize\textcolor{gray!60}{[1.09,1.29]} \\
+\midrule
+overall & RC \texttt{[jemalloc]} & 0.49 & \scriptsize\textcolor{gray!60}{[0.47,0.51]} & - &  & 0.37 & \scriptsize\textcolor{gray!60}{[0.35,0.39]} & - &  \\
+ & Alloy \texttt{[default]} & 0.58 & \scriptsize\textcolor{gray!60}{[0.56,0.61]} & 1.19$\times$ & \scriptsize\textcolor{gray!60}{[1.11,1.30]} & 0.45 & \scriptsize\textcolor{gray!60}{[0.43,0.47]} & 1.22$\times$ & \scriptsize\textcolor{gray!60}{[1.10,1.32]} \\
+ & RC \texttt{[gcmalloc]} & 0.56 & \scriptsize\textcolor{gray!60}{[0.53,0.58]} & 1.14$\times$ & \scriptsize\textcolor{gray!60}{[1.05,1.24]} & 0.43 & \scriptsize\textcolor{gray!60}{[0.41,0.45]} & 1.16$\times$ & \scriptsize\textcolor{gray!60}{[1.05,1.27]} \\
+\bottomrule
+\end{tabular}
