@@ -1,0 +1,52 @@
+\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\toprule
+Suite & Benchmark & \multicolumn{4}{c}{User time (seconds)} \\
+ &  & \multicolumn{2}{c}{Before} & \multicolumn{2}{c}{After} \\
+\midrule
+\multirow{10}{*}{\rotatebox{90}{alacritty}} & Cur. Motion & 1.11 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
+ & Dense Cells & 6.63 & \scriptsize\textcolor{gray!60}{$\pm$0.11} & 6.62 & \scriptsize\textcolor{gray!60}{$\pm$0.12} \\
+ & Light Cells & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
+ & Scroll & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Scroll (fullscreen) & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
+ & Scroll Btm & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Scroll Btm (small) & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Scroll Top & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Scroll Top (small) & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Unicode & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+\midrule
+\multirow{7}{*}{\rotatebox{90}{fd}} & Cmd Exec. & 1.13 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Cmd Exec. (large) & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.10 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
+ & File Extension & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & File Type & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & No Pattern & 0.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Simple & 0.18 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.18 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Simple (-HI) & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+\midrule
+\multirow{26}{*}{\rotatebox{90}{som-rs-ast}} & Bounce & 10.60 & \scriptsize\textcolor{gray!60}{$\pm$0.41} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & BubbleSort & 7.90 & \scriptsize\textcolor{gray!60}{$\pm$0.22} & 0.83 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & DeltaBlue & 11.25 & \scriptsize\textcolor{gray!60}{$\pm$0.22} & 1.07 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Dispatch & 9.16 & \scriptsize\textcolor{gray!60}{$\pm$0.18} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Fannkuch & 9.36 & \scriptsize\textcolor{gray!60}{$\pm$0.17} & 0.98 & \scriptsize\textcolor{gray!60}{$\pm$0.05} \\
+ & Fibonacci & 26.67 & \scriptsize\textcolor{gray!60}{$\pm$2.64} & 1.40 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & FieldLoop & 6.22 & \scriptsize\textcolor{gray!60}{$\pm$0.16} & 1.20 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & GraphSearch & 3.79 & \scriptsize\textcolor{gray!60}{$\pm$0.07} & 0.41 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & IntegerLoop & 8.04 & \scriptsize\textcolor{gray!60}{$\pm$0.12} & 0.83 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & JsonSmall & 15.42 & \scriptsize\textcolor{gray!60}{$\pm$0.73} & 1.21 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & List & 5.68 & \scriptsize\textcolor{gray!60}{$\pm$0.07} & 0.52 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Loop & 8.32 & \scriptsize\textcolor{gray!60}{$\pm$0.26} & 0.85 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Mandelbrot & 6.42 & \scriptsize\textcolor{gray!60}{$\pm$0.11} & 0.69 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & NBody & 3.96 & \scriptsize\textcolor{gray!60}{$\pm$0.19} & 0.38 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & PageRank & 3.62 & \scriptsize\textcolor{gray!60}{$\pm$0.06} & 0.43 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Permute & 9.79 & \scriptsize\textcolor{gray!60}{$\pm$0.38} & 0.89 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Queens & 13.35 & \scriptsize\textcolor{gray!60}{$\pm$0.64} & 1.18 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & QuickSort & 15.64 & \scriptsize\textcolor{gray!60}{$\pm$0.84} & 1.26 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Recurse & 10.89 & \scriptsize\textcolor{gray!60}{$\pm$0.31} & 0.91 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Richards & 96.85 & \scriptsize\textcolor{gray!60}{$\pm$14.96} & 3.72 & \scriptsize\textcolor{gray!60}{$\pm$0.11} \\
+ & Sieve & 10.19 & \scriptsize\textcolor{gray!60}{$\pm$0.32} & 0.94 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Storage & 7.48 & \scriptsize\textcolor{gray!60}{$\pm$0.11} & 0.69 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Sum & 7.99 & \scriptsize\textcolor{gray!60}{$\pm$0.25} & 0.82 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Towers & 4.53 & \scriptsize\textcolor{gray!60}{$\pm$0.18} & 0.46 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & TreeSort & 5.66 & \scriptsize\textcolor{gray!60}{$\pm$0.21} & 0.40 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & WhileLoop & 6.46 & \scriptsize\textcolor{gray!60}{$\pm$0.47} & 0.72 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\bottomrule
+\end{tabular}

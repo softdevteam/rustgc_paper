@@ -1,0 +1,51 @@
+\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\toprule
+Suite & Benchmark & \multicolumn{4}{c}{\# collections} \\
+ &  & \multicolumn{2}{c}{Before} & \multicolumn{2}{c}{After} \\
+\midrule
+\multirow{10}{*}{\rotatebox{90}{alacritty}} & Cur. Motion & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Dense Cells & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Light Cells & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll (fullscreen) & 3 &  & 3 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll Btm & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll Btm (small) & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll Top & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Scroll Top (small) & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & Unicode & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} & 1 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+\midrule
+\multirow{6}{*}{\rotatebox{90}{fd}} & execution & 20 &  & 20 &  \\
+ & extension & 4 & \scriptsize\textcolor{gray!60}{$\pm$0} & 4 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & hi & 5 & \scriptsize\textcolor{gray!60}{$\pm$0} & 5 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & output & 20 & \scriptsize\textcolor{gray!60}{$\pm$0} & 20 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+ & pattern & 24 & \scriptsize\textcolor{gray!60}{$\pm$2} & 23 & \scriptsize\textcolor{gray!60}{$\pm$2} \\
+ & type & 5 & \scriptsize\textcolor{gray!60}{$\pm$0} & 5 & \scriptsize\textcolor{gray!60}{$\pm$0} \\
+\midrule
+\multirow{26}{*}{\rotatebox{90}{som-rs-ast}} & bounce & 332 & \scriptsize\textcolor{gray!60}{$\pm$172} & 499 & \scriptsize\textcolor{gray!60}{$\pm$6,811} \\
+ & bubblesort & 499 & \scriptsize\textcolor{gray!60}{$\pm$17,315} & 198 & \scriptsize\textcolor{gray!60}{$\pm$118} \\
+ & deltablue & 198 & \scriptsize\textcolor{gray!60}{$\pm$228} & 70 & \scriptsize\textcolor{gray!60}{$\pm$3} \\
+ & dispatch & 499 & \scriptsize\textcolor{gray!60}{$\pm$19,606} & 499 & \scriptsize\textcolor{gray!60}{$\pm$6,366} \\
+ & fannkuch & 198 & \scriptsize\textcolor{gray!60}{$\pm$193} & 248 & \scriptsize\textcolor{gray!60}{$\pm$338} \\
+ & fibonacci & 332 & \scriptsize\textcolor{gray!60}{$\pm$87} & 499 & \scriptsize\textcolor{gray!60}{$\pm$19,543} \\
+ & fieldloop & 499 & \scriptsize\textcolor{gray!60}{$\pm$5,347} & 248 & \scriptsize\textcolor{gray!60}{$\pm$468} \\
+ & graphsearch & 141 & \scriptsize\textcolor{gray!60}{$\pm$16} & 38 & \scriptsize\textcolor{gray!60}{$\pm$2} \\
+ & integerloop & 499 & \scriptsize\textcolor{gray!60}{$\pm$23,235} & 332 & \scriptsize\textcolor{gray!60}{$\pm$633} \\
+ & jsonsmall & 332 & \scriptsize\textcolor{gray!60}{$\pm$1,177} & 123 & \scriptsize\textcolor{gray!60}{$\pm$25} \\
+ & list & 499 & \scriptsize\textcolor{gray!60}{$\pm$8,848} & 198 & \scriptsize\textcolor{gray!60}{$\pm$67} \\
+ & loop & 499 & \scriptsize\textcolor{gray!60}{$\pm$14,386} & 332 & \scriptsize\textcolor{gray!60}{$\pm$1,063} \\
+ & mandelbrot & 499 & \scriptsize\textcolor{gray!60}{$\pm$3,628} & 248 & \scriptsize\textcolor{gray!60}{$\pm$230} \\
+ & nbody & 248 & \scriptsize\textcolor{gray!60}{$\pm$290} & 89 & \scriptsize\textcolor{gray!60}{$\pm$25} \\
+ & pagerank & 248 & \scriptsize\textcolor{gray!60}{$\pm$142} & 165 & \scriptsize\textcolor{gray!60}{$\pm$21} \\
+ & permute & 499 & \scriptsize\textcolor{gray!60}{$\pm$6,493} & 198 & \scriptsize\textcolor{gray!60}{$\pm$106} \\
+ & queens & 332 & \scriptsize\textcolor{gray!60}{$\pm$226} & 248 & \scriptsize\textcolor{gray!60}{$\pm$309} \\
+ & quicksort & 248 & \scriptsize\textcolor{gray!60}{$\pm$378} & 248 & \scriptsize\textcolor{gray!60}{$\pm$130} \\
+ & recurse & 1,000 &  & 1,000 &  \\
+ & richards & 332 & \scriptsize\textcolor{gray!60}{$\pm$1,623} & 1,000 &  \\
+ & sieve & 248 & \scriptsize\textcolor{gray!60}{$\pm$91} & 332 & \scriptsize\textcolor{gray!60}{$\pm$933} \\
+ & storage & 198 & \scriptsize\textcolor{gray!60}{$\pm$67} & 109 & \scriptsize\textcolor{gray!60}{$\pm$31} \\
+ & sum & 499 & \scriptsize\textcolor{gray!60}{$\pm$19,479} & 332 & \scriptsize\textcolor{gray!60}{$\pm$313} \\
+ & towers & 332 & \scriptsize\textcolor{gray!60}{$\pm$959} & 248 & \scriptsize\textcolor{gray!60}{$\pm$244} \\
+ & treesort & 141 & \scriptsize\textcolor{gray!60}{$\pm$29} & 38 & \scriptsize\textcolor{gray!60}{$\pm$2} \\
+ & whileloop & 499 & \scriptsize\textcolor{gray!60}{$\pm$1,400} & 141 & \scriptsize\textcolor{gray!60}{$\pm$61} \\
+\bottomrule
+\end{tabular}

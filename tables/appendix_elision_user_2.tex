@@ -1,0 +1,52 @@
+\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\toprule
+Suite & Benchmark & \multicolumn{4}{c}{User time (seconds)} \\
+ &  & \multicolumn{2}{c}{Before} & \multicolumn{2}{c}{After} \\
+\midrule
+\multirow{4}{*}{\rotatebox{90}{grmtools}} & Eclipse & 5.67 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 3.28 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
+ & Hadoop & 5.15 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 2.80 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Jenkins & 5.15 & \scriptsize\textcolor{gray!60}{$\pm$0.07} & 2.81 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
+ & Spring & 4.76 & \scriptsize\textcolor{gray!60}{$\pm$0.04} & 2.40 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+\midrule
+\multirow{13}{*}{\rotatebox{90}{ripgrep}} & Alternates & 0.58 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.51 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Alternates (-i) & 0.70 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.65 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Literal & 0.52 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.44 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Literal (-i) & 0.56 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.50 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Literal (default) & 0.49 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.40 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Literal (mmap) & 0.59 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.52 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Literal (mmap, -i) & 0.65 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.58 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Literal (regex) & 0.54 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.44 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & UTF Greek & 2.72 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 2.64 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & UTF Greek (-i) & 2.70 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 2.66 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
+ & UTF Word & 0.51 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.42 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & UTF Word (alt.) & 0.51 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.43 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+ & Word & 0.53 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.43 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+\midrule
+\multirow{26}{*}{\rotatebox{90}{som-rs-bc}} & Bounce & 4.43 & \scriptsize\textcolor{gray!60}{$\pm$0.60} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & BubbleSort & 3.80 & \scriptsize\textcolor{gray!60}{$\pm$0.44} & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & DeltaBlue & 5.56 & \scriptsize\textcolor{gray!60}{$\pm$0.10} & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Dispatch & 5.03 & \scriptsize\textcolor{gray!60}{$\pm$0.16} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Fannkuch & 3.80 & \scriptsize\textcolor{gray!60}{$\pm$0.19} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Fibonacci & 6.26 & \scriptsize\textcolor{gray!60}{$\pm$0.83} & 0.36 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & FieldLoop & 3.43 & \scriptsize\textcolor{gray!60}{$\pm$0.22} & 0.42 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & GraphSearch & 1.52 & \scriptsize\textcolor{gray!60}{$\pm$0.04} & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & IntegerLoop & 4.09 & \scriptsize\textcolor{gray!60}{$\pm$0.32} & 0.24 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & JsonSmall & 6.13 & \scriptsize\textcolor{gray!60}{$\pm$0.44} & 0.39 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & List & 3.85 & \scriptsize\textcolor{gray!60}{$\pm$0.31} & 0.22 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Loop & 3.93 & \scriptsize\textcolor{gray!60}{$\pm$0.18} & 0.25 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Mandelbrot & 3.00 & \scriptsize\textcolor{gray!60}{$\pm$0.17} & 0.21 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & NBody & 1.73 & \scriptsize\textcolor{gray!60}{$\pm$0.07} & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & PageRank & 1.50 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Permute & 3.81 & \scriptsize\textcolor{gray!60}{$\pm$0.13} & 0.26 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Queens & 4.36 & \scriptsize\textcolor{gray!60}{$\pm$0.08} & 0.33 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & QuickSort & 5.26 & \scriptsize\textcolor{gray!60}{$\pm$0.29} & 0.38 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Recurse & 6.83 & \scriptsize\textcolor{gray!60}{$\pm$2.26} & 0.31 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Richards & 21.04 & \scriptsize\textcolor{gray!60}{$\pm$4.47} & 1.20 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+ & Sieve & 4.01 & \scriptsize\textcolor{gray!60}{$\pm$1.05} & 0.26 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Storage & 3.24 & \scriptsize\textcolor{gray!60}{$\pm$0.08} & 0.20 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Sum & 4.21 & \scriptsize\textcolor{gray!60}{$\pm$0.44} & 0.24 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & Towers & 2.09 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & TreeSort & 1.67 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+ & WhileLoop & 3.65 & \scriptsize\textcolor{gray!60}{$\pm$0.11} & 0.22 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\bottomrule
+\end{tabular}
