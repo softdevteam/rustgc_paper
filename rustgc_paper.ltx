@@ -480,9 +480,9 @@ An obvious difference between destructors and finalizers is \emph{when} both
 are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
-unspecified.}, finalizers run at an unspecified point in time. Although
-we often assume this happens after the last reference to a GCed value is lost,
-finalizers can run \emph{prematurely}, that is before the equivalent
+unspecified.}, finalizers run at an unspecified point in time. This typically
+happens at some point after the equivalent destructor would run. Surprisingly, however, it is also
+possible for finalizers to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}.
 
 A less obvious difference relates to where destructors and finalizers are run.
@@ -499,50 +499,44 @@ The only way to avoid this is to run
 finalizers on a non-mutator thread: however, not all Rust types / destructors
 are safe to run on another thread.
 
-Finally, finalization and cycles are not happy bedfellows: finalizers
+There are several additional differences such as: finalizers
 can reference other GCed values that are partly, or wholly, `finalized' and may
-even have had their backing memory reused. A related, but
-distinct, problem is the ability of finalizers to \emph{resurrect} values by
+have had their backing memory reused; and finalizers can \emph{resurrect} values by
 copying the reference passed to the finalizer and storing it somewhere.
+
+Over time, finalizers have thus come to be viewed with increasing suspicion. Java,
+for example, has deprecated, and intends eventually removing, per-type
+finalizers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
+prevents problems such as object resurrection and per-class finalization~\cite{goetz21deprecated}.
 
 
 \subsection{The Challenge of Finalizers for \ourgc}
 
-At this point we hope to have convinced the reader of two general points: a
+At this point we hope to have convinced the reader that: a
 viable GC for Rust needs to be able to use existing destructors as finalizers
-whenever possible; and that finalizers, even in existing GCs, cause
+whenever possible; but that finalizers, even in existing GCs, cause
 various problems.
 
-Over time, finalizers have come to be viewed with increasing suspicion. Java,
-for example, has deprecated, and intends eventually removing, per-type
-finalizers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
-prevents problems such as object resurrection~\cite{goetz21deprecated}. It
-is important to differentiate such mechanisms from the \lstinline{Finalize} trait that many existing GCs for
-Rust force users to manually implement: cleaners impose restrictions
-to make finalizers less problematic where existing \lstinline{Finalize} traits
-mostly do not.
+It is our belief that some problems with finalizers are fundamental. For
+example, finalizers necessarily introduce, in general, latency between the last
+use of a value and its finalization.
 
-\jake{as part of our feedback, we need to explicitly discuss and present the issues around finalizations semantics, as learned from other languages.This should take the form of a) explicit acknowledgement of the issue of this as a solution (as per the JEP) b) explain why such an undesirable solution is unavoidable (if it is) c) clearly explain how the problems with finalization semantics relate to destructor semantics which Rust has already bought into (i.e. exactly how much introducing this approach makes things worse or not). I have added our notes on the JEP below}
+Some problems with finalizers are best considered the accidental artefacts of
+older designs. Java's cleaners, for example, can be thought of as a more
+restrictive version of finalizers that allow most common use-cases but forbid
+by design many dangerous use cases. For example, per-class/struct finalization
+can easily be replaced by per-object/value finalization; and object
+resurrection can be prevented if object access requires a level of indirection.
+\ourgc benefits from our better shared understanding of such problems and the
+potential solutions: it addresses (trivially) per-object/value finalization and
+(somewhat more involved) resurrection.
 
-
-The JEP’s concerns are: latency; unconstrained behaviour; implicit registration; and unspecified threading / finalization ordering.
-
-Unlike Java, finalizers in Alloy cannot execute arbitrary code (i.e. Alloy finalizers do not have unconstrained behaviour) because of FSA. In other words, FSA deliberately constrains finalizer behaviour. For example, FSA makes object resurrection impossible (unless the user uses unsafe, at which point anything in Rust is possible, though not all things are wise). There is a trade-off: because FSA aims for soundness, it is not complete, and necessarily rejects some correct finalizers.
-
-Alloy defaults to per-`struct` finalization, but users can turn that off per-object with \lstinline{GC::new_unfinalizable}. We did not find a place for this in the initial submissions, though the existence of this API can be inferred from its mirror image \lstinline{GC::new_finalizable} in Listing 3.
-
-As in Java, Alloy runs finalizers on a separate thread, in an arbitrary order. FSA prevents one problem that this causes Java: GCed objects cannot access other GCed objects in finalizers, which solves some finalization ordering issues.
-
-%%%%%%%%
-
-
-Our desire that \ourgc should use existing Rust destructors as finalizers whenever
-possible may seem out of reach. As alluded to above, in a proposal for GC
-for C++, the desire was ruled out as the
-problems were thought insoluble~\cite[p.~32]{boehm09garbage}. We break these
-problems down into four:
+However, that leaves many problems that are potentially in the middle: they are
+not obviously fundamental, but there are not obvious fixes for them either. In
+our context, where we wish to use destructors as finalizers, four problems have
+hitherto been thought insoluble~\cite[p.~32]{boehm09garbage}:
 (1) finalizers are prohibitively slower than destructors;
-(2) finalizers can be run prematurely;
+(2) finalizers can run prematurely;
 (3) running finalizers on the same thread as a paused mutator can cause race conditions and deadlocks;
 (4) some safe destructors are not safe finalizers.
 
