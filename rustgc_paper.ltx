@@ -83,7 +83,13 @@ API; and how to make \emph{finalizers} (i.e.~the code that is run just before a
 value is collected by the GC) safe, performant, and ergonomic.
 \emph{Conservative} GC (i.e.~treating each reachable machine word as
 a potential pointer) is sufficient to solve the API challenge
-but the finalization challenge is more involved.
+but the finalization challenge is more involved. \jake{I think we should reword
+this to state more explicitly that we use conservative GC in \ourgc. Most
+existing Rust GCs try a precise approach, so I think readers coming from this
+background assume the same of \ourgc until later on when they read the
+implementation details. I think this would nip in the bud criticisms that we
+``hide the fact we use conservative collection'' (which I don't agree with btw)
+since this is on the first page.}
 
 Normal Rust code uses \emph{destructors} (i.e.~code which is run just before a
 value is reclaimed by Rust's implicit memory management) extensively. Although
@@ -156,7 +162,7 @@ readers to skip material they are already comfortable with.
 \section{Background}
 \label{sec:background}
 
-\subsection{Does Rust need a GC?}
+\subsection{Does Rust need a GC?} \jake{Shall we reword this heading? or, at least answer it immediately with a tldr-ish first sentence.}
 
 \begin{figure}[t]
 \lstinputlisting[
@@ -258,8 +264,8 @@ A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects, including cycles of
 objects, that are not reachable from the roots can then be \emph{reclaimed}. In
 contrast, a pure reference counting GC does not scan memory, and thus cannot
-free objects that form a cycle. We assume that `GC' is a short-hand for
-`tracing GC', except when discussing external work that is partly or wholly use
+free objects that form a cycle. \jake{maybe include a footnote or a sentence that in reality, mature tracing / reference counting often incorporate elements traditionally associated with one or the other, blurring the lines (and then reference the bacon unified GC paper)?} We assume that `GC' is a short-hand for
+`tracing GC', \jake{I don't think reviewers will like this. How-about something like ``henceforth, for brevity we use GC to refer to tracing and RC for ref counting'' or something of the sort, it comes with less baggage about other's usage of the terms} except when discussing external work that is partly or wholly use
 non-tracing GC, where we qualify the kind of GC explicitly.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
@@ -344,7 +350,7 @@ to conservative GC: there is no cross-platform API for precise GC; and while
 some compilers such as LLVM provide some support for GC
 features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
 Despite the potential soundness worries, conservative GC thus remains a widely
-used technique.
+used technique. \jake{laurie: I have some other VMs I could add as citations here. Should I?}
 
 \label{gc_is_copyable}
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
@@ -359,7 +365,7 @@ reducing the need for a function call that cloning requires entirely\footnote{Th
 syntax \lstinline{y = Gc::clone(&v)} is available, since every copyable type is
 also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} in \ourgc is is a cheaper and simpler operation
-than most other GCs for Rust which which tend to rely, at least in part, on reference counting.
+than most other GCs for Rust which which tend to rely, at least in part, on reference counting. \jake{In our evaluation, we mention that there are some APIs for RC/Arc which are common idiomatic patterns in Rust programs (e.g. \lstinline{get_mut / make_mut}) and that these are impossible on a GC equivalent meaning that in some cases GC can be less expressive. Is this worth mentioning in the body of the paper too?}
 
 
 \subsection{Basic Implementation}
@@ -419,7 +425,19 @@ Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a value is dropped,
 the underlying resources it possesses (e.g.~file handles or heap memory) are
 released. Destructors are used frequently in Rust code \laurie{jake: we need a
 figure here. for example, across our benchmarks, there are XYZ destructors, or
-XYZ\% of structs have destructors, or similar}.
+XYZ\% of structs have destructors, or similar} \jake{This is quite hard to
+quantify because while destructors are prevelant, most are implicitly pulled in
+from standard library building block types (or transitively dependant crates).
+So a crude,source-level ``how many of my project's type's have a drop method?''
+will give misleadingly low percentages. I tried hacking together a MIR pass
+which just loops over each type and calls \lstinline{needs_drop} but this
+conservatively returns true for any type which has generic parameters as they have not been
+monomorphized. This would over-approximate their frequency (and I don't know
+how much by). One idea I have to get some rough percentage while not spending a
+long time calculating it is to count all the types in a program (baseline), and
+generate the MIR and grep for drop terminators. we divide the latter by the
+former and we get a ratio. we'd do this in debug mode because the compiler
+aggressively inlines drop calls. does this seem sensible?}
 
 Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
