@@ -255,11 +255,12 @@ collections always \emph{stop-the-world}, where all threads running
 mutator code are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
-for reachable objects from a program's roots: objects that are not reachable
-from the roots can then be \emph{reclaimed}. In contrast, a pure reference counting GC does
-not scan memory, and thus cannot free objects that form a cycle. As is common
-in most GC literature, henceforth we use `GC' to mean `tracing GC' (and not
-reference counting or the like) unless we explicitly say otherwise. \jake{We need to fix this and make the distinction between research literature and common implementation parlance.}
+for reachable objects from a program's roots: objects, including cycles of
+objects, that are not reachable from the roots can then be \emph{reclaimed}. In
+contrast, a pure reference counting GC does not scan memory, and thus cannot
+free objects that form a cycle. We assume that `GC' is a short-hand for
+`tracing GC', except when discussing external work that is partly or wholly use
+non-tracing GC, where we qualify the kind of GC explicitly.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}. We use the term `GC value' to refer both to the pointer wrapped in a
