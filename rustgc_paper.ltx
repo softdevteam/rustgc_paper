@@ -1462,33 +1462,91 @@ it performs a single (huge!) deallocation at the end of the benchmark.
 Very differently, the heaptrack data allowed us to spot that the JSON SOM benchmark
 has a leak, which manifests in all SOM VMs.
 
-\begin{table}[t]
+\begin{figure}[htbp]
     \centering
-    \scalebox{0.7}{%
-      \input{plots/elision/perf_summary}
-    }
-      \vspace{5pt}
-    \caption{
-    Finalizer elision's impact on wall-clock performance
-    (times in seconds with 99\% confidence interval ranges; lower is better). As
-    expected, there is a causal link between the number of finalizers
-    elided (see~\cref{table:Ercgc:conversion}) and wall-clock performance.}
-\label{table:Eelision:perf}
+    \begin{subfigure}{0.33\textwidth}
+        \centering
+            \begin{adjustbox}{width=0.6\linewidth, valign=t}
+                \input{tables/elision_metrics}
+            \end{adjustbox}%
+           \vspace*{12pt}
+        \caption{Metrics}
+        \label{subfig:metrics}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/elision_wallclock}
+        \caption{Wall-clock Time}
+        \label{subfig:wallclock}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.33\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{plots/elision_user}
+        \caption{User Time}
+        \label{subfig:user}
+    \end{subfigure}
+    \caption{Performance of our finalizer elision optimization. The subfigures
+    show: (a) the arithmetic mean percentage of GC object finalizers elided by
+    \ourgc; and the relative wall-clock (b) and user-time (c) performance of
+    our optimization. The performance results show geometric means of each
+    suite of benchmarks, with the vertical black line represents the baseline
+    (1), and the blue line showing the geometric mean for our optimization
+    across all suites, with shaded regions indicating 99\% confidence
+    intervals. All benchmarks were run for \benchmarkpexecs iterations.
+    Unsurprisingly, a reduction in the number of finalizable GC objects leads
+    to a performance improvement. In particular, user-time achieves bigger wins
+    because finalization is performed on a separate thread. There are a couple
+    of exceptions: the \alacritty results are inconclusive as our conversion
+    only led to two GC objects with finalizers, neither of which could have
+    their finalizers elided. For \fd, the performance impact is negligible
+    despite ~25\% of finalizers being elided. This is due to high variance
+    between runs, a consequence of an incomplete migration from reference
+    counting (RC) to garbage collection (GC). The resulting mix of GC objects
+    owning RC objects necessitates finalization to decrement reference counts,
+    creating an inherent non-deterministic runtime penalty. The
+    non-deterministic nature of the GC and finalizer queue means small changes
+    from our elision optimization can cause large, unpredictable knock-on
+    effects, masking any performance gains.}
+    %\label{fig:combined}
+\end{figure}
 
-    \scalebox{0.7}{%
-      \input{plots/elision/mem_summary}
-    }
-      \vspace{5pt}
-    \caption{
-        Finalizer elision's impact on heap size
-      (memory in MiB/KiB as indicated, with 99\% confidence interval ranges; lower is better).
-      Finalizer elision can cause higher memory usage because
-      memory is no longer immediately reclaimed during finalization, and is batched
-      up by \boehm.}
-\label{table:Eelision:mem}
-
-\vspace{-14pt}
-\end{table}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{0.33\textwidth}
+        \includegraphics[width=1\textwidth]{plots/elision_numgcs}
+        \caption{Number of Collections}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=1\textwidth]{plots/elision_pause}
+        \caption{Total GC Pause Time}
+    \end{subfigure}
+    \begin{subfigure}{0.33\textwidth}
+        \includegraphics[width=1\textwidth]{plots/elision_heap}
+        \caption{Avg. Heap Size}
+    \end{subfigure}
+    \caption{The impact of finalizer elision on GC scheduling and memory usage.
+    For benchmarks where over 70\% of finalizers are removed, the number of GC
+    collections and total pause time are significantly reduced. The collection
+    frequency decreases because removing finalizers makes each GC cycle more
+    effective at reclaiming memory. The \boehm triggers collections based on
+    the amount of memory allocated since the last cycle, and more effective
+    collections mean more time elapses until the next one. The total pause time
+    is also reduced by the diminished work needed within each collection (i.e.,
+    not enqueuing objects for finalization).\\Surprisingly, this leads to a
+    dramatic increase in average memory usage for \ripgrep (6.5$\times$) and
+    \grmtools (4$\times$). In the case of \texttt{grmtools}, the improved
+    performance allows its timeout-based error recovery mechanism to search for
+    a fix for longer, allocating more objects in the process (which can be seen
+    from the high variance in GC object allocations). More generally, finalizer
+    elision demonstrates a trade-off: allowing the application longer,
+    uninterrupted execution intervals results in a higher average memory
+    footprint, but in exchange for significantly better overall performance
+    where perhaps \ripgrep is a pathological case. \jake{I'm not sure about how
+    I've phrased this}} \label{fig:combined}
+\end{figure}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
 benchmarks (e.g.~the SOM VMs) benefit significantly from finalizer elision,
