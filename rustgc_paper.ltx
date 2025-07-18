@@ -1816,10 +1816,32 @@ Steve Klabnik and Andy Wingo for comments.
 
 \appendix
 
-\section*{Experiment \Egcrc results}
+\section*{Additional Experiment Data}
 
-In this appendix, we provide supplementary plots for the \Egcrc experiment -- a
-comparison of \ourgc with Rust's reference counting.
+In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
+\\\\
+\textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
+
+\begin{itemize}
+  \item \cref{table:app:gcvs:perf:summary} (page~\pageref{table:app:gcvs:perf:summary}): Performance summary of each suite.
+  \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock time comparison.
+  \item \cref{table:app:gcvs:wallclock} (page~\pageref{table:app:gcvs:wallclock}): Raw wall-clock time data.
+  \item \cref{table:app:gcvs:user} (page~\pageref{table:app:gcvs:user}): Raw user time data.
+\end{itemize}
+\textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
+
+\begin{itemize}
+  \item \cref{table:app:elision:pct} (page~\pageref{table:app:elision:pct}): Percentage of finalizers \ourgc elided.
+  \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
+  \item \cref{fig:app:elision:heap} (page~\pageref{fig:app:elision:heap}): Pause time and heap size.
+  \item \cref{table:app:elision:wallclock} (page~\pageref{table:app:elision:wallclock}): Raw wall-clock time data.
+  \item \cref{table:app:elision:user} (page~\pageref{table:app:elision:user}): Raw user time data.
+  \item \cref{table:app:elision:heap} (page~\pageref{table:app:elision:heap}): Raw average heap usage data.
+  \item \cref{table:app:elision:numgcs} (page~\pageref{table:app:elision:numgcs}): Raw collection count data.
+  \item \cref{table:app:elision:numgcallocs} (page~\pageref{table:app:elision:numgcallocs}): Raw GC object allocation count data.
+\end{itemize}
+
+\clearpage
 
 \begin{table}[h]
 \scalebox{0.9}{%
@@ -1832,14 +1854,14 @@ comparison of \ourgc with Rust's reference counting.
     ratios (×) of other configurations relative to the baseline (Reference
     counting with jemalloc). Each benchmark in the suite was run for
     \benchmarkpexecs iterations. We provide 99\% confidence intervals.}
-  \label{table:Ercgc:perf:summary}
+    \label{table:app:gcvs:perf:summary}
 \end{table}
 
 \newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
 \begin{figure}[htbp!]
     \centering
 
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/gcvs_perf.pdf}
+    \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_gcvs_wallclock.pdf}
     \caption{The relative wall-clock performance of \ourgc vs \rc reference
     counting across each benchmark in each suite. The performance ratios are
     normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
@@ -1848,25 +1870,221 @@ comparison of \ourgc with Rust's reference counting.
     confidence intervals. The solid vertical lines show the geometric mean
     ratios for all benchmarks for each configuration, with shaded regions
     representing the 99\% confidence intervals.}
-\label{fig:Egcvs:individual}
+    \label{fig:app:gcvs:wallclock}
 \end{figure}
 \restoregeometry
 
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.5}{%
+  \input{tables/appendix_gcvs_wallclock_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.5}{%
+  \input{tables/appendix_gcvs_wallclock_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Raw wall-clock time data for each benchmark on the finalizer gcvs
+    experiment. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:gcvs:wallclock}
+\end{table}
+
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.5}{%
+  \input{tables/appendix_gcvs_user_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.5}{%
+  \input{tables/appendix_gcvs_user_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Raw user time data for each benchmark on the finalizer gcvs
+    experiment. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:gcvs:user}
+\end{table}
+
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_pct_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_pct_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Percentage of finalizers \ourgc was able to elide for each benchmark. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:elision:pct}
+\end{table}
+
 \clearpage
 
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_wallclock.pdf}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_user.pdf}
+    \end{subfigure}
+    \caption{Wall-clock and user time performance comparison for finalizer
+    elision on each benchmark. The bars show the relative performance of \ourgc
+    after applying our elision optimization, normalized against the baseline
+    (solid black line). The vertical blue line marks the overall geometric mean
+    (with shaded area for CIs). User time often shows greater improvement than
+    wall-clock time, as elision reduces the CPU overhead of the finalization
+    thread.}
+    \label{fig:app:elision:perf}
+\end{figure}
 
-\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
-\begin{table}
-\centering
-\setlength{\tabcolsep}{10pt}
-\resizebox{!}{0.4\paperheight}{\input{tables/gcvs_perf_individual}}
-\vspace{5pt}
-\caption{Raw wall-clock and user time results for each benchmark in seconds.
-    Each value shows the arithmetic mean of a single benchmark for
-    \benchmarkpexecs iterations with 99\% confidence intervals. Refer to
-    \cref{fig:Egcvs:individual} for a relative comparison.}
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_pause.pdf}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_heap.pdf}
+    \end{subfigure}
+    \caption{Total pause time and average heap size on each benchmark after
+    applying finalizer elision. The plot follows the same conventions as
+    \cref{fig:app:elision:perf}. A general decrease in pause time is observable
+    (excluding \ripgrep and \alacritty explained here \jake{todo}), but the
+    confidence intervals are notably wide. This is an unfortunate side-effect
+    of the high variance introduced by non-deterministic GC scheduling,
+    especially in a multi-threaded environment.\\
+    The average heap size is measured by taking snapshots at the beginning
+    of each collection. While this method is useful for observing trends
+    across the suite, it can also lead to high variance or pathological
+    behavior on individual benchmarks, particularly when phase changes in
+    the benchmark's execution affect GC scheduling.}
+    \label{fig:app:elision:heap}
+\end{figure}
+
+\clearpage
+
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_wallclock_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_wallclock_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Raw wall-clock time data for each benchmark on the finalizer elision
+    experiment. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:elision:wallclock}
 \end{table}
-\restoregeometry
+
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_user_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_user_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Raw user time data for each benchmark on the finalizer elision
+    experiment. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:elision:user}
+\end{table}
+
+\begin{table}[t]
+  \begin{subtable}{0.47\textwidth}
+    \centering
+\scalebox{0.81}{%
+  \input{tables/appendix_elision_heap_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.47\textwidth}
+    \centering
+\scalebox{0.79}{%
+  \input{tables/appendix_elision_heap_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+    \caption{Raw data for the average heap size (in MiB) for each benchmark on
+    the finalizer elision experiment. Values show arithmetic means with 99\%
+    confidence intervals.}
+    \label{table:app:elision:heap}
+\end{table}
+
+\begin{table}[t]
+  \begin{subtable}{0.48\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_numgcs_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.48\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_numgcs_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+  \caption{Raw collection count data for each benchmark on the finalizer elision
+    experiment. Values show arithmetic means with 99\% confidence intervals.}
+    \label{table:app:elision:numgcs}
+\end{table}
+
+\begin{table}[t]
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.75}{%
+  \input{tables/appendix_elision_numgcallocs_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.75}{%
+  \input{tables/appendix_elision_numgcallocs_2}
+      }
+  \end{subtable}
+  \vspace{5pt}
+    \caption{Raw data for the number of \texttt{Gc<T>} objects allocated for
+    each benchmark on the finalizer elision experiment. Values show arithmetic
+    means with 99\% confidence intervals.}
+    \label{table:app:elision:numgcallocs}
+\end{table}
 
 \clearpage
 
@@ -1938,80 +2156,6 @@ fn main() {
 }
 \end{lstlisting}
 \end{figure}
-
-\clearpage
-
-
-\section*{Individual plots for experiment \Epremopt}
-
-\begin{figure}[htbp!]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/premopt_individual1.pdf}
-    \caption{\Epremopt results \jake{todo caption}}
-\label{fig:Epremopt:individual}
-\end{figure}
-
-\clearpage
-
-\begin{figure}[htbp!]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/premopt_individual2.pdf}
-    \caption{\Epremopt results \jake{todo caption}}
-\label{fig:Epremopt:individual}
-\end{figure}
-
-\clearpage
-
-\section*{Individual plots for experiment \Eelision}
-
-\begin{figure}[htbp]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/elision_individual.pdf}
-    \caption{Performance speedup of finalizer elision.
-    We show the relative wall-clock times normalized to a naive \ourgc
-    configuration running no finalizer elision at all. The horizontal dashed
-    lines show the geometric mean values. Each benchmark was run
-    \benchmarkpexecs times, and we report 99\% confidence intervals both for
-    individual benchmarks, and as the shaded regions on the geometric mean
-    lines.}
-\label{fig:Epremopt:som-rs-ast:wall:individual}
-\end{figure}
-
-\begin{table}
-\scalebox{0.8}{%
-  \input{plots/elision_breakdown}
-    }
-  \vspace{5pt}
-    \caption{Metrics showing before/after from our Finalizer Elision optimisation.}
-  \label{table:Eelision:breakdown}
-\end{table}
-
-\clearpage
-
-\begin{table}
-\scalebox{0.7}{%
-  \input{plots/premopt_summary}
-}
-  \vspace{5pt}
-  \caption{Wall-clock and user time results for each benchmark suite for the
-    \Epremopt experiment. We create three configuration of \ourgc. \emph{None},
-    our baseline configuration, which has no fences, and thus is unsound, but
-    allows us to approximate (allowing for possible vagaries from running
-    unsound code!) the best possible situation for fence removal. \emph{Naive}
-    inserts all possible fences. \emph{Optimised} inserts only necessary
-    fences. Geometric mean wall-clock and user times for the baseline
-    \emph{None} configuration are provided; both values are in milliseconds
-    (ms). Subsequent rows show ratios (×) of other configurations relative to
-    the baseline. Each benchmark in the suite was run for 10 iterations. We
-    provide 99\% confidence intervals. Bold values indicate the best (lowest)
-    time observed for each suite. \textsuperscript{\dag}Denotes results that
-    are not statistically distinguishable from the baseline (their
-    confidence intervals overlap) }
-  \label{table:Ercgc:perf}
-\end{table}
 
 
 \end{document}
