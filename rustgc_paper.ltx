@@ -373,13 +373,7 @@ than most other GCs for Rust which which tend to rely, at least in part, on refe
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion, adding
 or changing approximately 1,700 Lines of Code (LoC) in the core compiler,
-and adding 6388LoC of tests. Users must opt-in
-to GC by enabling the allocator and assigning it to an arbitrarily-named variable:
-
-\begin{lstlisting}[language=Rust, numbers=none, basicstyle=\footnotesize\ttfamily]
-#![feature(gc)] use std::gc::GcAllocator;
-#[global_allocator] static A: GcAllocator = GcAllocator
-\end{lstlisting}
+and adding 6388LoC of tests.
 
 \ourgc uses \boehm as the underlying conservative GC, because it is the
 most widely ported conservative GC we know of. Although we adapted \boehm
