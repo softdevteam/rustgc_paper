@@ -160,7 +160,7 @@ readers to skip material they are already comfortable with.
 \section{Background}
 \label{sec:background}
 
-\subsection{Does Rust need a GC?} \jake{Shall we reword this heading? or, at least answer it immediately with a tldr-ish first sentence.}
+\subsection{The challenges of shared ownership in Rust}
 
 \begin{figure}[t]
 \lstinputlisting[
@@ -262,9 +262,12 @@ A \emph{tracing} GC is one that scans memory looking
 for reachable objects from a program's roots: objects, including cycles of
 objects, that are not reachable from the roots can then be \emph{reclaimed}. In
 contrast, a pure reference counting GC does not scan memory, and thus cannot
-free objects that form a cycle. \jake{maybe include a footnote or a sentence that in reality, mature tracing / reference counting often incorporate elements traditionally associated with one or the other, blurring the lines (and then reference the bacon unified GC paper)?} We assume that `GC' is a short-hand for
-`tracing GC', \jake{I don't think reviewers will like this. How-about something like ``henceforth, for brevity we use GC to refer to tracing and RC for ref counting'' or something of the sort, it comes with less baggage about other's usage of the terms} except when discussing external work that is partly or wholly use
-non-tracing GC, where we qualify the kind of GC explicitly.
+free objects that form a cycle. Increasingly, GC implementations make use of
+multiple techniques (see~\citep{bacon04unified}) but, for simplicity's sake,
+at this stage of the paper we assume that implementations wholly use one
+technique or another. For brevity, we use `GC' as a short-hand for `tracing
+GC'; when we deal with other kinds of GC (e.g.~reference counting), we
+explicitly name them.
 
 We refer to memory which is allocated via \lstinline{Gc<T>} as being on
 the \emph{GC heap}. We use the term `GC value' to refer both to the pointer wrapped in a
@@ -348,7 +351,7 @@ to conservative GC: there is no cross-platform API for precise GC; and while
 some compilers such as LLVM provide some support for GC
 features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
 Despite the potential soundness worries, conservative GC thus remains a widely
-used technique. \jake{laurie: I have some other VMs I could add as citations here. Should I?}
+used technique.
 
 \label{gc_is_copyable}
 Conservative GC enables \ourgc to make a useful ergonomic improvement over
@@ -363,7 +366,17 @@ reducing the need for a function call that cloning requires entirely\footnote{Th
 syntax \lstinline{y = Gc::clone(&v)} is available, since every copyable type is
 also cloneable.}. This is not just a syntactic convenience but also reflects an underlying
 semantic difference: duplicating a \lstinline{Gc<T>} in \ourgc is is a cheaper and simpler operation
-than most other GCs for Rust which which tend to rely, at least in part, on reference counting. \jake{In our evaluation, we mention that there are some APIs for RC/Arc which are common idiomatic patterns in Rust programs (e.g. \lstinline{get_mut / make_mut}) and that these are impossible on a GC equivalent meaning that in some cases GC can be less expressive. Is this worth mentioning in the body of the paper too?}
+than most other GCs for Rust which which tend to rely, at least in part, on reference counting.
+
+There is one notable limitation of \lstinline{Gc<T>}'s API relative to
+\lstinline{Rc<T>}. The latter, by definition, knows how many references
+there are to the underlying data. This enables an API (\lstinline{get_mut} and
+\lstinline{make_mut}) which allows the value stored inside a \lstinline{Rc<T>}
+to be moved out of it, without copying, when there is provably only a single dynamic
+reference. In contrast, \lstinline{Gc<T>} can never know how many references
+there are to the underlying data, and cannot allow data to be moved without
+copying. As we shall see in Section~\cref{sec:evaluation}, some Rust programs
+are built around the performance advantages of this API.
 
 
 \subsection{Basic Implementation}
@@ -429,7 +442,8 @@ how much by). One idea I have to get some rough percentage while not spending a
 long time calculating it is to count all the types in a program (baseline), and
 generate the MIR and grep for drop terminators. we divide the latter by the
 former and we get a ratio. we'd do this in debug mode because the compiler
-aggressively inlines drop calls. does this seem sensible?}
+aggressively inlines drop calls. does this seem sensible?}\laurie{it sounds
+like it's worth trying to me!}
 
 Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
@@ -442,7 +456,7 @@ we therefore use `destructor' as the umbrella term for both drop methods and dro
 
 Because destructors are used frequently in Rust code, it is inevitable that
 GCs for Rust need to provide support for finalizers. However, existing GCs
-for Rust are forced to have unusually distinct notions of destructors and finalizers.
+for Rust are forced to have distinct notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the latter typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
@@ -491,7 +505,8 @@ are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalizers run at an unspecified point in time. This typically
-happens at some point after the equivalent destructor would run. Surprisingly, however, it is also
+happens at some point after the equivalent destructor would run (though
+the program may exit before any given finalizer is run). Surprisingly, however, it is also
 possible for finalizers to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}.
 
@@ -735,10 +750,10 @@ specifications often do not define, or do not precisely define, when the earlies
 be finalized is. While this means that, formally, there is no `premature' finalization,
 it seems unlikely that language designers anticipated some of the resulting
 implementation surprises (see e.g.~this example in
-Java~\cite{shipilev20local}). Second, most compiler optimisations are
-`GC unaware', so optimisations such as scalar
+Java~\cite{shipilev20local}). Second, compiler optimisations -- at least in LLVM --
+are `GC unaware', so optimisations such as scalar
 replacement can change the point in a program when GCed values appear to be
-finalizable. \jake{We need to scope this to gcc and LLVM}
+finalizable.
 
 In our context, it is trivial to define premature finalization as a (dynamic) finalizer
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
@@ -1492,29 +1507,23 @@ has a leak, which manifests in all SOM VMs.
         \caption{User Time}
         \label{subfig:user}
     \end{subfigure}
-    \caption{Performance of our finalizer elision optimization. The subfigures
-    show: (a) the arithmetic mean percentage of GC object finalizers elided by
-    \ourgc; and the relative wall-clock (b) and user-time (c) performance of
-    our optimization. The performance results show geometric means of each
-    suite of benchmarks, with the vertical black line represents the baseline
-    (1), and the blue line showing the geometric mean for our optimization
-    across all suites, with shaded regions indicating 99\% confidence
-    intervals. All benchmarks were run for \benchmarkpexecs iterations.
-    Unsurprisingly, a reduction in the number of finalizable GC objects leads
-    to a performance improvement. In particular, user-time achieves bigger wins
-    because finalization is performed on a separate thread. There are a couple
-    of exceptions: the \alacritty results are inconclusive as our conversion
-    only led to two GC objects with finalizers, neither of which could have
-    their finalizers elided. For \fd, the performance impact is negligible
-    despite ~25\% of finalizers being elided. This is due to high variance
-    between runs, a consequence of an incomplete migration from reference
-    counting (RC) to garbage collection (GC). The resulting mix of GC objects
-    owning RC objects necessitates finalization to decrement reference counts,
-    creating an inherent non-deterministic runtime penalty. The
-    non-deterministic nature of the GC and finalizer queue means small changes
-    from our elision optimization can cause large, unpredictable knock-on
-    effects, masking any performance gains.}
-    %\label{fig:combined}
+    \caption{\laurie{don't forget to add the +/- 0 CIs} The relative effect of
+    finalizer elision: (a) how many finalizers were elided; (b) the change on
+    wall-clock time and (c) the change on user time (which adds up work done in
+    all threads)
+    \laurie{if i had to guess, i'd say those two figures look the wrong way
+    around. i would expect wall-clock time to show more of a speed up than user
+    time, since the latter is adding up the costs of multiple threads, which
+    surely increases the perceived workload?}. In all cases the baseline
+    is no finalizer elision (represented as the black line at 1.0 on (b) and
+    (c)). (a) uses the arithmetic mean; (b) and (c) the geometric mean.
+    There is a fairly clear correlation: the more finalizers are elided,
+    the better performance becomes. The main exception to this is \fd. Although
+    25\% of finalizers are elided, many \lstinline{Gc<T>}s reference
+    \lstinline{Rc<T>}s: not only can their finalizers not be elideded, but
+    they cause notable performance non-determinism that makes it hard to
+    draw any definitive conclusions.}
+    \label{fig:elision_wallclock_user}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -1532,25 +1541,15 @@ has a leak, which manifests in all SOM VMs.
         \includegraphics[width=1\textwidth]{plots/elision_heap}
         \caption{Avg. Heap Size}
     \end{subfigure}
-    \caption{The impact of finalizer elision on GC scheduling and memory usage.
-    For benchmarks where over 70\% of finalizers are removed, the number of GC
-    collections and total pause time are significantly reduced. The collection
-    frequency decreases because removing finalizers makes each GC cycle more
-    effective at reclaiming memory. The \boehm triggers collections based on
-    the amount of memory allocated since the last cycle, and more effective
-    collections mean more time elapses until the next one. The total pause time
-    is also reduced by the diminished work needed within each collection (i.e.,
-    not enqueuing objects for finalization).\\Surprisingly, this leads to a
-    dramatic increase in average memory usage for \ripgrep (6.5$\times$) and
-    \grmtools (4$\times$). In the case of \texttt{grmtools}, the improved
-    performance allows its timeout-based error recovery mechanism to search for
-    a fix for longer, allocating more objects in the process (which can be seen
-    from the high variance in GC object allocations). More generally, finalizer
-    elision demonstrates a trade-off: allowing the application longer,
-    uninterrupted execution intervals results in a higher average memory
-    footprint, but in exchange for significantly better overall performance
-    where perhaps \ripgrep is a pathological case. \jake{I'm not sure about how
-    I've phrased this}} \label{fig:combined}
+    \caption{
+      The impact of finalizer elision on (a) the number of GC collections (b)
+      cumulative GC pause times and (c) memory usage. Similarly to
+      \cref{fig:elision_wallclock_user}, there is a fairly clear correlation
+      between the number of finalizers elided and performance. There
+      are two exceptions. Finalizer elision allows \grmtools to run faster,
+      allowing it to perform more syntax repairs within its wall-clock-based
+      timeout, which causes it to consume more memory. \laurie{what is
+      the situation with \ripgrep?}} \label{fig:combined}
 \end{figure}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
@@ -1582,8 +1581,8 @@ to operate more efficiently, in the sense that it is more likely to batch
 reclamation tasks.
 
 The performance penalty of finalizers is partly a function of \ourgc's
-use of a separate finalizer thread and \boehm's somewhat old-fashioned
-approach to multi-threading. As soon as \boehm is informed of the existence
+use of a separate finalizer thread and the way that \boehm was retrofitted
+for multi-threaded programs. As soon as \boehm is informed of the existence
 of an extra thread in a process, it changes behaviour: all subsequent calls
 to \boehm acquire a single global lock. As well as the inherent costs of
 locking and unlocking, this means that the finalizer thread sometimes
@@ -1672,8 +1671,6 @@ experiments if and when that arrives.
 
 \section{Related work}
 \label{sec:related_work}
-
-\jake{We had a reviewer comment about the placement of this section.}
 
 In this paper we hope to have given sufficient background on GC and the use
 of destructors and finalizers in general. In this section we mostly survey the major
