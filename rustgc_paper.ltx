@@ -81,15 +81,13 @@ We identify two fundamental challenges
 for GC for Rust: how to give \lstinline{Gc<T>} an idiomatic and complete
 API; and how to make \emph{finalizers} (i.e.~the code that is run just before a
 value is collected by the GC) safe, performant, and ergonomic.
-\emph{Conservative} GC (i.e.~treating each reachable machine word as
-a potential pointer) is sufficient to solve the API challenge
-but the finalization challenge is more involved. \jake{I think we should reword
-this to state more explicitly that we use conservative GC in \ourgc. Most
-existing Rust GCs try a precise approach, so I think readers coming from this
-background assume the same of \ourgc until later on when they read the
-implementation details. I think this would nip in the bud criticisms that we
-``hide the fact we use conservative collection'' (which I don't agree with btw)
-since this is on the first page.}
+
+In this paper we introduce \ourgc, a new GC for Rust: an example of its use is
+shown in \cref{fig:first_example}. \ourgc uses \emph{conservative} garbage
+collection (i.e.~treating each reachable machine word as a potential pointer),
+which naturally solves the API challenge. However, the finalization challenge
+is much more involved: the causes of this challenge, and our solutions to
+it, occupy the bulk of this paper.
 
 Normal Rust code uses \emph{destructors} (i.e.~code which is run just before a
 value is reclaimed by Rust's implicit memory management) extensively. Although
@@ -117,7 +115,7 @@ All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of \#2, has
 existing solutions.
 
-In this paper we show that it is possible to reuse most
+We show that it is possible to reuse most
 Rust destructors as finalizers in a satisfying way. We introduce novel solutions to the
 long-standing problems this implies by making use of some of Rust's unusual
 static guarantees. We thus gain a better GC for
@@ -131,18 +129,18 @@ the GC from being `tricked' into collecting values before they are dead;
 extends Rust's static analyses to reject programs whose destructors are not
 provably safe to be used as finalizers.
 
-These solutions are implemented as part of \ourgc, a new GC for Rust:
-an example of its use is shown in \cref{fig:first_example}. As shown
-in our evaluation (\cref{sec:evaluation}), when we control for the
-conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
-varies from zero to, in the worst case, several times slower. Perhaps
-surprisingly, our results suggest that as more of a codebase is ported to
-\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
 Although \ourgc is not production ready, its performance is arguably
 good enough, and it is sufficiently polished (e.g.~good quality error messages)
 in other ways for it (1) to show a plausible path forwards for those who may
 wish to follow it (2) to allow others to evaluate whether GC for Rust is a good
-idea or not. Furthermore, although \ourgc as an implementation
+idea or not.
+
+When we control for the
+(admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
+varies from zero to, in the worst case, several times slower. Perhaps
+surprisingly, our results suggest that as more of a codebase is ported to
+\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
+Furthermore, although \ourgc as an implementation
 is necessarily tied to Rust, most of the novel techniques in this paper rely on
 general properties of affine types and ownership. Although we do not wish
 to claim generality without evidence, it seems likely that
