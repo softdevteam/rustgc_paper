@@ -386,7 +386,7 @@ Rust compiler \rustc. We forked \rustc~\rustcversion, adding
 or changing approximately 1,700 Lines of Code (LoC) in the core compiler,
 and adding 6388LoC of tests.
 
-\ourgc uses \boehm as the underlying conservative GC, because it is the
+\ourgc uses \boehm~\cite{boehm88garbage} as the underlying conservative GC, because it is the
 most widely ported conservative GC we know of. Although we adapted \boehm
 for \ourgc, we expect that our techniques will apply to other conservative GCs with
 relative ease.
