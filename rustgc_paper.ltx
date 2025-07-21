@@ -373,8 +373,8 @@ There is one notable limitation of \lstinline{Gc<T>}'s API relative to
 there are to the underlying data. This enables an API (\lstinline{get_mut} and
 \lstinline{make_mut}) which allows the value stored inside a \lstinline{Rc<T>}
 to be moved out of it, without copying, when there is provably only a single dynamic
-reference. In contrast, \lstinline{Gc<T>} can never know how many references
-there are to the underlying data, and cannot allow data to be moved without
+reference. \jake{Not moved, mutably borrowed} In contrast, \lstinline{Gc<T>} can never know how many references
+there are to the underlying data, and cannot allow data to be moved \jake{mutably borrowed} without
 copying. As we shall see in Section~\cref{sec:evaluation}, some Rust programs
 are built around the performance advantages of this API.
 
