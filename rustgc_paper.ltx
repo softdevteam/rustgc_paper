@@ -1508,19 +1508,17 @@ has a leak, which manifests in all SOM VMs.
         \label{subfig:user}
     \end{subfigure}
     \caption{\laurie{don't forget to add the +/- 0 CIs} The relative effect of
-    finalizer elision: (a) how many finalizers were elided; (b) the change on
-    wall-clock time and (c) the change on user time (which adds up work done in
-    all threads)
-    \laurie{if i had to guess, i'd say those two figures look the wrong way
-    around. i would expect wall-clock time to show more of a speed up than user
-    time, since the latter is adding up the costs of multiple threads, which
-    surely increases the perceived workload?}. In all cases the baseline
+    finalizer elision: (a) how many finalizers were elided; (b) the change for
+    wall-clock time and (c) the change for user time (which adds up work done in
+    all threads, including the finalizer thread). In all cases the baseline
     is no finalizer elision (represented as the black line at 1.0 on (b) and
-    (c)). (a) uses the arithmetic mean; (b) and (c) the geometric mean.
-    There is a fairly clear correlation: the more finalizers are elided,
-    the better performance becomes. The main exception to this is \fd. Although
+    (c)). (a) uses the arithmetic mean; (b) and (c) the geometric mean. There
+    is a fairly clear correlation: the more finalizers are elided, the better
+    performance becomes; and user time benefits more than wall-clock time,
+    because it takes into account the complete time the finalizer thread saves
+    by not running elided finalizers. The main exception to this is \fd. Although
     25\% of finalizers are elided, many \lstinline{Gc<T>}s reference
-    \lstinline{Rc<T>}s: not only can their finalizers not be elideded, but
+    \lstinline{Rc<T>}s: not only can their finalizers not be elided, but
     they cause notable performance non-determinism that makes it hard to
     draw any definitive conclusions.}
     \label{fig:elision_wallclock_user}
