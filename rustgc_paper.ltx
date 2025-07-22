@@ -505,9 +505,16 @@ are run. Where C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalizers run at an unspecified point in time. This typically
-happens at some point after the equivalent destructor would run (though
-the program may exit before any given finalizer is run). Surprisingly, however, it is also
-possible for finalizers to run \emph{prematurely}, that is before the equivalent
+happens at some point after the equivalent destructor would run, though
+a program may exit before any given finalizer is run\footnote{A program could pause after `exit' while all queued finalizers are run. We are
+not aware of a system which does this.}. There are also two
+situations where finalizers can be run before the equivalent destructor.
+If a thread exits due to an error, and the program is either not compiled with
+unwinding, or the thread has crossed a non-unwinding ABI boundary, then
+destructors might not be run at all, where a GC will naturally run the
+equivalent finalizers: we do not dwell on this further, as both behaviours
+seem reasonable in their different contexts. More surprisingly, it is possible for finalizers in
+non-error situations to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}.
 
 A less obvious difference relates to where destructors and finalizers are run.
