@@ -1668,12 +1668,15 @@ manish16gc}. Over time these efforts dwindled, and those interested in GC for Ru
 \rustc support to expecting to have to do everything in user-level libraries.
 
 One of the earliest user-level GC for Rust libraries is
-\rustbacon~\citep{rustbacon}, an implementation of the well-known GC
-algorithm~\citep{bacon01concurrent}. \jake{It's suggested that we should instead say an implementation of the trial deletion mechanism that Bacon and Rajan used to collect cycles} This provides a type \lstinline{Cc<T>}
-which is similar in intention to \ourgc's \lstinline{Gc<T>}, though using
-reference counting and manually invoked cycle detection via the
-\lstinline{collect_cycles} function. In order for this function to correctly
-trace fields, users must manually implement a \texttt{Trace} trait which
+\rustbacon~\citep{rustbacon}. This provides a type \lstinline{Cc<T>}
+which is similar in intention to \ourgc's \lstinline{Gc<T>}.  The
+mechanism by which objects are collected is rather different: they have
+a naive reference count, which causes objects outside a cycle to
+have deterministic destruction; and users can manually invoke a cycle
+detector, which uses trial deletion in the style of \citep{bacon01concurrent}\footnote{The term
+`trial deletion' does not appear in this paper, but it is now commonly used
+to describe this part of the algorithm in retrospect.} to identify objects in unused cycles. Cycle detection requires
+users manually implementing a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
 \cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T: 'Static}
@@ -1681,10 +1684,7 @@ lifetime bound on the type parameter passed to \lstinline{Cc<T>}. Simplifying
 slightly, this means that any references in such a type must be valid for the
 remaining lifetime of the program, a severe restriction. Unlike our approach to the access
 of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
-such accesses at runtime, leading to a (safe) Rust \lstinline{panic}. Unlike most other GCs for
-Rust, destruction in \rustbacon can be
-seen as deterministic: GCed values outside cycles have their destructors run as soon as their reference count is
-0; GCed values inside cycles at the end of the \lstinline{collect_cycles} function.
+such accesses at runtime, leading to a (safe) Rust \lstinline{panic}.
 
 Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
 covered in \cref{sec:destructor challenges}). \rustgc's \lstinline{Gc<T>} provides
