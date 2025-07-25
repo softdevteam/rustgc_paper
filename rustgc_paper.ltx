@@ -470,7 +470,7 @@ designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
 cannot replicate \rustc's refusal to allow calls to the equivalent of
 \lstinline{Drop::drop}.
 
-Programmers can work around problems \#1 and \#2 in various ways. For example,
+Programmers can work around problems \#1 and \#2 in various ways\jake{minor styling nit, we wrap problem numbers in brackets above, should we do the same here for consistency or use \# above too?)}. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalizers on those instead~\cite[Section~19.3]{klabnik18rust}.
 Doing so is tedious but not conceptually difficult.
