@@ -1926,7 +1926,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{Percentage of finalizers \ourgc was able to elide for each benchmark. Values show arithmetic means with 99\% confidence intervals.}
+    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark. Values show arithmetic means with 99\% confidence intervals.\jake{TODO: add missing CIs for most values as these do not have variance.}}
     \label{table:app:elision:pct}
 \end{table}
 
@@ -1996,7 +1996,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{\laurie{what VM(s) are being benchmarked here? what does \texttt{-i} mean? is the ordering of benchmarks meaningful in any way?} Raw wall-clock time data for each benchmark on the finalizer elision
+    \caption{\laurie{what VM(s) are being benchmarked here? what does \texttt{-i} mean? is the ordering of benchmarks meaningful in any way?} \jake{This is benchmarking before / after applying finalizer elision. The benchmarks belong to the suites in the left column. The ordering is not important, it was done this way so that it fits on the page. \texttt{-i} is a ripgrep flag for case insensitive. I agree something like \texttt{case insensitive} would be better but longer benchmark names break the plot and table layouts.}.Raw wall-clock time data for each benchmark on the finalizer elision
     experiment. Values show arithmetic means with 99\% confidence intervals.}
     \label{table:app:elision:wallclock}
 \end{table}
