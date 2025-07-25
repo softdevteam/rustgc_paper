@@ -1395,33 +1395,7 @@ Our experiment is fully repeatable and downloadable from
 
 \subsection{Results}
 
-\begin{table}[t]
-\scalebox{0.7}{%
-  \input{plots/gcvs/perf_summary}
-}
-  \vspace{5pt}
-  \caption{Wall-clock results for the \Egcrc experiment, comparing
-  benchmarks running on \ourgc against other shared ownership approaches
-  (measuring wall-clock time in seconds with 99\% confidence
-  ranges; lower is better). As individual benchmarks, \binarytrees and \regexredux report arithmetic means;
-  the remaining rows are benchmark suites that report geometric means.}
-  \label{table:Ercgc:perf}
-
-\scalebox{0.7}{%
-  \input{tables/migration_stats}%
-}
-  \vspace{5pt}
-    \caption{
-    Statistics about benchmarks at run-time. `Allocated' shows how
-    many \lstinline{Gc<T>} (etc.) objects were allocated. `GC Memory' shows
-    what proportion of the heap is directly or indirectly (via an embedded
-    smart pointer) allocated via \lstinline{Gc<T>}. `Finalizers' shows how many
-    finalizers were actually run and those that would have been run without
-    finalizer elision.
-  }
-  \label{table:Ercgc:conversion}
-\end{table}
-
+\jake{TODO: replace removed table with bar plot}
 
 Starting with \Egcrc, wall-clock performance be found
 in~\cref{table:Ercgc:perf}, which we suggest interpreting in conjunction with
@@ -1590,6 +1564,8 @@ causes the mutator thread to pause. It is probable that a GC designed with
 multi-threading in mind from its inception would incur lower overheads
 in this regard.
 
+
+\jake{todo \cref{fig:elision:metrics} in main prose}
 
 \begin{table}[t]
 \scalebox{0.7}{%
