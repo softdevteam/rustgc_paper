@@ -1472,7 +1472,7 @@ has a leak, which manifests in all SOM VMs.
                 \input{tables/elision_metrics}
             \end{adjustbox}%
            \vspace*{12pt}
-        \caption{Metrics}
+        \caption{Finalizers elided at run-time}
         \label{subfig:metrics}
     \end{subfigure}%
     \hfill
@@ -1505,7 +1505,7 @@ has a leak, which manifests in all SOM VMs.
     \caption{The effects of finalizer elision on various programs. The table in
     the top-left shows how many finalizers are elided \laurie{what is `how
     many'? the number relative to source locations or relative to the number of
-    Gc objects at run-time?}. The subsequent metrics
+    Gc objects at run-time?} \jake{the latter}. The subsequent metrics
     are normalised against a baseline of no finalizers elided (the black bar at
     1.0) showing 99\% confidence intervals; the blue vertical line represents a
     ratio (the geometric mean for all metrics except `number of GC collections'
@@ -1522,7 +1522,7 @@ has a leak, which manifests in all SOM VMs.
     is not an explanation that makes any sense: why would removing 25\% of
     finalizers have no observable performance effect? similarly, why does
     som-rs-ast benefit so much less than som-rs-bc give both have a
-    -- oddly similar, which might be fishy? -- 99.9\% of finalizers removed.}}
+    -- oddly similar, which might be fishy? -- 99.9\% of finalizers removed.}\jake{I don't have an answer yet for \fd, but I don't understand your second point about som-rs-ast? 99.9\% of finalizers is correct because we go from a few million objects with finalizers to a just a few hundred, but where are you seeing som-rs-ast benefit so much less? they look relatively similar except for the number of scheduled collections that are reduced. This could be because som-rs-ast uses more memory in general than the bytecode version so the threshold heuristic will differ and it doesn't necessarily scale down linearly.}}
     \label{fig:elision:metrics}
 \end{figure}
 
