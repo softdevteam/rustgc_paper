@@ -1514,25 +1514,6 @@ has a leak, which manifests in all SOM VMs.
         \caption{User Time}
         \label{subfig:user}
     \end{subfigure}
-    \caption{\laurie{don't forget to add the +/- 0 CIs} The relative effect of
-    finalizer elision: (a) how many finalizers were elided; (b) the change for
-    wall-clock time and (c) the change for user time (which adds up work done in
-    all threads, including the finalizer thread). In all cases the baseline
-    is no finalizer elision (represented as the black line at 1.0 on (b) and
-    (c)). (a) uses the arithmetic mean; (b) and (c) the geometric mean. There
-    is a fairly clear correlation: the more finalizers are elided, the better
-    performance becomes; and user time benefits more than wall-clock time,
-    because it takes into account the complete time the finalizer thread saves
-    by not running elided finalizers. The main exception to this is \fd. Although
-    25\% of finalizers are elided, many \lstinline{Gc<T>}s reference
-    \lstinline{Rc<T>}s: not only can their finalizers not be elided, but
-    they cause notable performance non-determinism that makes it hard to
-    draw any definitive conclusions.}
-    \label{fig:elision_wallclock_user}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_numgcs}
         \caption{Number of Collections}
@@ -1546,15 +1527,24 @@ has a leak, which manifests in all SOM VMs.
         \includegraphics[width=1\textwidth]{plots/elision_heap}
         \caption{Avg. Heap Size}
     \end{subfigure}
-    \caption{
-      The impact of finalizer elision on (a) the number of GC collections (b)
-      cumulative GC pause times and (c) memory usage. Similarly to
-      \cref{fig:elision_wallclock_user}, there is a fairly clear correlation
-      between the number of finalizers elided and performance. There
-      are two exceptions. Finalizer elision allows \grmtools to run faster,
-      allowing it to perform more syntax repairs within its wall-clock-based
-      timeout, which causes it to consume more memory. \laurie{what is
-      the situation with \ripgrep?}} \label{fig:combined}
+    \caption{The relative impact of finalizer elision on various metrics. In
+    each plot, bars indicate the performance of our elision optimization
+    relative to the baseline, which is shown as a black line at 1.0. The blue
+    vertical line represents the aggregate ratio across all benchmarks, with
+    shaded regions denoting 99\% confidence intervals. For the number of
+    collections (d), this is the arithmetic mean; for the others, it is the
+    geometric mean. As expected, Alacritty shows no statistically significant
+    changes for any metric, since no objects were eligible for finalizer
+    elision. In most other benchmarks (apart from \fd), a clear trend emerges:
+    greater elision of finalizers generally correlates with improved
+    performance and reduced average heap usage. Notably, user time tends to
+    benefit more than wall-clock time, as it more fully accounts for the time
+    the finalizer thread saves by skipping elided finalizers. The main
+    exception is \fd: although 25\% of its finalizers are elided, many
+    \lstinline{Gc<T>}s point to \lstinline{Rc<T>}s; the finalizers for these
+    cannot be elided, and they also introduce considerable performance
+    variability, making it difficult to draw firm conclusions.\jake{I'm also not sure why the CIs are so wide for this one compared to others}}
+    \label{fig:elision:metrics}
 \end{figure}
 
 The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
