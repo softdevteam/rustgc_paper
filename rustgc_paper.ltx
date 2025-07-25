@@ -409,7 +409,7 @@ We made one conceptually larger -- though only 60LoC -- change to \boehm,
 making it run all finalizers on a
 separate thread (see~\cref{sec:general_challenges,sec:fsa_finalizer_thread} for
 motivation). We lazily create a thread dedicated to this as soon as the collector has
-identified an object that requires finalization.
+identified an object that requires finalization. \jake{We no longer make these changes inside Boehm. Instead, we use their \lstinline{GC_set_finalize_on_demand()} API (as per Andy's suggestion) and moved finalization thread logic into rustc.}
 
 
 \section{Destructors and Finalizers}
