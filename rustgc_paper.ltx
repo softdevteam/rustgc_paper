@@ -1449,7 +1449,8 @@ usage with heaptrack.
     \centering
     \vspace{-25pt}
     \includegraphics[width=1\textwidth]{ripgrep_subset.pdf}
-    \caption{A representative subset of time-series memory usage for \ripgrep.
+    \caption{\laurie{the text here's pretty much unreadable. since they're all somewhat similar, why not display 2 or 3, and then we can enlarge them somewhat?}
+      A representative subset of time-series memory usage for \ripgrep.
     Each plot shows the memory usage (in MiB) on the $y$-axis of two runs (one
     for \ourgc, one for \lstinline{Arc<T>}) of a benchmark: the $x$-axis normalises
     running times. We initially thought was a memory leak in \ourgc or our \ripgrep port.
@@ -1504,46 +1505,50 @@ has a leak, which manifests in all SOM VMs.
     \begin{subfigure}{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{plots/elision_wallclock}
-        \caption{Wall-clock Time}
+        \caption{Wall-clock time}
         \label{subfig:wallclock}
     \end{subfigure}%
     \hfill
     \begin{subfigure}{0.33\textwidth}
         \centering
         \includegraphics[width=\linewidth]{plots/elision_user}
-        \caption{User Time}
+        \caption{User time}
         \label{subfig:user}
     \end{subfigure}
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_numgcs}
-        \caption{Number of Collections}
+        \caption{Number of GC collections}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_pause}
-        \caption{Total GC Pause Time}
+        \caption{Total GC pause time}
     \end{subfigure}
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_heap}
-        \caption{Avg. Heap Size}
+        \caption{Avg. heap size}
     \end{subfigure}
-    \caption{The relative impact of finalizer elision on various metrics. In
-    each plot, bars indicate the performance of our elision optimization
-    relative to the baseline, which is shown as a black line at 1.0. The blue
-    vertical line represents the aggregate ratio across all benchmarks, with
-    shaded regions denoting 99\% confidence intervals. For the number of
-    collections (d), this is the arithmetic mean; for the others, it is the
-    geometric mean. As expected, Alacritty shows no statistically significant
-    changes for any metric, since no objects were eligible for finalizer
-    elision. In most other benchmarks (apart from \fd), a clear trend emerges:
-    greater elision of finalizers generally correlates with improved
-    performance and reduced average heap usage. Notably, user time tends to
-    benefit more than wall-clock time, as it more fully accounts for the time
-    the finalizer thread saves by skipping elided finalizers. The main
+    \caption{The effects of finalizer elision on various programs. The table in
+    the top-left shows how many finalizers are elided \laurie{what is `how
+    many'? the number relative to source locations or relative to the number of
+    Gc objects at run-time?}. The subsequent metrics
+    are normalised against a baseline of no finalizers elided (the black bar at
+    1.0) showing 99\% confidence intervals; the blue vertical line represents a
+    ratio (the geometric mean for all metrics except `number of GC collections'
+    which uses the arithmetic mean) and the blue shaded area the 99\%
+    confidence interval. Broadly speaking, the
+    more finalizers \ourgc can remove, the greater the performance benefit
+    across various metrics is. Note that user time -- which is the cumulative cost of
+    all threads, including the finalizer thread -- benefits slightly more than
+    wall-clock time. \laurie{``The main
     exception is \fd: although 25\% of its finalizers are elided, many
     \lstinline{Gc<T>}s point to \lstinline{Rc<T>}s; the finalizers for these
     cannot be elided, and they also introduce considerable performance
-    variability, making it difficult to draw firm conclusions.\jake{I'm also not sure why the CIs are so wide for this one compared to others}}
+    variability, making it difficult to draw firm conclusions.''} \laurie{This
+    is not an explanation that makes any sense: why would removing 25\% of
+    finalizers have no observable performance effect? similarly, why does
+    som-rs-ast benefit so much less than som-rs-bc give both have a
+    -- oddly similar, which might be fishy? -- 99.9\% of finalizers removed.}}
     \label{fig:elision:metrics}
 \end{figure}
 
