@@ -13,24 +13,6 @@ ARXIV_FILES = softdev.sty \
 		rustgc_paper.bbl \
 		experiment_stats.tex \
 		ripgrep_subset.pdf \
-		plots/gcvs/perf_summary.tex \
-		plots/gcvs/mem_summary.tex \
-		plots/elision/perf_summary.tex \
-		plots/elision/mem_summary.tex \
-		plots/premopt/perf_summary.tex \
-		plots/premopt/mem_summary.tex \
-		plots/gcvs/alacritty/perf/alacritty.pdf \
-		plots/gcvs/alacritty/profiles/alacritty.pdf \
-		plots/gcvs/fd/perf/fd.pdf \
-		plots/gcvs/fd/profiles/fd.pdf \
-		plots/gcvs/grmtools/perf/grmtools.pdf \
-		plots/gcvs/grmtools/profiles/grmtools.pdf \
-		plots/gcvs/ripgrep/perf/ripgrep.pdf \
-		plots/gcvs/ripgrep/profiles/ripgrep.pdf \
-		plots/gcvs/som/perf/som-rs-ast.pdf \
-		plots/gcvs/som/perf/som-rs-bc.pdf \
-		plots/gcvs/som/profiles/som-rs-ast.pdf \
-		plots/gcvs/som/profiles/som-rs-bc.pdf \
 		listings/dangling_reference.rs \
 		listings/finalization_cycle.rs \
 		listings/finalizer_deadlock.rs \
@@ -43,7 +25,7 @@ ARXIV_BASE=arxiv
 
 all: appendices.pdf main.pdf rustgc_paper.pdf diff.pdf
 
-rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex plots/gcvs/perf_summary.tex
+rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex
 	pdflatex rustgc_paper.ltx
 	bibtex rustgc_paper
 	pdflatex rustgc_paper.ltx

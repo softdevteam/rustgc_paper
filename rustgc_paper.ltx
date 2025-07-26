@@ -1476,6 +1476,14 @@ has a leak, which manifests in all SOM VMs.
         \label{subfig:metrics}
     \end{subfigure}%
     \hfill
+    \begin{subfigure}{0.33\textwidth}
+        \includegraphics[width=1\textwidth]{plots/elision_total_collections}
+        \caption{Number of GC collections}
+    \end{subfigure}
+    \begin{subfigure}{0.33\textwidth}
+        \includegraphics[width=1\textwidth]{plots/elision_mem_hsize_avg}
+        \caption{Avg. heap size}
+    \end{subfigure}
     \begin{subfigure}{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{plots/elision_wallclock}
@@ -1489,19 +1497,12 @@ has a leak, which manifests in all SOM VMs.
         \caption{User time}
         \label{subfig:user}
     \end{subfigure}
+    \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_pause}
+        \includegraphics[width=1\textwidth]{plots/elision_gc_time}
         \caption{Total GC pause time}
     \end{subfigure}
     \hfill
-    \begin{subfigure}{0.33\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_heap}
-        \caption{Avg. heap size}
-    \end{subfigure}
-    \begin{subfigure}{0.33\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_numgcs}
-        \caption{Number of GC collections}
-    \end{subfigure}
     \caption{The effects of finalizer elision on various programs. The table in
     the top-left shows how many finalizers are elided as a proportion of
     GC objects at run-time. The subsequent metrics
@@ -1564,20 +1565,20 @@ in this regard.
 
 \jake{todo \cref{fig:elision:metrics} in main prose}
 
-\begin{table}[t]
-\scalebox{0.7}{%
-  \input{plots/premopt/perf_summary}
-}
-  \vspace{5pt}
-  \caption{
-  The effects of premature finalization fences on wall-clock performance. \emph{None} is unsound but shows
-  the maximum possible performance from removing fences; \emph{Naive} inserts
-  all possible fences; and \emph{Optimised} inserts fences when necessary.
-  When confidence intervals are taken into account there
-  no statistically significant differences between the approaches.}
-  \label{table:Epremopt:perf}
-\vspace{-18pt}
-\end{table}
+%\begin{table}[t]
+%\scalebox{0.7}{%
+%  \input{plots/premopt/perf_summary}
+%}
+%  \vspace{5pt}
+%  \caption{
+%  The effects of premature finalization fences on wall-clock performance. \emph{None} is unsound but shows
+%  the maximum possible performance from removing fences; \emph{Naive} inserts
+%  all possible fences; and \emph{Optimised} inserts fences when necessary.
+%  When confidence intervals are taken into account there
+%  no statistically significant differences between the approaches.}
+%  \label{table:Epremopt:perf}
+%\vspace{-18pt}
+%\end{table}
 
 The results for \Epremopt are shown in \cref{table:Epremopt:perf}. We create
 three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
@@ -1935,12 +1936,12 @@ In this appendix, we provide supplementary plots for our performance evaluation.
     \centering
     \begin{subfigure}{1\textwidth}
         \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_pause.pdf}
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_gc_time.pdf}
     \end{subfigure}%
     \hfill
     \begin{subfigure}{1\textwidth}
         \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_heap.pdf}
+        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_mem_hsize_avg.pdf}
     \end{subfigure}
     \caption{Total pause time and average heap size on each benchmark after
     applying finalizer elision. The plot follows the same conventions as
