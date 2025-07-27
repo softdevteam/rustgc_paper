@@ -23,7 +23,7 @@ ARXIV_FILES = softdev.sty \
 
 ARXIV_BASE=arxiv
 
-all: appendices.pdf main.pdf rustgc_paper.pdf diff.pdf
+all: appendices.pdf main.pdf rustgc_paper.pdf diff.pdf response.pdf
 
 rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex
 	pdflatex rustgc_paper.ltx
@@ -55,6 +55,9 @@ diff.pdf: rustgc_paper.pdf
 bib.bib: softdevbib/softdev.bib local.bib
 	softdevbib/bin/prebib softdevbib/softdev.bib > bib.bib
 	softdevbib/bin/prebib local.bib >> bib.bib
+
+response.pdf: response.tex
+	pdflatex response.tex
 
 softdevbib/softdev.bib:
 	git submodule init
