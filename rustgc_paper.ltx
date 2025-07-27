@@ -1170,23 +1170,7 @@ but there are valid idioms of use where we found it necessary.
 \begin{table}[t]
 \small
 \begin{center}
-\begin{tabular}{lllll}
-\toprule
-                  & Version & Description & \#benchmarks \\
-\midrule
-    \binarytrees & Debian CLBG \binarytreesversion & Heap allocation microbenchmark & 1 \\
-    \regexredux & Debian CLBG \regexreduxversion  & Regular expression matching & 1 \\
-  \midrule
-    \alacritty & \alacrittyversion  & Terminal emulator & 10 \\
-    \fd & \fdversion  & Unix find replacement & 7 \\
-    \grmtools & \grmtoolsversion  & Lexer / parser library & 4 \\
-    \ripgrep & \ripgrepversion  & Fast grep replacement & 13 \\
-  \midrule
-    \somrsast & git \#\somrsversion  & SOM AST VM & 26 \\
-    \somrsbc & git \#\somrsversion  & SOM bytecode VM & 26 \\
-    \yksom & git \#\yksomversion  & SOM bytecode VM & 26 \\
-\bottomrule
-\end{tabular}
+    \input{tables/benchmarks}
 \end{center}
 
   \vspace{5pt}
@@ -1268,23 +1252,7 @@ from these source locations during a benchmark's execution.
 \begin{table}[t]
 \small
 \begin{center}
-\begin{tabular}{lrrrrr}
-\toprule
-  & \texttt{Gc<T>} & \texttt{Rc<T>} & \texttt{Arc<T>} & \texttt{rc::Weak} & \texttt{sync::Weak} \\
-\midrule
-\binarytrees & 2 & 0 & 0 & 0 & 0 \\
-\regexredux & 108 & 0 & 109 & 0 & 0 \\
-\midrule
-\alacritty & 107 & 1904 & 7546 & 45 & 1925 \\
-\fd & 7 & 19 & 402 & 0 & 1 \\
-\grmtools & 299 & 1686 & 139 & 2 & 21 \\
-\ripgrep & 104 & 27 & 222 & 2 & 2 \\
-\midrule
-\somrsast & 206 & 17 & 18 & 0 & 0 \\
-\somrsbc & 464 & 21 & 18 & 0 & 0 \\
-\yksom & 668 & 251 & 0 & 3 & 0 \\
-\bottomrule
-\end{tabular}
+\input{tables/conversion_source}
   \vspace{5pt}
   \caption{
     The number of source-level locations of relevant types in our
