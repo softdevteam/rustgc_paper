@@ -372,11 +372,11 @@ There is one notable limitation of \lstinline{Gc<T>}'s API relative to
 \lstinline{Rc<T>}. The latter, by definition, knows how many references
 there are to the underlying data. This enables an API (\lstinline{get_mut} and
 \lstinline{make_mut}) which allows the value stored inside a \lstinline{Rc<T>}
-to be moved out of it, without copying, when there is provably only a single dynamic
-reference. \jake{Not moved, mutably borrowed} In contrast, \lstinline{Gc<T>} can never know how many references
-there are to the underlying data, and cannot allow data to be moved \jake{mutably borrowed} without
-copying. As we shall see in Section~\cref{sec:evaluation}, some Rust programs
-are built around the performance advantages of this API.
+to be mutably borrowed at run-time if there is only a single reference to it.
+In contrast, \lstinline{Gc<T>} can never know how many references
+there are to the underlying data. As we shall see in Section~\cref{sec:evaluation}, some Rust programs
+are built around the performance advantages of this API (e.g.~turning
+`copy on write` into just `write' in some important cases).
 
 
 \subsection{Basic Implementation}
@@ -384,14 +384,14 @@ are built around the performance advantages of this API.
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion, adding
 or changing approximately 1,700 Lines of Code (LoC) in the core compiler,
-and adding 6388LoC of tests.
+and adding 6388LoC of tests. \laurie{have these figures changed?}
 
 \ourgc uses \boehm~\cite{boehm88garbage} as the underlying conservative GC, because it is the
-most widely ported conservative GC we know of. Although we adapted \boehm
-for \ourgc, we expect that our techniques will apply to other conservative GCs with
-relative ease.
+most widely ported conservative GC we know of. We use \boehm's \lstinline{GC_set_finalize_on_demand(1)} API,
+which causes finalizers to be run on their own thread.
 
-We made the following changes to \boehm. First, we disabled \boehm's parallel collector
+We had to make some minor changes to \boehm to suit our situation.
+First, we disabled \boehm's parallel collector
 because it worsens \ourgc's performance. It is unclear to us why this happens:
 we observe significant lock contention within \boehm during GC
 collections, but have not correlated this with a cause.
@@ -400,16 +400,10 @@ because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
 this ELF segment during each collection. Third,
-\boehm dynamically intercepts thread creation calls so that it can
+\boehm dynamically intercepts thread creation calls so that it cannot a
 then can scan their stacks, but (for bootstrapping
 reasons) is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm.
-
-We made one conceptually larger -- though only 60LoC -- change to \boehm,
-making it run all finalizers on a
-separate thread (see~\cref{sec:general_challenges,sec:fsa_finalizer_thread} for
-motivation). We lazily create a thread dedicated to this as soon as the collector has
-identified an object that requires finalization. \jake{We no longer make these changes inside Boehm. Instead, we use their \lstinline{GC_set_finalize_on_demand()} API (as per Andy's suggestion) and moved finalization thread logic into rustc.}
 
 
 \section{Destructors and Finalizers}
@@ -428,9 +422,8 @@ scope) its destructor is automatically run. Rust's destructors enable a style
 of programming that originated in C++ called RAII (Resource Acquisition Is
 Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a value is dropped,
 the underlying resources it possesses (e.g.~file handles or heap memory) are
-released. Destructors are used frequently in Rust code \jake{approx. 15\% of
-all types used in our benchmarks have destructors. Note that this is static,
-and does not reflect their frequency at runtime.}.
+released. Destructors are used frequently in Rust code (to give a rough idea: approximately 15\%
+of source-level types in our benchmark suite have destructors).
 Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
 automatically inserted \emph{drop glue}. Drop methods are optional and users
@@ -440,9 +433,18 @@ in a \texttt{struct}). Although it is common usage to conflate `destructor' in
 Rust with drop methods, drop glue is an integral part of a Rust destructor:
 we therefore use `destructor' as the umbrella term for both drop methods and drop glue.
 
-Because destructors are used frequently in Rust code, it is inevitable that
-GCs for Rust need to provide support for finalizers. \jake{This isn't enough IMO. The kicker is that we want \ourgc to interleave with regular Rust objects. Therefore, if those Rust objects have destructors, then we need finalizers. I think this point is obvious to us, but from the perspective of an unfamiliar reader it is not. Until now, we haven't explicitly stated this. This raises the question ``why do we want such interraction in the first place?''. To me the answer is that of our goal being ergonomics and reaching for \ourgc when other options would be difficult. This integration reduces that friction. Another implementation would be an \ourgc with a completely isolated GC heap, though this would be harder to use, it would still be a valid design. This is what Verona and Pony do, and would make finalizers harder to justify. I think we should mention this as it relates directly to the reviewer questions about why use finalization despite all its problems.} However, existing GCs
-for Rust are forced to have distinct notions of destructors and finalizers.
+When considering finalizers for a GC for Rust, there are several layers of
+design choices. We will shortly see that finalizers cause a number of
+challenges (\cref{sec:general_challenges}) and one choice would be to forbid
+finalizers entirely. However, this would mean that one could not sensibly embed types
+that have destructors in a \lstinline{Gc<T>}. While, as we
+shall see, Rust does not always call destructors, the situations where this can
+occur are best considered as `exceptional': not calling destructors from
+\lstinline{Gc<T>} would completely undermine reasonable programmer
+expectations. Because of this, \ourgc, and indeed virtually all GCs for Rust,
+support finalizers in some form.
+
+However, existing GCs force distinct notions of destructors and finalizers onto the programmer.
 Where the former have the \lstinline{Drop} trait, the latter typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
 the user must provide an implementation of the \lstinline{Finalize} trait.
@@ -456,7 +458,7 @@ designed to support \lstinline{Gc<T>}, those types cannot be directly GCed);
 cannot replicate \rustc's refusal to allow calls to the equivalent of
 \lstinline{Drop::drop}.
 
-Programmers can work around problems \#1 and \#2 in various ways\jake{minor styling nit, we wrap problem numbers in brackets above, should we do the same here for consistency or use \# above too?)}. For example,
+Programmers can work around problems \#1 and \#2 in various ways. For example,
 they can wrap external library types in \emph{newtypes} (zero-cost wrappers)
 and implement finalizers on those instead~\cite[Section~19.3]{klabnik18rust}.
 Doing so is tedious but not conceptually difficult.
