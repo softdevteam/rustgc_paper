@@ -441,7 +441,7 @@ Rust with drop methods, drop glue is an integral part of a Rust destructor:
 we therefore use `destructor' as the umbrella term for both drop methods and drop glue.
 
 Because destructors are used frequently in Rust code, it is inevitable that
-GCs for Rust need to provide support for finalizers. However, existing GCs
+GCs for Rust need to provide support for finalizers. \jake{This isn't enough IMO. The kicker is that we want \ourgc to interleave with regular Rust objects. Therefore, if those Rust objects have destructors, then we need finalizers. I think this point is obvious to us, but from the perspective of an unfamiliar reader it is not. Until now, we haven't explicitly stated this. This raises the question ``why do we want such interraction in the first place?''. To me the answer is that of our goal being ergonomics and reaching for \ourgc when other options would be difficult. This integration reduces that friction. Another implementation would be an \ourgc with a completely isolated GC heap, though this would be harder to use, it would still be a valid design. This is what Verona and Pony do, and would make finalizers harder to justify. I think we should mention this as it relates directly to the reviewer questions about why use finalization despite all its problems.} However, existing GCs
 for Rust are forced to have distinct notions of destructors and finalizers.
 Where the former have the \lstinline{Drop} trait, the latter typically have
 a \lstinline{Finalize} trait. If a user type needs to be finalized then
