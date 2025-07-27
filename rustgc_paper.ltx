@@ -137,7 +137,7 @@ idea or not.
 
 When we control for the
 (admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
-varies from zero to, in the worst case, several times slower. Perhaps
+varies from zero to, in the worst case, several times slower \laurie{let's give an accurate range, taken from our benchmark data}. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
 \ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
 Furthermore, although \ourgc as an implementation
@@ -1327,8 +1327,10 @@ A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
-roots, and a quick experiment showed us that comparing different underlying
-allocators was a significant confounding factor. Fortunately, \boehm can
+roots: in \lstinline{Rc<T>}-only benchmarks, we observe an inherent overhead
+from \boehm of 2--26\% relative to jemalloc (see~\cref{table:app:gcvs:perf:summary}
+in the Appendix), which is a significant, and variable, confounding factor.
+Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): we thus use \boehm as the allocator for all
 benchmarks.
@@ -1786,7 +1788,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \input{tables/gcvs_perf_summary}
 }
   \vspace{5pt}
-  \caption{Wall-clock and user time results for each benchmark suite for the
+  \caption{\laurie{This table is doing, I think, 3 things: summarising each benchmark's suite performance; boehm's overhead vs jemalloc; and wall-clock vs. user time. that means that i have trouble focussing on this table's message. i think we should (a) get rid of user time from this table (it's not important, and we have some of that data elsewhere for those who really care) (b) put the summary data (that is: the `Alloy (default)' and `Rc (gcmalloc)' data) in the main body of the paper if we have room (c) have a table in the appendix which is just `boehm vs jemalloc on Rc'.} Wall-clock and user time results for each benchmark suite for the
     \Egcrc experiment. Geometric mean wall-clock and user times for each
     configuration are provided; both values are in seconds. We also provide the
     ratios (×) of other configurations relative to the baseline (Reference
