@@ -825,15 +825,6 @@ more formal version of this algorithm.
 \section{Finalizer Safety Analysis}
 \label{sec:fsa}
 
-\jake{Reviewer comment: Could you name the soundness properties that FSA needs in the intro to sec. 7?}
-\jake{I may not have fully understood what the reviewer is asking for, but my
-interpretation is that they are asking for FSA guarantees, which are as
-follows: all finalizers will be thread-safe, finalizers will be memory safe in
-safe rust (i.e. they will not deref invalid references), finalizers will not
-access already finalized GC objects (subtly different from previous point),
-finalizers cannot resurect objects, finalizers will not be run prematurely
-(though this isn't part of FSA specifically) }
-
 In this section we address two high-level problems: running finalizers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
 safe finalizers. Addressing the former problem is conceptually simple --
@@ -841,12 +832,12 @@ finalizers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the latter problem,
 treating both equally in this section.
 
-In this section we introduce Finalizer Safety Analysis (FSA), which prevents
+In this section we introduce Finalizer Safety Analysis (FSA), which rejects
 a type \lstinline{T}'s destructor being used as a finalizer if it is not
-safe to do so. FSA is a form of abstract interpretation: it
-analyses a Rust program using its Control Flow Graph (CFG), safely
-approximating its finalization properties. We introduce the three main
-components of FSA first before bringing it all together.
+safe (in the sense of `safe Rust') to do so. As a first approximation, FSA
+guarantees that finalizers are memory safe, cycle safe (i.e.~do not access
+already finalized objects), and thread safe. In this section, we introduce the three main
+components of FSA individually before bringing them together into one.
 
 
 \subsection{Rust references}
@@ -1730,19 +1721,21 @@ for a rendering engine: \ourgc currently makes no pretences to being low latency
 
 \section{Conclusions}
 
-\jake{add a discussion thats sums up the overall benefits/drawbacks of this particular approach, possibly depending on specific scenarios/use cases, and perhaps outlines directions for future work from a conceptional perspective, i.e., possible design directions that could be investigated
-}
+We introduced a novel design for GC in Rust that solves a number of outstanding
+challenges in GC for Rust, as well as -- by taking advantage of Rust's
+unusual static guarantees -- some classical GC finalizer problems.
+By making integration with existing Rust code easier than previous GCs for
+Rust, we hope to have shown a pragmatic route for partial or wholesale
+migration of Rust code that would benefit from GC.
 
-\jake{i'll list them below. I'm not sure whether this stuff belongs in the conclusion or somewhere else.}
+Challenges and future opportunities remain: we give two small examples. \ourgc
+is an `all or nothing' cost: if you want to use \lstinline{Gc<T>} in a single
+location, you must pay the costs of the GC runtime and so on. \ourgc's absolute
+speed is, we believe, limited by \boehm: it is probable that using a
+semi-precise GC and/or a faster conservative GC could change our view of the
+absolutely performance speed.
 
-\jake{Overall benefits of Alloy: easy management of cycles without memory leaks; less boilerplate needed for finalizers compared with other approaches and a guarantee that they are safe; the API is mostly orthoganol to the collector backend (barring the assumption about conservative stack scanning); shown to be possible to retro-fitted to existing non-trivial codebases; allows for partial migration. Drawbacks: speed (though most of this is due to us being tied to \boehm); non-obvious and non-linear cost model, using a single GC object now pulls in an entire Gc runtime for the duration of a program; Finalizer rules are tricky... while FSA's granular checks allow users to not bother worrying about potential finalizer issues, if FSA prevents a type from being garbage-collected, it requires deep GC familiarity to understand why it's an issue (analogous to non-lexical-lifetime's ability to hide complexity really)}
-
-\jake{possible design directions: MMTk backend; mostly-precise GC (using type info to precisely trace heap objects); application/extension of FSA algorithm to other non-GC domains (e.g. more fine-grained alias analysis)  }
-
-We introduced a novel design for GC in Rust that, by taking advantage of Rust's
-unusual static guarantees, also solves some classical GC finalizer problems. We
-implemented our design in a fork of \rustc, and showed that it has a fairly
-small performance overhead. We do not claim that \ourgc is the ultimate design
+In summary, we do not claim that \ourgc is the ultimate design
 for GC in Rust, but it does
 show how much can be achieved if one is willing to adjust and extend the
 language's design and \rustc.
