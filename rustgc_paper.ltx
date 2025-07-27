@@ -824,6 +824,13 @@ more formal version of this algorithm.
 \label{sec:fsa}
 
 \jake{Reviewer comment: Could you name the soundness properties that FSA needs in the intro to sec. 7?}
+\jake{I may not have fully understood what the reviewer is asking for, but my
+interpretation is that they are asking for FSA guarantees, which are as
+follows: all finalizers will be thread-safe, finalizers will be memory safe in
+safe rust (i.e. they will not deref invalid references), finalizers will not
+access already finalized GC objects (subtly different from previous point),
+finalizers cannot resurect objects, finalizers will not be run prematurely
+(though this isn't part of FSA specifically) }
 
 In this section we address two high-level problems: running finalizers on the same thread
 as a paused mutator can cause race conditions and deadlocks; and some safe destructors are not
