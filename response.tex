@@ -4,6 +4,8 @@
 \usepackage{setspace}
 \usepackage{xcolor}
 \usepackage{amssymb}
+\usepackage{listings}
+\usepackage{listings-rust}
 \usepackage{softdev}
 \usepackage{quoting}
 \usepackage{xspace}
@@ -31,6 +33,7 @@
 \newcommand\Egcrc{E$_\textrm{gcvs}$\xspace}
 \newcommand\Eelision{E$_\textrm{elision}$\xspace}
 \newcommand\Epremopt{E$_\textrm{premopt}$\xspace}
+\newcommand\boehm{\textsc{BDWGC}\xspace}
 
 \begin{document}
 
@@ -38,63 +41,91 @@
 \title{Response to Reviewer Feedback}
 \maketitle
 
-We thank the reviewers for their thoughtful reviews! While our
-\texttt{revisions R2} submission contains a PDF diff that shows prose
-modifications, we recognize that many review comments centered on our
-evaluation approach. Since \texttt{latexdiff} cannot effectively display
-changes to figures and tables, this document serves as a brief guide to our
-major revisions.
+We thank the reviewers for their thoughtful reviews: we hope to have
+taken onboard your feedback and addressed your questions. In this document
+we summarise the major changes we have made: the diff shows changes to the prose
+(though it does tend to mangle changes to figures and tables).
 
-Below, we highlight the most significant changes made in response to reviewer
-input, including references to new visualizations that directly address the
-points raised during review.
 
-\subsection*{Better Justification around Finalizers}
+\subsection*{Finalization semantics}
 
-\begin{blockquote} explicitly discuss and present the issues around
-  finalizations semantics, as learned from other languages...\\
-
-... This should take the form of a) explicit acknowledgement of the issue of
-this as a solution (as per the JEP) b) explain why such an undesirable solution
-is unavoidable (if it is) c) clearly explain how the problems with finalization
-semantics relate to destructor semantics which Rust has already bought into
-(i.e. exactly how much introducing this approach makes things worse or not).
+\begin{blockquote}
+explicitly discuss and present the issues around finalizations semantics, as
+  learned from other languages
 \end{blockquote}
 
-We have updated Section 4.1 to include a more detailed discussion of how
-finalization semantics relate to destructor semantics in Rust in particular. We
-offer a concrete example of an instance where finalizers can actually lead to
-more drop methods being run than their equivalent destructor based counterparts
--- across panic unwind boundaries on different mutator threads.
+We have made a number of changes (chiefly to the end of Section 3, and
+throughout Section 4), which we hope address this.
 
-We also update Section 4.2 to more explicitly address finalizer challenges
-(such as latency) as they relate to JEP-421.
+As the reviewers note ``an
+implementation that does not finalize anything would be compliant when
+finalization may be deferred indefinitely'' is true of most GCed
+implementations we are aware of, including Java. Indeed, Java once had the
+\lstinline{runFinalizersOnExit} flag to force finalizers to be run before the
+JVM exists, but it is marked as deprecated as ``inherently unsafe''; instead,
+there is now the \lstinline{addShutdownHook} mechanism.
 
-In Section 4 we mention that despite the issues surrounding finalization,
-Rust's heavy reliance on destructor-based code, and Alloy's desire allow GC
-interaction with these objects, finalization is inevitable.
+While investigating thus further, we discovered one surprise (to us, at least),
+which muddies the waters with respect to finalizer latency further. In Rust,
+when a thread unwinds (i.e.~panics) then, depending on compile-time flags, no
+destructors will be run --- but Alloy can run all of the `queued' finalizers!
+We have not belaboured this point in the paper, but it shows that destructors
+can have guaranteed-infinite latency in some situations where finalizers have
+infinite-at-worst latency.
+
 
 \subsection*{Performance Evaluation}
 
+We have made a large number of changes to the performance evaluation. These are
+mostly due to reviewer comments, but we also uncovered two mistakes in our
+experiment: (1) we used metric XYZ instead of ABC in \boehm (2) we incorrectly
+calculated confidence intervals in \laurie{which cases?}. While neither mistake
+fundamentally changes the outcome, we believe it is important that we not
+try and sweep this under the carpet.
+
+The most significant changes are:
+
+\begin{itemize}
+  \item We provide a comparison of \lstinline{Rc<T>} with jemalloc and \boehm
+    in Table~\laurie{3?} in the Appendix. This suggests that the inherent
+    overhead of \boehm ranges from 2--26\%, averaging around 11\%.
+
+  \item We have standardized all visualizations by normalizing against
+    appropriate baselines (e.g.~Alloy-without-elision as the baseline for
+    the \Eelision experiment; and barrier-free execution as the baseline
+    for the \Epremopt experiment). This allows us to show what we hope
+    are easily understand performance ratios. We also provide the raw data
+    in the appendix.
+
+  \item We provide data for wall-clock and user-time.
+\end{itemize}
+
+The downside to this is that we now present far too many figures and tables to
+fit in the main body of the paper! We have tried to select the subset of
+visualizations that will most quickly help the reader understand the overall
+picture for the main body of the paper, relegating everything else to the
+appendix.
+
+We were asked -- when explaining the overhead of \boehm -- the following:
+
 \begin{blockquote}
-include the non-BDW baseline in the evaluation and discuss the utility of this
-approach w.r.t. that performance result. Ideally this would include a
+Ideally this would include a
 discussion of how much of the performance deficit is likely redeemable via
 "engineering", and how much is likely to be intrinsic (i.e. due to
 unavoidable conservatism), so that we can get a better intuition of the
 plausible "best case" for this approach.
 \end{blockquote}
 
-We have standardized all visualizations in Section 8 by normalizing against
-appropriate baselines. Each experiment uses a specific baseline for comparison:
-non-BDW allocator benchmarks for the \Egcrc experiment (RC comparison)
-\jake{TODO link to figures}, naive Alloy without elision for the \Eelision
-experiment \jake{TODO link to figures}, and barrier-free execution for the
-\Epremopt experiment \jake{TODO link to figures}. All results are presented as
-ratio relative to these baselines rather than raw values. For the interested
-reader, we provide the raw values for each experiment in appendix tables.
+Although we can now quantify the overhead of Boehm vs.~jemalloc in our context,
+the data doesn't really give us clues as to why the overhead exists. That makes
+us nervous about speculating further. While we are not total allocator dummies,
+both of us have talked to allocator experts over the years to know that there is a lot
+here that we don't know. At a high level, \boehm is -- and we don't mean this as an
+insult or criticism! -- ``old''. Since then many allocators (e.g.~dlmalloc, jemalloc)
+have been designed, and subsequently tweaked and improved; each such allocator
+is full of many decisions which are likely to affect its performance. Unfortunately,
+we don't really know which decisions might be relevant or not.
 
-We offer a discussion of the engineering cost in the prose in section \jake{TODO: section}
 
 \subsection*{Conclusion}
 
@@ -105,5 +136,7 @@ perhaps outlines directions for future work from a conceptional perspective,
 i.e., possible design directions that could be investigated
 \end{blockquote}
 
+We have expanded the conclusions, but we hope to have done so in a way
+that does not overstate our confidence in our predictions.
 
 \end{document}
