@@ -428,23 +428,9 @@ scope) its destructor is automatically run. Rust's destructors enable a style
 of programming that originated in C++ called RAII (Resource Acquisition Is
 Initialization)~\cite[Section~14.4]{stroustrup97c++}: when a value is dropped,
 the underlying resources it possesses (e.g.~file handles or heap memory) are
-released. Destructors are used frequently in Rust code \laurie{jake: we need a
-figure here. for example, across our benchmarks, there are XYZ destructors, or
-XYZ\% of structs have destructors, or similar} \jake{This is quite hard to
-quantify because while destructors are prevelant, most are implicitly pulled in
-from standard library building block types (or transitively dependant crates).
-So a crude,source-level ``how many of my project's type's have a drop method?''
-will give misleadingly low percentages. I tried hacking together a MIR pass
-which just loops over each type and calls \lstinline{needs_drop} but this
-conservatively returns true for any type which has generic parameters as they have not been
-monomorphized. This would over-approximate their frequency (and I don't know
-how much by). One idea I have to get some rough percentage while not spending a
-long time calculating it is to count all the types in a program (baseline), and
-generate the MIR and grep for drop terminators. we divide the latter by the
-former and we get a ratio. we'd do this in debug mode because the compiler
-aggressively inlines drop calls. does this seem sensible?}\laurie{it sounds
-like it's worth trying to me!}
-
+released. Destructors are used frequently in Rust code \jake{approx. 15\% of
+all types used in our benchmarks have destructors. Note that this is static,
+and does not reflect their frequency at runtime.}.
 Rust destructors are formed of two
 parts, run in the following order: a user-defined \emph{drop method}; and
 automatically inserted \emph{drop glue}. Drop methods are optional and users
