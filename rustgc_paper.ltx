@@ -1731,6 +1731,12 @@ for a rendering engine: \ourgc currently makes no pretences to being low latency
 \jake{add a discussion thats sums up the overall benefits/drawbacks of this particular approach, possibly depending on specific scenarios/use cases, and perhaps outlines directions for future work from a conceptional perspective, i.e., possible design directions that could be investigated
 }
 
+\jake{i'll list them below. I'm not sure whether this stuff belongs in the conclusion or somewhere else.}
+
+\jake{Overall benefits of Alloy: easy management of cycles without memory leaks; less boilerplate needed for finalizers compared with other approaches and a guarantee that they are safe; the API is mostly orthoganol to the collector backend (barring the assumption about conservative stack scanning); shown to be possible to retro-fitted to existing non-trivial codebases; allows for partial migration. Drawbacks: speed (though most of this is due to us being tied to \boehm); non-obvious and non-linear cost model, using a single GC object now pulls in an entire Gc runtime for the duration of a program; Finalizer rules are tricky... while FSA's granular checks allow users to not bother worrying about potential finalizer issues, if FSA prevents a type from being garbage-collected, it requires deep GC familiarity to understand why it's an issue (analogous to non-lexical-lifetime's ability to hide complexity really)}
+
+\jake{possible design directions: MMTk backend; mostly-precise GC (using type info to precisely trace heap objects); application/extension of FSA algorithm to other non-GC domains (e.g. more fine-grained alias analysis)  }
+
 We introduced a novel design for GC in Rust that, by taking advantage of Rust's
 unusual static guarantees, also solves some classical GC finalizer problems. We
 implemented our design in a fork of \rustc, and showed that it has a fairly
