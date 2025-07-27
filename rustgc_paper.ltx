@@ -1788,7 +1788,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \input{tables/gcvs_perf_summary}
 }
   \vspace{5pt}
-  \caption{\laurie{This table is doing, I think, 3 things: summarising each benchmark's suite performance; boehm's overhead vs jemalloc; and wall-clock vs. user time. that means that i have trouble focussing on this table's message. i think we should (a) get rid of user time from this table (it's not important, and we have some of that data elsewhere for those who really care) (b) put the summary data (that is: the `Alloy (default)' and `Rc (gcmalloc)' data) in the main body of the paper if we have room (c) have a table in the appendix which is just `boehm vs jemalloc on Rc'.} Wall-clock and user time results for each benchmark suite for the
+  \caption{\laurie{This table is doing, I think, 3 things: summarising each benchmark's suite performance; boehm's overhead vs jemalloc; and wall-clock vs. user time. that means that i have trouble focussing on this table's message. i think we should (a) put wall-clock vs. user-time in its own table (because it needs careful explaining e.g. fd has lower user time because of IO costs punishing wall-clock time) (b) put the summary data (that is: the `Alloy (default)' and `Rc (gcmalloc)' data) in the main body of the paper if we have room (c) have a table in the appendix which is just `boehm vs jemalloc on Rc'.} Wall-clock and user time results for each benchmark suite for the
     \Egcrc experiment. Geometric mean wall-clock and user times for each
     configuration are provided; both values are in seconds. We also provide the
     ratios (×) of other configurations relative to the baseline (Reference
