@@ -1276,13 +1276,12 @@ to be uninteresting from a GC benchmarking perspective. Irrespective of the
 number of source locations that reference memory allocation types, the
 benchmarks we could run from them allocated sufficiently little memory that
 there are no worthwhile differences between different allocation strategies.
-Put another way: these programs are in a sense `the same' from our evaluation perspective,
-and including them would drown us in unnecessary detail.
+Put another way: these programs are in a sense `the same' from our evaluation perspective.
 
 Two programs (bevy and rust-analyzer) did not run correctly after
 porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
 functions in \lstinline{Rc<T>} which allow a programmer to mutate their contents
-when it can be statically proven that there is a single owner. There is not,
+if, at run-time, they only have a single owner. There is not,
 and cannot be, equivalent functionality with a copyable \lstinline{Gc<T>} type. We thus had to
 use alternative mechanisms to express the desired outcome, but found that
 this occasionally led to deadlocks (this same problem also occurred in
@@ -1328,12 +1327,13 @@ different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
 roots: in \lstinline{Rc<T>}-only benchmarks, we observe an inherent overhead
-from \boehm of 2--26\% relative to jemalloc (see~\cref{table:app:gcvs:perf:summary}
+from \boehm of 2--26\% relative to jemalloc (see~\laurie{the what-was-fig1}
+and \cref{table:app:gcvs:perf:summary} in the Appendix).
 in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
-(i.e.~no conservative GC occurs): we thus use \boehm as the allocator for all
-benchmarks.
+(i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
+the allocator for all benchmarks.
 
 We ran each benchmark in our suite 30 times reporting means and 99\% confidence intervals
 (note: that for individual benchmarks we report the arithmetic mean, and for benchmark
@@ -1363,13 +1363,8 @@ Our experiment is fully repeatable and downloadable from
     \end{subfigure}
     \hfill
     \caption{Relative wall-clock performance (left) and average heap-size
-    (right) comparing GC (using \ourgc) against two Rust reference counting
-    (\rc) configurations across all benchmark suites. The RC configurations
-    are: \gcvsbaseline (standard RC using the jemalloc allocator with
-    unmodified benchmarks) and \gcvsrc (RC configured with \boehm's allocator
-    for controlled comparison against GC). Note that \fd, \ripgrep, and
-    \alacritty use atomic reference counting, while all other benchmarks use
-    non-atomic reference counting. Results are presented as ratios normalized
+    (right) comparing \lstinline{Gc<T>} against reference counting (\lstinline{Rc<T> and \lstinline{Arc<T>})
+    on our benchmark suites. Results are presented as ratios normalized
     to \gcvsbaseline (black horizontal line at x=1.0). Blue bars represent GC
     performance and orange bars show \gcvsrc results. Each bar shows the
     geometric mean across \benchmarkpexecs iterations, with error bars
@@ -1379,7 +1374,7 @@ Our experiment is fully repeatable and downloadable from
     Relative to \gcvsrc, we observe an average slowdown of \jake{TODO} while
     consuming \jake{TODO} times more memory on average. When controlling for
     allocator differences, these reduce to \jake{TODO} and \jake{TODO}
-    respectively.}
+    respectively.\laurie{what explains grmtools heap usage?}}
     \label{fig:gcvs:summary}
 \end{figure}
 
