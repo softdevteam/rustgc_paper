@@ -1357,10 +1357,40 @@ Our experiment is fully repeatable and downloadable from
 
 \subsection{Results}
 
-\jake{TODO: replace removed table with bar plot}
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth]{plots/gcvs_wallclock}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=1\textwidth]{plots/gcvs_mem_hsize_avg}
+    \end{subfigure}
+    \hfill
+    \caption{Relative wall-clock performance (left) and average heap-size
+    (right) comparing GC (using \ourgc) against two Rust reference counting
+    (\rc) configurations across all benchmark suites. The RC configurations
+    are: \gcvsbaseline (standard RC using the jemalloc allocator with
+    unmodified benchmarks) and \gcvsrc (RC configured with \boehm's allocator
+    for controlled comparison against GC). Note that \fd, \ripgrep, and
+    \alacritty use atomic reference counting, while all other benchmarks use
+    non-atomic reference counting. Results are presented as ratios normalized
+    to \gcvsbaseline (black horizontal line at x=1.0). Blue bars represent GC
+    performance and orange bars show \gcvsrc results. Each bar shows the
+    geometric mean across \benchmarkpexecs iterations, with error bars
+    indicating 99\% confidence intervals. Solid vertical lines display overall
+    geometric mean performance ratios across all benchmarks for each
+    configuration, with shaded regions showing 99\% confidence intervals.\\\\
+    Relative to \gcvsrc, we observe an average slowdown of \jake{TODO} while
+    consuming \jake{TODO} times more memory on average. When controlling for
+    allocator differences, these reduce to \jake{TODO} and \jake{TODO}
+    respectively.}
+    \label{fig:gcvs:summary}
+\end{figure}
 
-Starting with \Egcrc, wall-clock performance be found
-in~\cref{table:Ercgc:perf}, which we suggest interpreting in conjunction with
+Starting with \Egcrc, wall-clock performance and average heap-size data be found
+in~\cref{fig:gcvs:summary}. We suggest interpreting in conjunction with
 the `quantity of memory' data found in \cref{table:Ercgc:conversion}. The broad
 story we can see from this data is that \ourgc has, when confidence intervals
 are taken into account, similar performance to other memory allocation
