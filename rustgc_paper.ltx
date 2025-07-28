@@ -383,14 +383,8 @@ are built around the performance advantages of this API (e.g.~turning
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion, adding
-or changing approximately 5651 Lines of Code (LoC) in the core compiler,
-of which at least 2224 LoC are tests. \laurie{have these figures changed?}
-
-\jake{I can't remember how I arrived at the previous figures. Granted, a lot has changed in Alloy since, but I don't think the original calculations were correct. Here's the rationale for the latest changes, calculated using \lstinline{git diff 41a5f2fc --shortstat} (where we diverged from upstream minus CI changes)  }
-\jake{total changes 7896LoC [6443 insertions(+), 1453 deletions(-)].}
-\jake{Of which 5651 are to the core compiler}
-\jake{Of which at least 2224 are tests}
-\jake{This is not hugely accurate because it only considers UI tests in the \lstinline{tests/} directory. Unit tests within files are counted as being part of the implementation.}
+or changing approximately 5,500 Lines of Code (LoC) in the core compiler,
+and approximately 2,250 LoC are tests.
 
 \ourgc uses \boehm~\cite{boehm88garbage} as the underlying conservative GC, because it is the
 most widely ported conservative GC we know of. We use \boehm's \lstinline{GC_set_finalize_on_demand(1)} API,
@@ -1416,17 +1410,18 @@ usage with heaptrack.
     \vspace{-25pt}
     \includegraphics[width=\textwidth]{plots/ripgrep_subset.pdf}
     \noindent
-    \caption{A representative subset of time-series memory usage for three
-    benchmarks in \ripgrep. Each plot shows the memory usage (in MiB) on the
-    $y$-axis of three configurations: GC using \ourgc's default heap-size
-    (blue); reference counting with \texttt{jemalloc} (black); and reference
-    counting with \texttt{gcmalloc} (orange). The $x$-axis normalises running
-    times. We initially thought was a memory leak in \ourgc or our \ripgrep
-    port. In fact, it shows the consequences of `partial' porting: \ripgrep
-    uses external libraries that embed \lstinline{Arc<T>}s in
-    \lstinline{Gc<T>}s, causing more finalizers to be run, and memory to be
-    kept alive for longer, than might be expected.
-    }
+    \caption{\laurie{jemalloc vs gcmalloc isn't useful: let's just print the
+    gcmalloc line for Rc. We need to use `Rc` and `Gc` not `RC` and `GC` in the
+    labels. Let's also label them `Rc<T>` and `Gc<T>` for consistency with the
+    rest of the paper.}
+    An example of surprising, though fairly rare, heap usage patterns
+    behaviour of \lstinline{Gc<T>} relative to \lstinline{Rc<T>}: on
+    the $x$-axis is time (normalised across all three executions); on the
+    $y$-axis heap usage (in MiB, with 99\% confidence intervals).
+    The need to finalize large numbers of objects means that memory is not
+    instantly freed, giving the appearance of possible memory leaks: in
+    reality the memory is freed a little later than normal, hence the
+    seeming `growing' and `shrinking' phases in the plots.}
     \label{fig:ripgrep_subset}
 \end{figure}
 
