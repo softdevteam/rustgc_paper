@@ -62,7 +62,8 @@ implementation that does not finalize anything would be compliant when
 finalization may be deferred indefinitely'' is true of most GCed
 implementations we are aware of, including Java. Indeed, Java once had the
 \lstinline{runFinalizersOnExit} flag to force finalizers to be run before the
-JVM exists, but it is marked as deprecated as ``inherently unsafe''; instead,
+JVM exists; it was long marked as deprecated as ``inherently unsafe'' and
+now appears to have been removed; instead,
 there is now the \lstinline{addShutdownHook} mechanism.
 
 While investigating this further, we discovered one surprise (to us, at least),
@@ -76,35 +77,14 @@ infinite-at-worst latency.
 
 \subsection*{Performance Evaluation}
 
-\jake{Since the original submission, alloy has been updated. We now
-dynamically link boehm in all cases. For memory metrics, this alone won't
-change things because we always used dynamic linkage for these tests anyway.
-However, this may have affected wall-clock performance on some individual
-benchmarks (though it's really hard to tell which, because there are
-confounders: we also now run benchmarks on b15; we made changes to finalization
-based on Andy wingo's feedback (mentioned below); and we made a couple of other
-unrelated QoL and implementation changes to Alloy (i doubt these made a
-difference, but who knows). What is clear though is that even if individual
-benchmarks may have changed, the overall picture has not not since original
-submission.}
-
 We have made a large number of changes to the performance evaluation. These are
 mostly due to reviewer comments, but we also uncovered a mistake in our
-experiment. We used \boehm's \lstinline{GC_heapsize} metric (which never
-shrinks) for calculating in-use heap snapshots, we have since modified boehm to
-output the number of bytes swept and explicitly freed on each GC. While neither mistake
-fundamentally changes the outcome, we believe it is important that we not
-try and sweep this under the carpet. \jake{This does fundamentally change the
-memory results for finalizer elision. In som-rs-ast, som-rs-bc, grmtools, and
-ripgrep, finalizer elision now uses less memory than the no-elision
-configuration. In the original submission, we incorrectly observed that it had
-a higher average heap usage as a trade-off for better wall-clock performance.}
-\jake{furthermore, since the original submission we have changed the way that
-finalization works: we now use Boehm's \lstinline{finalize_on_demand} API based on
-Andy Wingo's feedback. It is very possible that this could have moved the dial
-on heap size too, how much that this changes things in relation to the above
-mentioned wrong metric error I don't know. but it has crossed my mind.}
-
+experiment. We previously used \boehm's \lstinline{GC_heapsize} metric:
+this does not, as we assumed, represent current heap usage, but total
+memory usage since the program's start. We now use the \laurie{XYZ} metric,
+which does measure the correct thing. This changes the results for finalizer
+elision in on way: previously this appeared to cause heap usage to grow, but in
+fact it shrinks.
 
 The most significant changes are:
 
@@ -126,6 +106,10 @@ The most significant changes are:
   pause time.
 \end{itemize}
 
+We also made some minor changes (e.g.~we now always use dynamic
+linking of \boehm; we reran benchmarks on a more modern machine), but
+these had no obvious impact on our results.
+
 The downside to this is that we now present far too many figures and tables to
 fit in the main body of the paper! We have tried to select the subset of
 visualizations that will most quickly help the reader understand the overall
@@ -142,6 +126,9 @@ unavoidable conservatism), so that we can get a better intuition of the
 plausible "best case" for this approach.
 \end{blockquote}
 
+We ended up a little unsure which of two questions this might be asking,
+so please forgive us if we answer both!
+
 Although we can now quantify the overhead of Boehm vs.~jemalloc in our context,
 the data doesn't really give us clues as to why the overhead exists. That makes
 us nervous about speculating further. While we are not total allocator dummies,
@@ -152,25 +139,11 @@ have been designed, and subsequently tweaked and improved; each such allocator
 is full of many decisions which are likely to affect its performance. Unfortunately,
 we don't really know which decisions might be relevant or not.
 
-\jake{My reading of this reviewer comment is that our mention of allocator
-differences are just a partial (yet important!) answer. I think they are also
-asking something else too (based on their mention of ``unavoidable
-conservatism''). This is more along the lines of: ``what GC-specific
-engineering would be needed to make this research-based GC productionised to
-have comparable performance with jemalloc RC''. My intuition is that they're
-wondering about things like ``what if you had a Bartlett-style
-semi-conservative collector rather than fully conservative?'' The short answer
-here would also be ``it's too difficult to say'' IMHO. Bartlett-style
-collection muddies the waters a bit showing that (counter to what I would
-assume) precise object scanning doesn't make a lot of difference in terms of
-wall-clock time. For some workloads its slower, for others its a modest
-improvement. And trying to make guesses on Rust workloads based off of this
-would be pure speculation on my part. Precise GC OTOH would be an interesting
-comparison, maybe fully moving compaction would improve things... but as we
-mention in the paper, this is not possible while respecting the Rust semantics
-of today. If you think this is worth mentioning in the body of the paper I can
-do so and include a citation to the Bartlett work. I don't know how on-topic it
-is though.}
+Another possibility is to use a Bartlett-esque semi-conservative GC. The literature
+offers a complex picture: sometimes this is faster, sometimes slower, than
+fully conservative GC. We again lack confidence to know how this might translate
+into our context.
+
 
 \subsection*{Conclusion}
 
