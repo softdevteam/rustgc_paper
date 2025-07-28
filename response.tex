@@ -65,7 +65,7 @@ implementations we are aware of, including Java. Indeed, Java once had the
 JVM exists, but it is marked as deprecated as ``inherently unsafe''; instead,
 there is now the \lstinline{addShutdownHook} mechanism.
 
-While investigating thus further, we discovered one surprise (to us, at least),
+While investigating this further, we discovered one surprise (to us, at least),
 which muddies the waters with respect to finalizer latency further. In Rust,
 when a thread unwinds (i.e.~panics) then, depending on compile-time flags, no
 destructors will be run --- but Alloy can run all of the `queued' finalizers!
@@ -76,12 +76,35 @@ infinite-at-worst latency.
 
 \subsection*{Performance Evaluation}
 
+\jake{Since the original submission, alloy has been updated. We now
+dynamically link boehm in all cases. For memory metrics, this alone won't
+change things because we always used dynamic linkage for these tests anyway.
+However, this may have affected wall-clock performance on some individual
+benchmarks (though it's really hard to tell which, because there are
+confounders: we also now run benchmarks on b15; we made changes to finalization
+based on Andy wingo's feedback (mentioned below); and we made a couple of other
+unrelated QoL and implementation changes to Alloy (i doubt these made a
+difference, but who knows). What is clear though is that even if individual
+benchmarks may have changed, the overall picture has not not since original
+submission.}
+
 We have made a large number of changes to the performance evaluation. These are
-mostly due to reviewer comments, but we also uncovered two mistakes in our
-experiment: (1) we used metric XYZ instead of ABC in \boehm (2) we incorrectly
-calculated confidence intervals in \laurie{which cases?}. While neither mistake
+mostly due to reviewer comments, but we also uncovered a mistake in our
+experiment. We used \boehm's \lstinline{GC_heapsize} metric (which never
+shrinks) for calculating in-use heap snapshots, we have since modified boehm to
+output the number of bytes swept and explicitly freed on each GC. While neither mistake
 fundamentally changes the outcome, we believe it is important that we not
-try and sweep this under the carpet.
+try and sweep this under the carpet. \jake{This does fundamentally change the
+memory results for finalizer elision. In som-rs-ast, som-rs-bc, grmtools, and
+ripgrep, finalizer elision now uses less memory than the no-elision
+configuration. In the original submission, we incorrectly observed that it had
+a higher average heap usage as a trade-off for better wall-clock performance.}
+\jake{furthermore, since the original submission we have changed the way that
+finalization works: we now use Boehm's \lstinline{finalize_on_demand} API based on
+Andy Wingo's feedback. It is very possible that this could have moved the dial
+on heap size too, how much that this changes things in relation to the above
+mentioned wrong metric error I don't know. but it has crossed my mind.}
+
 
 The most significant changes are:
 
@@ -98,6 +121,9 @@ The most significant changes are:
     in the appendix.
 
   \item We provide data for wall-clock and user-time.
+
+  \item We provide data for the number of collections run, and the total GC
+  pause time.
 \end{itemize}
 
 The downside to this is that we now present far too many figures and tables to
@@ -126,6 +152,25 @@ have been designed, and subsequently tweaked and improved; each such allocator
 is full of many decisions which are likely to affect its performance. Unfortunately,
 we don't really know which decisions might be relevant or not.
 
+\jake{My reading of this reviewer comment is that our mention of allocator
+differences are just a partial (yet important!) answer. I think they are also
+asking something else too (based on their mention of ``unavoidable
+conservatism''). This is more along the lines of: ``what GC-specific
+engineering would be needed to make this research-based GC productionised to
+have comparable performance with jemalloc RC''. My intuition is that they're
+wondering about things like ``what if you had a Bartlett-style
+semi-conservative collector rather than fully conservative?'' The short answer
+here would also be ``it's too difficult to say'' IMHO. Bartlett-style
+collection muddies the waters a bit showing that (counter to what I would
+assume) precise object scanning doesn't make a lot of difference in terms of
+wall-clock time. For some workloads its slower, for others its a modest
+improvement. And trying to make guesses on Rust workloads based off of this
+would be pure speculation on my part. Precise GC OTOH would be an interesting
+comparison, maybe fully moving compaction would improve things... but as we
+mention in the paper, this is not possible while respecting the Rust semantics
+of today. If you think this is worth mentioning in the body of the paper I can
+do so and include a citation to the Bartlett work. I don't know how on-topic it
+is though.}
 
 \subsection*{Conclusion}
 
