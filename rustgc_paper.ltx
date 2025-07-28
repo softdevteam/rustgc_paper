@@ -1378,16 +1378,24 @@ usage with heaptrack.
 \begin{figure}[t]
     \centering
     \vspace{-25pt}
-    \includegraphics[width=1\textwidth]{ripgrep_subset.pdf}
-    \caption{\laurie{the text here's pretty much unreadable. since they're all somewhat similar, why not display 2 or 3, and then we can enlarge them somewhat?}
-      A representative subset of time-series memory usage for \ripgrep.
-    Each plot shows the memory usage (in MiB) on the $y$-axis of two runs (one
-    for \ourgc, one for \lstinline{Arc<T>}) of a benchmark: the $x$-axis normalises
-    running times. We initially thought was a memory leak in \ourgc or our \ripgrep port.
-    In fact, it shows the consequences of `partial' porting: \ripgrep uses
-    external libraries that embed \lstinline{Arc<T>}s in \lstinline{Gc<T>}s,
-    causing more finalizers to be run, and memory to be kept alive for longer, than might be expected.
+    \includegraphics[width=\textwidth]{plots/ripgrep_subset.pdf}
+    \vspace{0.5em}
+    \noindent
+    {\small
+    \makebox[0.33\textwidth]{(a) Word}\hfill
+    \makebox[0.33\textwidth]{(b) UTF-8 Greek}\hfill
+    \makebox[0.33\textwidth]{(c) Alternates}
     }
+    \caption{A representative subset of time-series memory usage for three
+    benchmarks in \ripgrep. Each plot shows the memory usage (in MiB) on the
+    $y$-axis of three configurations: \ourgc (blue); reference counting with
+    \texttt{jemalloc} (black); and reference counting with \texttt{gcmalloc}
+    (orange). The $x$-axis normalises running times. We initially thought was a
+    memory leak in \ourgc or our \ripgrep port. In fact, it shows the
+    consequences of `partial' porting: \ripgrep uses external libraries that
+    embed \lstinline{Arc<T>}s in \lstinline{Gc<T>}s, causing more finalizers to
+    be run, and memory to be kept alive for longer, than might be expected.
+    \jake{TODO fix incorrect spacing}}
     \label{fig:ripgrep_subset}
 \end{figure}
 
