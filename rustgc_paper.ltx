@@ -383,8 +383,14 @@ are built around the performance advantages of this API (e.g.~turning
 
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion, adding
-or changing approximately 1,700 Lines of Code (LoC) in the core compiler,
-and adding 6388LoC of tests. \laurie{have these figures changed?}
+or changing approximately 5651 Lines of Code (LoC) in the core compiler,
+of which at least 2224 LoC are tests. \laurie{have these figures changed?}
+
+\jake{I can't remember how I arrived at the previous figures. Granted, a lot has changed in Alloy since, but I don't think the original calculations were correct. Here's the rationale for the latest changes, calculated using \lstinline{git diff 41a5f2fc --shortstat} (where we diverged from upstream minus CI changes)  }
+\jake{total changes 7896LoC [6443 insertions(+), 1453 deletions(-)].}
+\jake{Of which 5651 are to the core compiler}
+\jake{Of which at least 2224 are tests}
+\jake{This is not hugely accurate because it only considers UI tests in the \lstinline{tests/} directory. Unit tests within files are counted as being part of the implementation.}
 
 \ourgc uses \boehm~\cite{boehm88garbage} as the underlying conservative GC, because it is the
 most widely ported conservative GC we know of. We use \boehm's \lstinline{GC_set_finalize_on_demand(1)} API,
