@@ -1774,8 +1774,8 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 
 \begin{itemize}
   \item \cref{table:app:gcvs:perf:summary} (page~\pageref{table:app:gcvs:perf:summary}): Performance summary of each suite.
-  \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock time comparison.
-  \item \cref{table:app:gcvs:wallclock} (page~\pageref{table:app:gcvs:wallclock}): Raw wall-clock time data.
+  \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock performance comparison for each benchmark.
+  \item \cref{table:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
   \item \cref{table:app:gcvs:user} (page~\pageref{table:app:gcvs:user}): Raw user time data.
 \end{itemize}
 \textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
@@ -1812,14 +1812,22 @@ In this appendix, we provide supplementary plots for our performance evaluation.
     \centering
 
     \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_gcvs_wallclock.pdf}
-    \caption{The relative wall-clock performance of \ourgc vs \rc reference
-    counting across each benchmark in each suite. The performance ratios are
-    normalized to \rc with the jemalloc allocator (baseline = 1.0). Blue bars
-    represent Alloy performance, orange bars show \rc with gcmalloc to control for the allocator.
-    Each bar shows the arithmetic mean of a single benchmark for \benchmarkpexecs iterations with 99\%
-    confidence intervals. The solid vertical lines show the geometric mean
-    ratios for all benchmarks for each configuration, with shaded regions
-    representing the 99\% confidence intervals.}
+    \caption{A comparison of the wall-clock performance of GC (using \ourgc)
+    against two Rust reference counting (\rc) configurations across all
+    benchmarks. The reference counting configurations are: \gcvsbaseline
+    (standard RC with jemalloc allocator, using unmodified benchmarks) and
+    \gcvsrc (RC configured to use \boehm's allocator for controlled comparison
+    with GC). Note that \fd, \ripgrep, and \alacritty use atomic reference
+    counting, while all other benchmarks use non-atomic reference counting.\\\\
+    Performance is shown as relative speedup/slowdown, with all
+    results normalized to \gcvsbaseline (represented by the black horizontal
+    line at x=1.0). Blue bars show GC performance and orange bars show \gcvsrc
+    performance. Each bar represents the geometric mean across \benchmarkpexecs
+    iterations, with error bars indicating 99\% confidence intervals. The solid
+    vertical lines display the overall geometric mean performance ratio across
+    all benchmarks for each configuration, with shaded regions showing 99\%
+    confidence intervals. Raw wall-clock measurements (non-normalized) are
+    provided in \cref{tab:app:gcvs:wallclock} on the following page.}
     \label{fig:app:gcvs:wallclock}
 \end{figure}
 \restoregeometry
@@ -1839,9 +1847,15 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{Raw wall-clock time data for each benchmark on the finalizer gcvs
-    experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{table:app:gcvs:wallclock}
+  \caption{Raw wall-clock execution times (in seconds) for all benchmark
+    configurations. Shows absolute timing measurements for GC (\ourgc),
+    \gcvsbaseline, and \gcvsrc. Each value represents the arithmetic mean
+    across \benchmarkpexecs iterations, with 99\% confidence intervals. Note
+    that \fd, \ripgrep, and \alacritty use atomic reference counting, while all
+    other benchmarks use non-atomic reference counting. These raw measurements
+    correspond to the normalized performance ratios shown in
+    \cref{fig:app:gcvs:wallclock} on the previous page.}
+    \label{tab:app:gcvs:wallclock}
 \end{table}
 
 \begin{table}[t]
@@ -1859,9 +1873,13 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{Raw user time data for each benchmark on the finalizer gcvs
-    experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{table:app:gcvs:user}
+  \caption{Raw user times (in seconds) for all benchmark
+    configurations. Shows absolute timing measurements for GC (\ourgc),
+    \gcvsbaseline, and \gcvsrc. Each value represents the arithmetic mean
+    across \benchmarkpexecs iterations, with 99\% confidence intervals. Note
+    that \fd, \ripgrep, and \alacritty use atomic reference counting, while all
+    other benchmarks use non-atomic reference counting.}
+    \label{tab:app:gcvs:user}
 \end{table}
 
 \begin{table}[t]
