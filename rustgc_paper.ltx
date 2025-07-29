@@ -1382,14 +1382,15 @@ Our experiment is fully repeatable and downloadable from
     \end{subfigure}
     \hfill
     \caption{Relative wall-clock performance (left) and average heap-size
-    (right) comparing \lstinline{Gc<T>} against reference counting (\lstinline{Rc<T>} and \lstinline{Arc<T>})
-    on our benchmark suites. Results are presented as ratios normalized
-    to \gcvsbaseline (black horizontal line at x=1.0). Blue bars represent GC
-    performance and orange bars show \gcvsrc results. Each bar shows the
-    geometric mean across \benchmarkpexecs iterations, with error bars
-    indicating 99\% confidence intervals. Solid vertical lines display overall
-    geometric mean performance ratios across all benchmarks for each
-    configuration, with shaded regions showing 99\% confidence intervals.\\\\
+    (right) comparing \lstinline{Gc<T>} against reference counting
+    (\lstinline{Rc<T>} and \lstinline{Arc<T>}) on our benchmark suites. The
+    bars show each suite's \lstinline{Gc<T>} configuration relative to
+    \lstinline{Rc<T>} (black horizontal line at x=1.0). The ratios are
+    presented as the geometric mean across \benchmarkpexecs iterations, with
+    error bars indicating 99\% confidence intervals. The vertical blue line
+    display the overall performance ratio of the \lstinline{Gc<T>}
+    configuration across all benchmarks, with shaded regions showing 99\%
+    confidence intervals.\\\\
     Relative to \gcvsrc, we observe an average slowdown of \jake{TODO} while
     consuming \jake{TODO} times more memory on average. When controlling for
     allocator differences, these reduce to \jake{TODO} and \jake{TODO}
