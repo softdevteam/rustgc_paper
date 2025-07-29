@@ -1334,15 +1334,12 @@ of interest (e.g.~number of finalizers).
 
 As we shall soon see, in order to understand our experiments, we needed to
 understand the memory usage of different allocation strategies over the
-lifetime of a benchmark. To do this we used heaptrack~\cite{wolff14heaptrack}. heaptrack
-takes a complete snapshot of the heap every millisecond, tracking
-allocated chunks of memory throughout their lifetime. We had to modify both
-\boehm and heaptrack itself so that they worked correctly in the context of
-\ourgc. We added a hook into \boehm's collector so that each reclaimed object
-is reported to heaptrack. We built a second \rustc binary for heaptrack,
-since heaptrack requires the binary it is tracking to be dynamically linked
-and, normally, \rustc and \ourgc are statically linked. There are no other
-differences between the two \rustc builds.
+lifetime of a benchmark. To do this we used Heaptrack~\cite{wolff14heaptrack}.
+Heaptrack takes a complete snapshot of the heap every nanosecond, tracking both
+the number of allocations, and the number of bytes allocated throughout a
+program's execution. We had to modify both \boehm and Heaptrack itself so that
+they worked correctly in the context of \ourgc. We added a hook into \boehm's
+collector so that each reclaimed object is reported to Heaptrack.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
