@@ -1519,7 +1519,7 @@ has a leak, which manifests in \somrsast.
     remove, the greater the performance benefit across various metrics is. This
     is particularly obvious on the three time-based metrics (wall-clock, user,
     and pause times); the effect on heap size and number of GC collections is
-    less clear. The surprising exception is \fd: despite eliding 25\% of its
+    less clear. The surprising exception is \fd: despite eliding \elisionfdpct of its
     finalizers, there are no statistically significant differences in either
     wall-clock or user time. This can be explained by the relatively small role
     of GC in \fd's overall heap profile. \lstinline{Gc<T>} objects (along with
@@ -1608,7 +1608,7 @@ in this regard.
     differences in wall-clock performance are not statistically significant.
     However, memory usage is slightly higher for \fd, likely because barriers
     may prolong stack references, extending object lifetimes. This effect is
-    stronger for \fd, where finalizer elision removes only \elisionfdmempct~of
+    stronger for \fd, where finalizer elision removes only \elisionfdpct~of
     finalizers, compared to at least 70\% in other benchmarks. }
     \label{fig:premopt:summary}
 \end{figure}
@@ -1628,7 +1628,7 @@ in this regard.
 %\vspace{-18pt}
 %\end{table}
 
-The results for \Epremopt are shown in \cref{table:Epremopt:perf}. We create
+The results for \Epremopt are shown in \cref{fig:premopt:summary}. We create
 three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
 but allows us to approximate (allowing for possible vagaries from running
 unsound code!) the best possible situation for fence removal. \emph{Naive}
