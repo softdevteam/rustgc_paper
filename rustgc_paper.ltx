@@ -1399,10 +1399,11 @@ Our experiment is fully repeatable and downloadable from
 
 Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
 in~\cref{fig:gcvs:summary}. We suggest interpreting this in conjunction with
-the heap distribution data found in \cref{subfig:gcvs:runtime}, and finalizer metrics in \jake{TODO}. The broad
-story we can see from this data is that \ourgc has, when controlled for the allocator, and confidence intervals
-are taken into account, similar performance to other memory allocation
-approaches when few finalizers are run. \jake{reword, bad phrasing}
+the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
+metrics in \cref{subfig:elision:metrics}. The broad story we can see from this
+data is that \ourgc, after controlling for the allocator and considering
+confidence intervals, performs comparably to other memory allocation approaches
+when few finalizers are run.
 
 However, there is a notable correlation between the quantity of finalizers and
 additional overhead in \ourgc. We can see the contrast between these two cases
