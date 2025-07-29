@@ -1587,6 +1587,32 @@ causes the mutator thread to pause. It is probable that a GC designed with
 multi-threading in mind from its inception would incur lower overheads
 in this regard.
 
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth]{plots/premopt_wallclock}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \includegraphics[width=1\textwidth]{plots/premopt_mem_hsize_avg}
+    \end{subfigure}
+    \hfill
+    \caption{ Wall-clock performance (left) and memory usage (right) for
+    premature finalization barriers across all benchmark suites. Gray bars
+    represent the ratio for the \emph{naive barrier} strategy (where all
+    possible barriers are inserted), while blue bars show the results from our
+    \emph{optimized barrier} strategy (see~\cref{sec:premature_finalize_prevention}). All ratios,
+    with 99\% confidence intervals, are normalized to a baseline with no
+    barriers (which is unsound). After accounting for confidence intervals,
+    differences in wall-clock performance are not statistically significant.
+    However, memory usage is slightly higher for \fd, likely because barriers
+    may prolong stack references, extending object lifetimes. This effect is
+    stronger for \fd, where finalizer elision removes only \elisionfdmempct~of
+    finalizers, compared to at least 70\% in other benchmarks. }
+    \label{fig:premopt:summary}
+\end{figure}
+
 %\begin{table}[t]
 %\scalebox{0.7}{%
 %  \input{plots/premopt/perf_summary}
