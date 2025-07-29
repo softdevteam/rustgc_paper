@@ -1393,23 +1393,8 @@ in~\cref{fig:gcvs:summary}. We suggest interpreting this in conjunction with
 the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
 metrics in \cref{subfig:elision:metrics}. The broad story we can see from this
 data is that \ourgc, after controlling for the allocator and considering
-confidence intervals, performs comparably to other memory allocation approaches
-when few finalizers are run.
-
-However, there is a notable correlation between the quantity of finalizers and
-additional overhead in \ourgc. We can see the contrast between these two cases
-using two different benchmark suites as exemplars. \grmtools allocates large
-numbers of \lstinline{Gc<T>} objects, but requires no finalizers. This is
-because, once intermediate wrappers are elided, the \lstinline{T}'s it uses are always either a nested
-\lstinline{Gc<T>} or an integer type --- since neither has a destructor, a
-finalizer is not required. In contrast, \ripgrep allocates a relatively small portion
-of \lstinline{Gc<T>} objects, but 26.51\% of those objects require
-a finalizer.
-
-The magnitude of this effect surprised us: finalizers do impose some overhead on the
-mutator, but we had assumed that most of the costs would be borne by the (parallel) finalizer
-thread. To investigate further, we recorded time-series data of heap
-usage with heaptrack.
+confidence intervals, has a roughly 5\% overhead, with some benchmarks
+slower and some faster.
 
 \begin{figure}[t]
     \centering
@@ -1502,20 +1487,14 @@ has a leak, which manifests in \somrsast.
     the top-left shows how many finalizers are elided as a proportion of GC
     objects at run-time. The subsequent metrics are normalised against a
     baseline of no finalizers elided (the black bar at 1.0) showing 99\%
-    confidence intervals; the blue vertical line represents a ratio (the
-    geometric mean for all metrics) and the blue shaded area the 99\%
-    confidence interval. Broadly speaking, the more finalizers \ourgc can
-    remove, the greater the performance benefit across various metrics is. This
+    confidence intervals; the blue vertical line and shaded area represent
+    the geometric mean (and 99\% confidence intervals) of all benchmarks.
+    Broadly speaking, the more finalizers \ourgc removes, the greater the performance benefit is. This
     is particularly obvious on the three time-based metrics (wall-clock, user,
     and pause times); the effect on heap size and number of GC collections is
-    less clear. The surprising exception is \fd: despite eliding \elisionfdpct of its
-    finalizers, there are no statistically significant differences in either
-    wall-clock or user time. This can be explained by the relatively small role
-    of GC in \fd's overall heap profile. \lstinline{Gc<T>} objects (along with
-    their owned \lstinline{Box<T>} objects) constitute only \fdgcownedpct of \fd's total
-    heap (see \cref{subfig:mem:runtime}). Consequently, any potential
-    performance gains from finalizer elision are likely overshadowed by the
-    minimal impact of GC on the application overall.}
+    less clear. The exceptions are \alacritty and \fd: in both cases, only
+    a small proportion of overall memory is in the GC heap (see~\cref{subfig:mem:runtime})
+    and the effects of elision thus minor.}
     \label{fig:elision:metrics}
 \end{figure}
 
@@ -1535,47 +1514,6 @@ We can see from \ripgrep's results, where many, but not all, finalizers are elid
 finalizer elision still has a notable performance impact irrespective of whether
 \boehm has entered its multi-threading mode or not.
 
-In general, finalizer elision causes processes to consume less memory.
-Surprisingly, however, we see it lead to a modest \elisionfdmempct increase in
-average memory use for \fd (see \cref{subfig:elision:mem}). The heaptrack data
-allowed us to uncover why this happens: finalizer elision changes the memory
-reclamation characteristics of \boehm. Like \ripgrep, \fd relies heavily on
-external libraries containing \lstinline{Arc<T>} objects that weren't ported to
-\lstinline{Gc<T>} objects. This creates an interleaved mix of \lstinline{Gc<T>}
-and \lstinline{Arc<T>} objects in the \ourgc port of \fd, where finalizers
-handle the memory deallocation for \lstinline{Arc<T>} objects. Although
-finalizer elision doesn't directly affect these particular finalizers, the
-overall 23\% reduction in finalizers introduces variability into \boehm's
-scheduling, which can delay the reclamation of interleaved \lstinline{Arc<T>}
-objects with knock-on effects throughout the heap.
-
-While GC scheduling changes typically impact performance, \fd's workload
-characteristics appear to mask these effects. As a Unix `find' replacement,
-\fd's benchmarks are heavily I/O bound, likely masking the CPU-level
-impact of altered GC scheduling. Additionally, with only \fdgcownedpct of the heap
-managed by \lstinline{Gc<T>} (both directly and indirectly), the impact of
-scheduling variability from finalizer elision may simply be too small
-measurably affect \fd's performance.
-
-In contrast, \ripgrep demonstrates why finalizer elision typically improves
-performance despite similar porting challenges. While \ripgrep suffers the same
-issue of interleaving \lstinline{Gc<T>} and \lstinline{Arc<T>} objects, the
-former constitute a larger proportion of \ripgrep's total heap (\ripgrepgcownedpct).
-More significantly, 79\% of \ripgrep's finalizers could be elided -- a
-substantial reduction in finalization workload. At this scale, the CPU overhead
-reduction is far more pronounced relative to the overall workload (as seen in
-user-time reduction, \cref{subfig:elision:user}), overshadowing any scheduling variability effects.
-
-The performance penalty of finalizers is partly a function of \ourgc's
-use of a separate finalizer thread and the way that \boehm was retrofitted
-for multi-threaded programs. As soon as \boehm is informed of the existence
-of an extra thread in a process, it changes behaviour: all subsequent calls
-to \boehm acquire a single global lock. As well as the inherent costs of
-locking and unlocking, this means that the finalizer thread sometimes
-causes the mutator thread to pause. It is probable that a GC designed with
-multi-threading in mind from its inception would incur lower overheads
-in this regard.
-
 \begin{figure}[t]
     \centering
     \begin{subfigure}{0.48\textwidth}
@@ -1583,22 +1521,12 @@ in this regard.
         \includegraphics[width=1\textwidth]{plots/premopt_wallclock}
     \end{subfigure}%
     \hfill
-    \begin{subfigure}{0.48\textwidth}
-        \includegraphics[width=1\textwidth]{plots/premopt_mem_hsize_avg}
-    \end{subfigure}
-    \hfill
-    \caption{ Wall-clock performance (left) and memory usage (right) for
-    premature finalization barriers across all benchmark suites. Gray bars
-    represent the ratio for the \emph{naive barrier} strategy (where all
-    possible barriers are inserted), while blue bars show the results from our
-    \emph{optimized barrier} strategy (see~\cref{sec:premature_finalize_prevention}). All ratios,
-    with 99\% confidence intervals, are normalized to a baseline with no
-    barriers (which is unsound). After accounting for confidence intervals,
-    differences in wall-clock performance are not statistically significant.
-    However, memory usage is slightly higher for \fd, likely because barriers
-    may prolong stack references, extending object lifetimes. This effect is
-    stronger for \fd, where finalizer elision removes only \elisionfdpct~of
-    finalizers, compared to at least 70\% in other benchmarks. }
+    \caption{ Wall-clock performance for premature finalization barriers across all benchmarks normalised
+    to \emph{None} (i.e.~an unsound configuration with no fences). Grey
+    bars represent the ratio for \emph{naive} (all possible fences)
+    and blue bars \emph{optimised} (obviously unnecessary fences
+    removed). Unfortunately, we can not measure any statistically
+    significant effect from this `optimisation`.}
     \label{fig:premopt:summary}
 \end{figure}
 
