@@ -2,15 +2,15 @@
 \toprule
 Benchmark         & Description                              & Reason for exclusion                                       \\
 \midrule
-bevy          & ECS game engine in Rust                   & \jake{TODO} \\
-dyon          & Scripting language in Rust                & \jake{TODO} \\
-jiff          & A datetime library for Rust               & \jake{TODO} \\
-mini-moka     & Concurrent in-memory cache library        & \jake{TODO} \\
-numbat        & Math search engine                        & \jake{TODO} \\
-rkyv          & Zero-copy deserialization framework       & \jake{TODO} \\
-RustPython    & Python interpreter written in Rust        & \jake{TODO} \\
-rust-analyzer & Language server for Rust                  & \jake{TODO} \\
-salsa         & Incremental recomputation library         & \jake{TODO} \\
-WLambda       & scripting language in Rust                & \jake{TODO} \\
+bevy          & ECS game engine in Rust                   & Unable to port successfully (see \cref{rustpython}) \\
+dyon          & Scripting language in Rust                & Unable to port successfully (see \cref{rustpython})\\
+jiff          & A datetime library for Rust               & Too few allocations to measure \\
+mini-moka     & Concurrent in-memory cache library        & Too few allocations to measure \\
+numbat        & Math search engine                        & Too few allocations to measure \\
+rkyv          & Zero-copy deserialization framework       & Insufficient \texttt{Gc<T>} coverage in benchmarks \\
+RustPython    & Python interpreter written in Rust        & Difficulty retro-fitting \texttt{\_\_del\_\_} semantics (see \cref{rustpython}). \\
+rust-analyzer & Language server for Rust                  & Unable to port successfully (see \cref{rustpython}) \\
+salsa         & Incremental recomputation library         & Too few allocations to measure \\
+WLambda       & Scripting language written in Rust        & Insufficient \texttt{Gc<T>} coverage in benchmarks \\
 \bottomrule
 \end{tabular}
