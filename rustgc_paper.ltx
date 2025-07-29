@@ -1525,15 +1525,7 @@ has a leak, which manifests in \somrsast.
     their owned \lstinline{Box<T>} objects) constitute only 4\% of \fd's total
     heap (see \cref{subfig:mem:runtime}). Consequently, any potential
     performance gains from finalizer elision are likely overshadowed by the
-    minimal impact of GC on the application overall. Additionally, \fd incurs a
-    \jake{TODO} increase in average heap size and requires \jake{X additional}
-    scheduled collections overall. This overhead may stem from the mixed use of
-    \lstinline{Arc<T>} objects alongside \lstinline{Gc<T>} objects. Many of
-    \fd's original \lstinline{Arc<T>} objects could not be ported, requiring
-    \lstinline{Gc<T>} objects to use finalizers to decrement their reference
-    counts and deallocate them. The elision of other finalizers can introduce
-    variability in GC scheduling, which may result in these \lstinline{Arc<T>}
-    objects being held on for longer.\jake{TODO: decide whether this last part ``additionally..'' should stay or go}}
+    minimal impact of GC on the application overall.}
     \label{fig:elision:metrics}
 \end{figure}
 
@@ -1553,16 +1545,36 @@ We can see from \ripgrep's results, where many, but not all, finalizers are elid
 finalizer elision still has a notable performance impact irrespective of whether
 \boehm has entered its multi-threading mode or not.
 
-In general, finalizer elision causes processes to consume less memory. Surprisingly, however, we see a modest \jake{TODO} increase for \fd in \cref{subfig:elision:mem}. The heaptrack data allowed
-us to uncover why this happens:
-finalizer elision changes the memory reclamation characteristics of \boehm. If,
-as is common, a finalizer deallocates an object's backing memory, \boehm immediately reclaims
-that memory (in the sense that it can reuse it, or even return it to the OS).
-When we elide finalizers that contain deallocation calls, we change when \boehm
-reclaims memory: it might reclaim it earlier than the equivalent finalizer but,
-mostly, it reclaims it much later. In general, this is likely to allow \boehm
-to operate more efficiently, in the sense that it is more likely to batch
-reclamation tasks.
+In general, finalizer elision causes processes to consume less memory.
+Surprisingly, however, we see it lead to a modest \jake{TODO} increase in
+average memory use for \fd (see \cref{subfig:elision:mem}). The heaptrack data
+allowed us to uncover why this happens: finalizer elision changes the memory
+reclamation characteristics of \boehm. Like \ripgrep, \fd relies heavily on
+external libraries containing \lstinline{Arc<T>} objects that weren't ported to
+\lstinline{Gc<T>} objects. This creates an interleaved mix of \lstinline{Gc<T>}
+and \lstinline{Arc<T>} objects in the \ourgc port of \fd, where finalizers
+handle the memory deallocation for \lstinline{Arc<T>} objects. Although
+finalizer elision doesn't directly affect these particular finalizers, the
+overall 23\% reduction in finalizers introduces variability into \boehm's
+scheduling, which can delay the reclamation of interleaved \lstinline{Arc<T>}
+objects with knock-on effects throughout the heap.
+
+While GC scheduling changes typically impact performance, \fd's workload
+characteristics appear to mask these effects. As a Unix `find' replacement,
+\fd's benchmarks are heavily I/O bound, likely masking the CPU-level
+impact of altered GC scheduling. Additionally, with only 4\% of the heap
+managed by \lstinline{Gc<T>} (both directly and indirectly), the impact of
+scheduling variability from finalizer elision may simply be too small
+measurably affect \fd's performance.
+
+In contrast, \ripgrep demonstrates why finalizer elision typically improves
+performance despite similar porting challenges. While \ripgrep suffers the same
+issue of interleaving \lstinline{Gc<T>} and \lstinline{Arc<T>} objects, the
+former  constitute a much larger proportion of \ripgrep's total heap (17\%).
+More significantly, 79\% of \ripgrep's finalizers could be elided -- a
+substantial reduction in finalization workload. At this scale, the CPU overhead
+reduction is far more pronounced relative to the overall workload (as seen in
+user-time reduction, \cref{subfig:elision:user}), overshadowing any scheduling variability effects.
 
 The performance penalty of finalizers is partly a function of \ourgc's
 use of a separate finalizer thread and the way that \boehm was retrofitted
