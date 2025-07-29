@@ -1168,8 +1168,8 @@ but there are valid idioms of use where we found it necessary.
 
   \vspace{5pt}
   \caption{
-  The benchmark suites that form our experiment: we take the Rust programs
-  above -- most of which are themselves a suite of benchmarks -- and alter
+  The benchmarks (top) and benchmark suites (bottom) that form our experiment.
+  We altered
   them to use different memory allocation strategies (\ourgc, \lstinline{Rc<T>},
   etc.). \binarytrees and \regexredux are classic stand-alone GC benchmarks;
   the other `benchmarks' represent benchmark suites (e.g.~\ripgrep contains
@@ -1203,11 +1203,16 @@ want to compare programs using existing shared ownership approaches (e.g.~\lstin
 \lstinline{Gc<T>}). We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates.
+
 \cref{tab:benchmarks} shows the resulting suite: note that, except
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
 count the SOM implementations' (identical) benchmark suites collectively or
-separately -- 62 or 88 benchmarks.
+separately -- 62 or 88 benchmarks. \cref{fig:mem:conversion} shows: how many
+source-level types are used in \lstinline{Rc<T>} (before porting) and
+\lstinline{Gc<T>} (after porting); and how much memory (after porting) is owned
+by \lstinline{Gc<T>}s. This shows that our benchmark suite contains benchmarks
+with a good distribution of memory patterns.
 
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
@@ -1224,15 +1229,6 @@ variety of implementations. Our suite includes two of these: \somrsast
 bytecode). Both are existing ports of a Java SOM VM into Rust and use
 \lstinline{Rc<T>}. We use the same SOM \lstinline{core-lib} benchmarks for
 both, derived from git commit \#afd5a6.
-
-\cref{fig:mem:conversion} provides soure-level and runtime context for our
-benchmark suite: \cref{subfig:mem:source} shows a source-level view of which
-types we converted in our benchmark suite, which gives an approximate idea of
-porting effort; \cref{subfig:mem:runtime} shows the proportion of objects
-created from these source locations during a benchmark's execution. It is worth
-emphasising that the number of source locations of various types does not in
-any way correspond to the number of objects created from these source locations
-during a benchmark's execution.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
