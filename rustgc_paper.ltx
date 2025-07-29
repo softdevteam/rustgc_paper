@@ -137,7 +137,7 @@ idea or not.
 
 When we control for the
 (admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
-varies from zero to, in the worst case, several times slower \laurie{let's give an accurate range, taken from our benchmark data}. Perhaps
+varies from \gcvsgcperfbestratio to, in the worst case, \gcvsgcperfworstratio slower. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
 \ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
 Furthermore, although \ourgc as an implementation
@@ -374,7 +374,7 @@ there are to the underlying data. This enables an API (\lstinline{get_mut} and
 \lstinline{make_mut}) which allows the value stored inside a \lstinline{Rc<T>}
 to be mutably borrowed at run-time if there is only a single reference to it.
 In contrast, \lstinline{Gc<T>} can never know how many references
-there are to the underlying data. As we shall see in Section~\cref{sec:evaluation}, some Rust programs
+there are to the underlying data. As we shall see in~\cref{sec:evaluation}, some Rust programs
 are built around the performance advantages of this API (e.g.~turning
 `copy on write` into just `write' in some important cases).
 
@@ -571,7 +571,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 
 As we shall see in \cref{sec:evaluation}, there is a correlation between the
 number of finalizers that are run and overhead from GC (with a worst case in
-our experiment of \elisionperfsomrsastnaiveworstratio). In this section
+our experiment of \elisionnaiveworstratio slowdown). In this section
 we show how to reduce the number of finalizers that are run, which helps
 reduce this overhead.
 
@@ -1279,7 +1279,7 @@ arena~\cite{chiovoloni15typed}). The results are shown in \jake{figure todo}.
     \lstinline{Arc<T>} and \lstinline{Rc<T>} objects. This provides important
     context for upcoming results: for example, while in \somrsast we are able
     to convert 85\% of RC objects to \lstinline{Gc<T>} in source, the heap is
-    still dominated by 67\% of \lstinline{Box<T>} objects unrelated to GC. The
+    still dominated by \somrsastboxpct of \lstinline{Box<T>} objects unrelated to GC. The
     raw runtime distribution values are available in
     \cref{tab:app:mem:conversion:runtime} in the Appendix. \jake{ TODO: Make a
     final decision on the order of benchmarks (i.e. do binary trees and regex
@@ -1315,6 +1315,7 @@ important portions of the program's structure have been designed with the
 flexibilities and limitations of existing APIs in mind: adapting them may
 be no small effort.
 
+\label{rustpython}
 We also ported RustPython, but were unable to adjust it to faithfully implement Python-level
 destructors. In essence, in RustPython's default configuration, its
 representation of objects is not compatible with FSA. This means that we can
@@ -1391,8 +1392,8 @@ Our experiment is fully repeatable and downloadable from
     \lstinline{Gc<T>} relative to the \lstinline{Arc<T>}/\lstinline{Rc<T>}
     baseline (1.0, black horizontal line), showing the geometric mean of ratios
     across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
-    \lstinline{Gc<T>} has a slowdown of \jake{TODO num} while consuming
-    \jake{TODO num} more memory (shown by the blue vertical lines).
+    \lstinline{Gc<T>} is \gcvsoverallperfratio slower while consuming
+    \gcvsoverallmemratio more memory (shown by the blue vertical lines).
     \laurie{what explains grmtools heap usage?}\jake{TODO: link to fig 2
     plots}}
     \label{fig:gcvs:summary}
@@ -1522,7 +1523,7 @@ has a leak, which manifests in \somrsast.
     finalizers, there are no statistically significant differences in either
     wall-clock or user time. This can be explained by the relatively small role
     of GC in \fd's overall heap profile. \lstinline{Gc<T>} objects (along with
-    their owned \lstinline{Box<T>} objects) constitute only 4\% of \fd's total
+    their owned \lstinline{Box<T>} objects) constitute only \fdgcownedpct of \fd's total
     heap (see \cref{subfig:mem:runtime}). Consequently, any potential
     performance gains from finalizer elision are likely overshadowed by the
     minimal impact of GC on the application overall.}
@@ -1546,7 +1547,7 @@ finalizer elision still has a notable performance impact irrespective of whether
 \boehm has entered its multi-threading mode or not.
 
 In general, finalizer elision causes processes to consume less memory.
-Surprisingly, however, we see it lead to a modest \jake{TODO} increase in
+Surprisingly, however, we see it lead to a modest \elisionfdmempct increase in
 average memory use for \fd (see \cref{subfig:elision:mem}). The heaptrack data
 allowed us to uncover why this happens: finalizer elision changes the memory
 reclamation characteristics of \boehm. Like \ripgrep, \fd relies heavily on
@@ -1562,7 +1563,7 @@ objects with knock-on effects throughout the heap.
 While GC scheduling changes typically impact performance, \fd's workload
 characteristics appear to mask these effects. As a Unix `find' replacement,
 \fd's benchmarks are heavily I/O bound, likely masking the CPU-level
-impact of altered GC scheduling. Additionally, with only 4\% of the heap
+impact of altered GC scheduling. Additionally, with only \fdgcownedpct of the heap
 managed by \lstinline{Gc<T>} (both directly and indirectly), the impact of
 scheduling variability from finalizer elision may simply be too small
 measurably affect \fd's performance.
@@ -1570,7 +1571,7 @@ measurably affect \fd's performance.
 In contrast, \ripgrep demonstrates why finalizer elision typically improves
 performance despite similar porting challenges. While \ripgrep suffers the same
 issue of interleaving \lstinline{Gc<T>} and \lstinline{Arc<T>} objects, the
-former  constitute a much larger proportion of \ripgrep's total heap (17\%).
+former constitute a larger proportion of \ripgrep's total heap (\ripgrepgcownedpct).
 More significantly, 79\% of \ripgrep's finalizers could be elided -- a
 substantial reduction in finalization workload. At this scale, the CPU overhead
 reduction is far more pronounced relative to the overall workload (as seen in
@@ -2023,16 +2024,11 @@ In this appendix, we provide supplementary plots for our performance evaluation.
     \end{subfigure}
     \caption{Total pause time and average heap size on each benchmark after
     applying finalizer elision. The plot follows the same conventions as
-    \cref{fig:app:elision:perf}. A general decrease in pause time is observable
-    (excluding \ripgrep and \alacritty explained here \jake{todo}), but the
-    confidence intervals are notably wide. This is an unfortunate side-effect
-    of the high variance introduced by non-deterministic GC scheduling,
-    especially in a multi-threaded environment.\\
-    The average heap size is measured by taking snapshots at the beginning
-    of each collection. While this method is useful for observing trends
-    across the suite, it can also lead to high variance or pathological
-    behavior on individual benchmarks, particularly when phase changes in
-    the benchmark's execution affect GC scheduling.}
+    \cref{fig:app:elision:perf}. The average heap size is measured by taking
+    snapshots at the beginning of each collection. While this method is useful
+    for observing trends across the suite, it can also lead to high variance or
+    pathological behavior on individual benchmarks, particularly when phase
+    changes in the benchmark's execution affect GC scheduling.}
     \label{fig:app:elision:heap}
 \end{figure}
 
