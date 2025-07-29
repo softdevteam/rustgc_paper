@@ -32,8 +32,8 @@ rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt expe
 	pdflatex rustgc_paper.ltx
 
 appendices.pdf main.pdf: rustgc_paper.pdf
-	pdfjam -o main.pdf rustgc_paper.pdf 1-24
-	pdfjam -o appendices.pdf rustgc_paper.pdf 25-
+	pdfjam -o main.pdf rustgc_paper.pdf 1-25
+	pdfjam -o appendices.pdf rustgc_paper.pdf 26-
 
 rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	set -e; \
