@@ -1349,8 +1349,7 @@ for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
 roots: in \lstinline{Rc<T>}-only benchmarks, we observe an inherent overhead
 from \boehm of 2--26\% relative to jemalloc (see~\laurie{the what-was-fig1}
-and \cref{table:app:gcvs:perf:summary} in the Appendix).
-in the Appendix), which is a significant, and variable, confounding factor.
+and \cref{table:app:gcvs:perf:summary} in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
@@ -1362,7 +1361,7 @@ suites the geometric mean).
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
 utility. The SOM benchmarks are run using its conventional \emph{rebench} tool;
 we adjusted \emph{rebench} to use \lstinline{time} for consistency with our
-other benchmarks. We ran all benchmarks on a \benchmarkcpu with \benchmarkram,
+other benchmarks. We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
@@ -1464,7 +1463,7 @@ Other aspects of \Egcrc are more straightforward.
 For example, we can see from \cref{table:Ercgc:perf} that
 \typedarena is hugely faster than other allocation strategies for \binarytrees:
 it performs a single (huge!) deallocation at the end of the benchmark.
-Very differently, the heaptrack data allowed us to spot that the JSON SOM benchmark
+Very differently, the heaptrack data allowed us to spot that, when using reference counting, the JSON SOM benchmark
 has a leak, which manifests in \somrsast.
 
 \begin{figure}[htbp]
