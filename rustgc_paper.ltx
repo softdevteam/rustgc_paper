@@ -1288,12 +1288,10 @@ we variously compare performance against: \lstinline{Rc<T>} and
 
 \subsubsection{What we couldn't include in the benchmark suite}
 
-\jake{There was a suggestion that these should be a table with reasons or relegated to an appendix.}
-
 We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
 eventual benchmark suite, we briefly report why those other programs have
-been excluded.
+been excluded. All excluded benchmarks are shown in \cref{tab:app:exclusions} in the Appendix.
 
 Several programs (e.g.~numbat, mini-moka, and salsa), once ported, turned out
 to be uninteresting from a GC benchmarking perspective. Irrespective of the
@@ -1817,7 +1815,8 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 
 \textbf{Misc.}
 \begin{itemize}
-  \item \cref{tab:app:mem:conversion:runtime} (page~\pageref{tab:app:mem:conversion:runtime}): Runtime allocation distribution statistics for benchmark suites.
+  \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
+  \item \cref{tab:app:mem:conversion:runtime} (page~\pageref{tab:app:mem:conversion:runtime}): Runtime allocation distribution statistics for benchmarks.
 \end{itemize}
 \textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
 
@@ -1841,6 +1840,16 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 \end{itemize}
 
 \clearpage
+
+\begin{table}[t]
+\small
+\begin{center}
+    \input{tables/exclusions}
+  \vspace{5pt}
+\caption{Rust programs excluded from our benchmark suite after attempted porting to \ourgc.}
+\label{tab:app:exclusions}
+\end{center}
+\end{table}
 
 \begin{table}[t]
 \small
