@@ -1424,14 +1424,10 @@ usage with heaptrack.
     \vspace{-25pt}
     \includegraphics[width=\textwidth]{plots/ripgrep_subset.pdf}
     \noindent
-    \caption{\laurie{jemalloc vs gcmalloc isn't useful: let's just print the
-    gcmalloc line for Rc. We need to use `Rc` and `Gc` not `RC` and `GC` in the
-    labels. Let's also label them `Rc<T>` and `Gc<T>` for consistency with the
-    rest of the paper.}
-    An example of surprising, though fairly rare, heap usage patterns
-    behaviour of \lstinline{Gc<T>} relative to \lstinline{Rc<T>}: on
+    \caption{An example of surprising, though fairly rare, heap usage patterns
+    behaviour of \lstinline{Gc<T>} relative to \lstinline{Arc<T>}/\lstinline{Rc<T>}: on
     the $x$-axis is time (normalised across all three executions); on the
-    $y$-axis heap usage (in MiB, with 99\% confidence intervals).
+    $y$-axis is heap usage (in MiB, with 99\% confidence intervals).
     The need to finalize large numbers of objects means that memory is not
     instantly freed, giving the appearance of possible memory leaks: in
     reality the memory is freed a little later than normal, hence the
@@ -1440,7 +1436,7 @@ usage with heaptrack.
 \end{figure}
 
 \cref{fig:ripgrep_subset} shows a representative subset of the data for
-\ripgrep (the complete data can be found in \cref{fig:Egcrc:ripgrep:mem:profiles}
+\ripgrep (the complete data can be found in \jake{todo} \cref{fig:Egcrc:ripgrep:mem:profiles}
 in the appendix). At first
 glance, this may suggest that \ourgc is leaking memory. It is not, but understanding
 why requires considering three factors. First, \ripgrep depends
