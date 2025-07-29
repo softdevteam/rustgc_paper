@@ -1219,7 +1219,7 @@ in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
 
 SOM is a small, but complete, language in the Smalltalk mould, which has a wide
-variety of implementations. Our suite includes two of these VMs: \somrsast
+variety of implementations. Our suite includes two of these: \somrsast
 (which represents programs as ASTs); and \somrsbc (which represents programs as
 bytecode). Both are existing ports of a Java SOM VM into Rust and use
 \lstinline{Rc<T>}. We use the same SOM \lstinline{core-lib} benchmarks for
@@ -1236,10 +1236,12 @@ during a benchmark's execution.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
-we variously compare performance against: \lstinline{Rc<T>} and
-\lstinline{Arc<T>} (the latter being the thread-safe version of the former);
-\rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
-(a non-GC memory arena\cite{chiovoloni15typed}) \jake{todo, come back to this after having separated binary trees}.
+we compare \lstinline{Gc<T>} against \lstinline{Rc<T>} and
+\lstinline{Arc<T>} (the latter being the thread-safe version of the former) for
+all benchmarks. For \binarytrees, we compare \lstinline{Gc<T>} with two
+additional allocation strategies: \rustgc (a user library for GC for
+Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
+arena~\cite{chiovoloni15typed}). The results are shown in \jake{figure todo}.
 
 \begin{figure}[t]
     \centering
