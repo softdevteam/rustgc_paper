@@ -1207,7 +1207,7 @@ package system) looking for suitable candidates.
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
 count the SOM implementations' (identical) benchmark suites collectively or
-separately -- 62 or 114 benchmarks.
+separately -- 62 or 88 benchmarks.
 
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
@@ -1218,48 +1218,72 @@ UTF-8 support (see below for discussion of deadlocking), so that part of \alacri
 in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
 
-Our suite includes three SOM VMs. SOM is a small, but complete,
-language in the Smalltalk mould, which has a wide variety of implementations. \somrsast
-(which represents programs as ASTs) and \somrsbc (which represents programs as
-bytecode) are existing ports of a Java
-SOM VM into Rust; both use \lstinline{Rc<T>}. \yksom is a from-scratch rewrite
-for this paper that was designed to explore how idiomatic Rust code can use a GC.
-Each SOM VM is
-approximately 5KLoC. The SOM VMs all run the same benchmark suite, derived
-from SOM git commit \#afd5a6.
+SOM is a small, but complete, language in the Smalltalk mould, which has a wide
+variety of implementations. Our suite includes two of these VMs: \somrsast
+(which represents programs as ASTs); and \somrsbc (which represents programs as
+bytecode). Both are existing ports of a Java SOM VM into Rust and use
+\lstinline{Rc<T>}. We use the same SOM \lstinline{core-lib} benchmarks for
+both, derived from git commit \#afd5a6.
+
+\cref{fig:mem:conversion} provides soure-level and runtime context for our
+benchmark suite: \cref{subfig:mem:source} shows a source-level view of which
+types we converted in our benchmark suite, which gives an approximate idea of
+porting effort; \cref{subfig:mem:runtime} shows the proportion of objects
+created from these source locations during a benchmark's execution. It is worth
+emphasising that the number of source locations of various types does not in
+any way correspond to the number of objects created from these source locations
+during a benchmark's execution.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
-programs in our benchmark suite to all allocation strategies. As shown in \cref{table:Ercgc:perf},
+programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
 we variously compare performance against: \lstinline{Rc<T>} and
 \lstinline{Arc<T>} (the latter being the thread-safe version of the former);
 \rustgc (a user library for GC for Rust~\cite{manish15rustgc}); and \typedarena
-(a non-GC memory arena\cite{chiovoloni15typed}).
+(a non-GC memory arena\cite{chiovoloni15typed}) \jake{todo, come back to this after having separated binary trees}.
 
-\cref{tab:conversion:static} shows a source-level view of relevant properties
-of our benchmark suite, which gives an approximate idea of porting effort. It
-is worth emphasising -- as we shall see in the dynamic view of benchmark runs
-in~\cref{table:Ercgc:conversion} -- that the number of source locations of
-various types does not in any way correspond to the number of objects created
-from these source locations during a benchmark's execution.
-
-\begin{table}[t]
-\small
-\begin{center}
-\input{tables/conversion_source}
-  \vspace{5pt}
-  \caption{
-    The number of source-level locations of relevant types in our
-  benchmark suite, including dependencies. For example, 107 source-level types are used
-  in \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s and \lstinline{Arc<T>}s come from
-  (direct or indirect) libraries. \lstinline{rc::Weak} (and its
-  \lstinline{Arc<T>} cousin \texttt{sync::Weak}) show how often programs that
-  use reference counting have to resort to juggling strong and weak counts to
-    express shared ownership.
-  }
-\label{tab:conversion:static}
-\end{center}
-  \vspace{-8pt}
-\end{table}
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+            \begin{adjustbox}{width=0.8\linewidth, valign=t}
+                \input{tables/conversion_source}
+            \end{adjustbox}%
+           \vspace*{12pt}
+        \caption{Source-level type conversions}
+        \label{subfig:mem:source}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.49\textwidth}
+        \includegraphics[width=1\textwidth]{plots/mem_distribution}
+        \caption{Distribution of heap objects at runtime}
+        \label{subfig:mem:runtime}
+    \end{subfigure}
+    \caption{Source-level type usage and runtime heap composition of our
+    benchmark suites after porting them to use \ourgc. (a) shows the number of
+    source-level locations of relevant types in our benchmark suite, including
+    dependencies. For example, 107 source-level types are \ourgc's
+    \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s
+    and \lstinline{Arc<T>}s come from (direct or indirect) libraries. The
+    additional values in brackets denote the number of \lstinline{Weak<T>}
+    pointers for each RC variant. This shows how often programs that use
+    reference counting have to resort to juggling strong and weak counts to
+    express shared ownership. (b) shows the total distribution of different
+    kinds of objects in the heap at runtime. \textit{GC Owned} refers to both
+    top-level \lstinline{Gc<T>} objects and any other non-GC heap objects which
+    are transitively reachable from it. In other words, a chain of objects
+    which are entirely owned (and thus managed) by \ourgc. \textit{Boxed} shows
+    the proportion of regular heap objects allocated using \lstinline{Box<T>}
+    which are independent from GC. \textit{Rc} shows the proportion of
+    \lstinline{Arc<T>} and \lstinline{Rc<T>} objects. This provides important
+    context for upcoming results: for example, while in \somrsast we are able
+    to convert 85\% of RC objects to \lstinline{Gc<T>} in source, the heap is
+    still dominated by 67\% of \lstinline{Box<T>} objects unrelated to GC. The
+    raw runtime distribution values are available in
+    \cref{tab:app:mem:conversion:runtime} in the Appendix. \jake{ TODO: Make a
+    final decision on the order of benchmarks (i.e. do binary trees and regex
+    go at the top?)}}
+    \label{fig:mem:conversion}
+\end{figure}
 
 
 \subsubsection{What we couldn't include in the benchmark suite}
@@ -1380,7 +1404,7 @@ Our experiment is fully repeatable and downloadable from
 
 Starting with \Egcrc, wall-clock performance and average heap-size data be found
 in~\cref{fig:gcvs:summary}. We suggest interpreting in conjunction with
-the `quantity of memory' data found in \cref{table:Ercgc:conversion}. The broad
+the `quantity of memory' data found in \cref{tab:Ercgc:conversion}. The broad
 story we can see from this data is that \ourgc has, when confidence intervals
 are taken into account, similar performance to other memory allocation
 approaches when few finalizers are run.
@@ -1790,6 +1814,11 @@ Steve Klabnik and Andy Wingo for comments.
 
 In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
 \\\\
+
+\textbf{Misc.}
+\begin{itemize}
+  \item \cref{tab:app:mem:conversion:runtime} (page~\pageref{tab:app:mem:conversion:runtime}): Runtime allocation distribution statistics for benchmark suites.
+\end{itemize}
 \textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
 
 \begin{itemize}
@@ -1812,6 +1841,20 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 \end{itemize}
 
 \clearpage
+
+\begin{table}[t]
+\small
+\begin{center}
+\input{tables/migration_stats}
+  \vspace{5pt}
+    \caption{Statistics about benchmarks at run-time. ‘Allocated’ shows how
+    many \lstinline{Gc<T>} (etc.) objects were allocated. ‘GC Memory’ shows
+    what proportion of the heap is directly or indirectly (via an embedded
+    smart pointer) allocated via \lstinline{Gc<T>}.}
+\label{tab:app:mem:conversion:runtime}
+\end{center}
+  \vspace{-8pt}
+\end{table}
 
 \begin{table}[h]
 \scalebox{0.9}{%
