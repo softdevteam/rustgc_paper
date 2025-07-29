@@ -1504,23 +1504,31 @@ has a leak, which manifests in all SOM VMs.
     \end{subfigure}
     \hfill
     \caption{The effects of finalizer elision on various programs. The table in
-    the top-left shows how many finalizers are elided as a proportion of
-    GC objects at run-time. The subsequent metrics
-    are normalised against a baseline of no finalizers elided (the black bar at
-    1.0) showing 99\% confidence intervals; the blue vertical line represents a
-    ratio (the geometric mean for all metrics except `number of GC collections'
-    which uses the arithmetic mean) and the blue shaded area the 99\%
-    confidence interval. Broadly speaking, the
-    more finalizers \ourgc can remove, the greater the performance benefit
-    across various metrics is. This is particularly obvious on the three time-based metrics (wall-clock, user,
+    the top-left shows how many finalizers are elided as a proportion of GC
+    objects at run-time. The subsequent metrics are normalised against a
+    baseline of no finalizers elided (the black bar at 1.0) showing 99\%
+    confidence intervals; the blue vertical line represents a ratio (the
+    geometric mean for all metrics) and the blue shaded area the 99\%
+    confidence interval. Broadly speaking, the more finalizers \ourgc can
+    remove, the greater the performance benefit across various metrics is. This
+    is particularly obvious on the three time-based metrics (wall-clock, user,
     and pause times); the effect on heap size and number of GC collections is
-    less clear. \laurie{``The main
-    exception is \fd: although 25\% of its finalizers are elided, many
-    \lstinline{Gc<T>}s point to \lstinline{Rc<T>}s; the finalizers for these
-    cannot be elided, and they also introduce considerable performance
-    variability, making it difficult to draw firm conclusions.''} \laurie{This
-    is not an explanation that makes any sense: why would removing 25\% of
-    finalizers have no observable performance effect?}}
+    less clear. The surprising exception is \fd: despite eliding 25\% of its
+    finalizers, there are no statistically significant differences in either
+    wall-clock or user time. This can be explained by the relatively small role
+    of GC in \fd's overall heap profile. \lstinline{Gc<T>} objects (along with
+    their owned \lstinline{Box<T>} objects) constitute only 4\% of \fd's total
+    heap (see \cref{subfig:mem:runtime}). Consequently, any potential
+    performance gains from finalizer elision are likely overshadowed by the
+    minimal impact of GC on the application overall. Additionally, \fd incurs a
+    \jake{TODO} increase in average heap size and requires \jake{X additional}
+    scheduled collections overall. This overhead may stem from the mixed use of
+    \lstinline{Arc<T>} objects alongside \lstinline{Gc<T>} objects. Many of
+    \fd's original \lstinline{Arc<T>} objects could not be ported, requiring
+    \lstinline{Gc<T>} objects to use finalizers to decrement their reference
+    counts and deallocate them. The elision of other finalizers can introduce
+    variability in GC scheduling, which may result in these \lstinline{Arc<T>}
+    objects being held on for longer.\jake{TODO: decide whether this last part ``additionally..'' should stay or go}}
     \label{fig:elision:metrics}
 \end{figure}
 
