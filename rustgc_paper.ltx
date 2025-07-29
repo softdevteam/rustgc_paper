@@ -1381,29 +1381,28 @@ Our experiment is fully repeatable and downloadable from
         \includegraphics[width=1\textwidth]{plots/gcvs_mem_hsize_avg}
     \end{subfigure}
     \hfill
-    \caption{Relative wall-clock performance (left) and average heap-size
-    (right) comparing \lstinline{Gc<T>} against reference counting
-    (\lstinline{Rc<T>} and \lstinline{Arc<T>}) on our benchmark suites. The
-    bars show each suite's \lstinline{Gc<T>} configuration relative to
-    \lstinline{Rc<T>} (black horizontal line at x=1.0). The ratios are
-    presented as the geometric mean across \benchmarkpexecs iterations, with
-    error bars indicating 99\% confidence intervals. The vertical blue line
-    display the overall performance ratio of the \lstinline{Gc<T>}
-    configuration across all benchmarks, with shaded regions showing 99\%
-    confidence intervals.\\\\
-    Relative to \gcvsrc, we observe an average slowdown of \jake{TODO} while
-    consuming \jake{TODO} times more memory on average. When controlling for
-    allocator differences, these reduce to \jake{TODO} and \jake{TODO}
-    respectively.\laurie{what explains grmtools heap usage?}}
+    \caption{Wall-clock performance (left) and memory (right) comparison of
+    \lstinline{Gc<T>} versus reference counting
+    (\lstinline{Rc<T>}/\lstinline{Arc<T>}) across all benchmark suites. Both
+    configurations are controlled for allocator differences by using \boehm's
+    allocator throughout (see \cref{fig:app:gcvs:baseline}\jake{todo} for comparisons
+    which include the default allocator jemalloc). Each bar represents
+    \lstinline{Gc<T>} relative to the \lstinline{Arc<T>}/\lstinline{Rc<T>}
+    baseline (1.0, black horizontal line), showing the geometric mean of ratios
+    across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
+    \lstinline{Gc<T>} has a slowdown of \jake{TODO num} while consuming
+    \jake{TODO num} more memory (shown by the blue vertical lines).
+    \laurie{what explains grmtools heap usage?}\jake{TODO: link to fig 2
+    plots}}
     \label{fig:gcvs:summary}
 \end{figure}
 
-Starting with \Egcrc, wall-clock performance and average heap-size data be found
-in~\cref{fig:gcvs:summary}. We suggest interpreting in conjunction with
-the `quantity of memory' data found in \cref{tab:Ercgc:conversion}. The broad
-story we can see from this data is that \ourgc has, when confidence intervals
+Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
+in~\cref{fig:gcvs:summary}. We suggest interpreting this in conjunction with
+the heap distribution data found in \cref{subfig:gcvs:runtime}, and finalizer metrics in \jake{TODO}. The broad
+story we can see from this data is that \ourgc has, when controlled for the allocator, and confidence intervals
 are taken into account, similar performance to other memory allocation
-approaches when few finalizers are run.
+approaches when few finalizers are run. \jake{reword, bad phrasing}
 
 However, there is a notable correlation between the quantity of finalizers and
 additional overhead in \ourgc. We can see the contrast between these two cases
