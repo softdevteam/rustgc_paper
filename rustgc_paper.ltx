@@ -1474,34 +1474,37 @@ has a leak, which manifests in \somrsast.
             \end{adjustbox}%
            \vspace*{12pt}
         \caption{Finalizers elided at run-time}
-        \label{subfig:metrics}
+        \label{subfig:elision:metrics}
     \end{subfigure}%
     \hfill
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_total_collections}
         \caption{Number of GC collections}
+        \label{subfig:elision:collections}
     \end{subfigure}
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_mem_hsize_avg}
         \caption{Avg. heap size}
+        \label{subfig:elision:mem}
     \end{subfigure}
     \begin{subfigure}{0.32\textwidth}
         \centering
         \includegraphics[width=\linewidth]{plots/elision_wallclock}
         \caption{Wall-clock time}
-        \label{subfig:wallclock}
+        \label{subfig:elision:wallclock}
     \end{subfigure}%
     \hfill
     \begin{subfigure}{0.33\textwidth}
         \centering
         \includegraphics[width=\linewidth]{plots/elision_user}
         \caption{User time}
-        \label{subfig:user}
+        \label{subfig:elision:user}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_gc_time}
         \caption{Total GC pause time}
+        \label{subfig:elision:pause}
     \end{subfigure}
     \hfill
     \caption{The effects of finalizer elision on various programs. The table in
@@ -1533,25 +1536,24 @@ has a leak, which manifests in \somrsast.
     \label{fig:elision:metrics}
 \end{figure}
 
-The wall-clock performance of \Eelision are shown in \cref{table:Eelision:perf}. Some
-benchmarks (e.g.~the SOM VMs) benefit significantly from finalizer elision,
+The results of \Eelision are shown in \cref{fig:elision:metrics}. Some
+benchmarks (e.g.~the SOM VMs) benefit significantly in terms of both performance and memory usage from finalizer elision,
 whereas for others it makes no difference. Unsurprisingly, there is a causal relationship
 between the number of finalizers elided as shown in
-\cref{table:Ercgc:conversion} and wall-clock performance as shown in
-\cref{table:Eelision:perf}.
+\cref{subfig:elision:metrics} and wall-clock performance as shown in
+\cref{subfig:elision:wallclock}.
 
-We can use the results of \cref{table:Eelision:perf} to infer an answer to
+We can use the results of \cref{fig:elision:metrics} to infer an answer to
 another question. Because we lazily create the finalizer thread, we may change
 \boehm's performance characteristics, because it only enters a slower
 multi-threading mode when it is told that another thread has started. Those
 benchmarks that have no finalizers may thus benefit significantly from this.
-We can see from \fd's results, where many, but not all, finalizers are elided, that
+We can see from \ripgrep's results, where many, but not all, finalizers are elided, that
 finalizer elision still has a notable performance impact irrespective of whether
 \boehm has entered its multi-threading mode or not.
 
-Surprisingly, however, finalizer elision can cause processes to consume more
-memory, as shown in \cref{table:Eelision:mem}. The heaptrack data allowed
-us to uncover why this happen:
+In general, finalizer elision causes processes to consume less memory. Surprisingly, however, we see a modest \jake{TODO} increase for \fd in \cref{subfig:elision:mem}. The heaptrack data allowed
+us to uncover why this happens:
 finalizer elision changes the memory reclamation characteristics of \boehm. If,
 as is common, a finalizer deallocates an object's backing memory, \boehm immediately reclaims
 that memory (in the sense that it can reuse it, or even return it to the OS).
@@ -1570,9 +1572,6 @@ locking and unlocking, this means that the finalizer thread sometimes
 causes the mutator thread to pause. It is probable that a GC designed with
 multi-threading in mind from its inception would incur lower overheads
 in this regard.
-
-
-\jake{todo \cref{fig:elision:metrics} in main prose}
 
 %\begin{table}[t]
 %\scalebox{0.7}{%
