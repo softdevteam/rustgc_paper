@@ -1260,30 +1260,23 @@ arena~\cite{chiovoloni15typed}). The results are shown in \jake{figure todo}.
         \caption{Distribution of heap objects at runtime}
         \label{subfig:mem:runtime}
     \end{subfigure}
-    \caption{Source-level type usage and runtime heap composition of our
-    benchmark suites after porting them to use \ourgc. (a) shows the number of
-    source-level locations of relevant types in our benchmark suite, including
-    dependencies. For example, 107 source-level types are \ourgc's
-    \lstinline{Gc<T>} in our ported \alacritty: most of the \lstinline{Rc<T>}s
-    and \lstinline{Arc<T>}s come from (direct or indirect) libraries. The
-    additional values in brackets denote the number of \lstinline{Weak<T>}
-    pointers for each RC variant. This shows how often programs that use
-    reference counting have to resort to juggling strong and weak counts to
-    express shared ownership. (b) shows the total distribution of different
-    kinds of objects in the heap at runtime. \textit{GC Owned} refers to both
-    top-level \lstinline{Gc<T>} objects and any other non-GC heap objects which
-    are transitively reachable from it. In other words, a chain of objects
-    which are entirely owned (and thus managed) by \ourgc. \textit{Boxed} shows
-    the proportion of regular heap objects allocated using \lstinline{Box<T>}
-    which are independent from GC. \textit{Rc} shows the proportion of
-    \lstinline{Arc<T>} and \lstinline{Rc<T>} objects. This provides important
-    context for upcoming results: for example, while in \somrsast we are able
-    to convert 85\% of RC objects to \lstinline{Gc<T>} in source, the heap is
-    still dominated by \somrsastboxpct of \lstinline{Box<T>} objects unrelated to GC. The
+    % \laurie{the brackets are just a bit confusing. i would format the table
+    % something like this:}
+    %           Gc<T>  Rc<T>      Arc<T>
+    %           #      #    Weak  #    Weak
+    % Alacritty 107    1904 45    7546 1925
+    \caption{(a) shows how many types in a benchmark suite (including its
+    dependencies) are ever used in a \lstinline{Gc<T>} (etc.). A given
+    \lstinline{struct} (or similar) can count at most once. The numbers in
+    brackets show the number of types that ever used in a weak reference:
+    in some cases, a large portion of these types are also used in weak references,
+    showing how much effort it can be to work around the
+    limitations of reference counting. (b) shows the run-time the proportion of
+    heap objects across the entire runtimes of each benchmark suites where `GC
+    owned' refers to all memory owned by \lstinline{Gc<T>}s. As this shows, our
+    benchmark suites have diverse memory usage patterns. The
     raw runtime distribution values are available in
-    \cref{tab:app:mem:conversion:runtime} in the Appendix. \jake{ TODO: Make a
-    final decision on the order of benchmarks (i.e. do binary trees and regex
-    go at the top?)}}
+    \cref{tab:app:mem:conversion:runtime} in the Appendix.}
     \label{fig:mem:conversion}
 \end{figure}
 
