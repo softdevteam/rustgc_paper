@@ -1467,11 +1467,6 @@ over time is more complex than mere GC reclamation latency would suggest. The
 reason for this is that a fairly high proportion of \ripgrep objects have
 finalizers.
 
-For completeness, we also evaluated each suite with 3 fixed-size heap
-configurations; results for these are reported in \cref{tab:app:gcvs:fixed:heap} in the Appendix.
-Our main discussion here focuses on \boehm’s adaptive heap sizing, which is the
-default and does not require manual tuning.
-
 \begin{figure}[htbp]
     \centering
     \begin{subfigure}{0.33\textwidth}
@@ -1578,6 +1573,12 @@ impossible for us to say whether this is an artefact of benchmarking `noise' or
 whether real benchmarks really are not meaningfully affected by fence insertion
 or removal.
 
+For completeness, we also assessed each suite using three fixed size heap
+configurations. We observed that manually tuning the heap size can range from
+no performance change to a 25\% improvement on some benchmarks; however, this
+is not broadly applicable due to the variability in heap sizes required for
+different benchmarks. The detailed results are presented in
+\cref{tab:app:gcvs:fixed:heap} in the Appendix.
 
 \section{Threats to validity}
 
@@ -1809,7 +1810,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \item \cref{fig:app:gcvs:mem:ripgrep} (page~\pageref{fig:app:gcvs:mem:ripgrep}): Time-series memory plots for \ripgrep.
   \item \cref{tab:app:gcvs:fixed:heap}
       (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
-default adaptive heap sizing and fixed-size heap configurations.\end{itemize}
+default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
 
 \begin{itemize}
