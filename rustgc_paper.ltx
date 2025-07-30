@@ -136,8 +136,7 @@ wish to follow it (2) to allow others to evaluate whether GC for Rust is a good
 idea or not.
 
 When we control for the
-(admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the overhead of \ourgc
-varies from \gcvsgcperfbestratio to, in the worst case, \gcvsgcperfworstratio slower. Perhaps
+(admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the performance of \ourgc varies from \gcvsgcperfbestratio to, in the worst case, \gcvsgcperfworstratio that of reference counting. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
 \ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
 Furthermore, although \ourgc as an implementation
@@ -1237,7 +1236,7 @@ we compare \lstinline{Gc<T>} against \lstinline{Rc<T>} and
 all benchmarks. For \binarytrees, we compare \lstinline{Gc<T>} with two
 additional allocation strategies: \rustgc (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
-arena~\cite{chiovoloni15typed}). The results are shown in \jake{figure todo}.
+arena~\cite{chiovoloni15typed}). The results are shown in \cref{fig:gcvs:binary_trees}.
 
 \begin{figure}[t]
     \centering
@@ -1338,8 +1337,8 @@ different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
 roots: in \lstinline{Rc<T>}-only benchmarks, we observe an inherent overhead
-from \boehm of 2--26\% relative to jemalloc (see~\laurie{the what-was-fig1}
-and \cref{table:app:gcvs:perf:summary} in the Appendix), which is a significant, and variable, confounding factor.
+from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
+and \cref{fig:app:gcvs:wallclock} in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
@@ -1376,16 +1375,42 @@ Our experiment is fully repeatable and downloadable from
     \lstinline{Gc<T>} versus reference counting
     (\lstinline{Rc<T>}/\lstinline{Arc<T>}) across all benchmark suites. Both
     configurations are controlled for allocator differences by using \boehm's
-    allocator throughout (see \cref{fig:app:gcvs:baseline}\jake{todo} for comparisons
-    which include the default allocator jemalloc). Each bar represents
+    allocator throughout (see \cref{tab:app:gcvs:alloc:cost} and
+    \cref{fig:app:gcvs:wallclock} in the Appendix for comparisons which include
+    the default allocator jemalloc). Each bar represents
     \lstinline{Gc<T>} relative to the \lstinline{Arc<T>}/\lstinline{Rc<T>}
     baseline (1.0, black horizontal line), showing the geometric mean of ratios
     across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
     \lstinline{Gc<T>} is \gcvsoverallperfratio slower while consuming
-    \gcvsoverallmemratio more memory (shown by the blue vertical lines).
-    \laurie{what explains grmtools heap usage?}\jake{TODO: link to fig 2
-    plots}}
+    \gcvsoverallmemratio more memory (shown by the blue vertical lines).}
     \label{fig:gcvs:summary}
+\end{figure}
+
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+            \begin{adjustbox}{width=0.8\linewidth, valign=t}
+                \input{tables/binary_trees}
+            \end{adjustbox}%
+           \vspace*{12pt}
+        \caption{Wall-clock relative to \texttt{Arc<T>}}
+        \label{subfig:gcvs:wallclock:binary_trees}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.49\textwidth}
+        \includegraphics[width=1\textwidth]{plots/binary_trees_mem}
+        \caption{Heap usage over time}
+        \label{subfig:gcvs:mem:binary_trees}
+    \end{subfigure}
+        \caption{Wall-clock times of various configurations on the Binary Trees
+        benchmark relative to \texttt{Arc<T>} (left), and their heap usage over
+        time (right). As is evident from the heap profile, Arena is
+        significantly faster than other approaches as it just does a single
+        large deallocation at the end. In contrast, \texttt{rust-gc} uses on
+        average between 3--4$\times$ as much memory as the other
+        configurations, whilst being over 2$\times$ slower.}
+    \label{fig:gcvs:binary_trees}
 \end{figure}
 
 Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
@@ -1435,7 +1460,7 @@ rule: the more of a codebase you convert to use
 \lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
 
 Other aspects of \Egcrc are more straightforward.
-For example, we can see from \cref{table:Ercgc:perf} that
+For example, we can see from \cref{subfig:gcvs:wallclock:binary_trees} that
 \typedarena is hugely faster than other allocation strategies for \binarytrees:
 it performs a single (huge!) deallocation at the end of the benchmark.
 Very differently, the heaptrack data allowed us to spot that, when using reference counting, the JSON SOM benchmark
@@ -1779,23 +1804,23 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 \textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
 
 \begin{itemize}
-  \item \cref{table:app:gcvs:perf:summary} (page~\pageref{table:app:gcvs:perf:summary}): Performance summary of each suite.
+    \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
   \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock performance comparison for each benchmark.
-  \item \cref{table:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
-  \item \cref{table:app:gcvs:user} (page~\pageref{table:app:gcvs:user}): Raw user time data.
+  \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
+  \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
   \item \cref{fig:app:gcvs:mem:ripgrep} (page~\pageref{fig:app:gcvs:mem:ripgrep}): Time-series memory plots for \ripgrep.
 \end{itemize}
 \textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
 
 \begin{itemize}
-  \item \cref{table:app:elision:pct} (page~\pageref{table:app:elision:pct}): Percentage of finalizers \ourgc elided.
+  \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
   \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
   \item \cref{fig:app:elision:heap} (page~\pageref{fig:app:elision:heap}): Pause time and heap size.
-  \item \cref{table:app:elision:wallclock} (page~\pageref{table:app:elision:wallclock}): Raw wall-clock time data.
-  \item \cref{table:app:elision:user} (page~\pageref{table:app:elision:user}): Raw user time data.
-  \item \cref{table:app:elision:heap} (page~\pageref{table:app:elision:heap}): Raw average heap usage data.
-  \item \cref{table:app:elision:numgcs} (page~\pageref{table:app:elision:numgcs}): Raw collection count data.
-  \item \cref{table:app:elision:numgcallocs} (page~\pageref{table:app:elision:numgcallocs}): Raw GC object allocation count data.
+  \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
+  \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
+  \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
+  \item \cref{tab:app:elision:numgcs} (page~\pageref{tab:app:elision:numgcs}): Raw collection count data.
+  \item \cref{tab:app:elision:numgcallocs} (page~\pageref{tab:app:elision:numgcallocs}): Raw GC object allocation count data.
 \end{itemize}
 
 \clearpage
@@ -1831,13 +1856,13 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \input{tables/gcvs_perf_summary}
 }
   \vspace{5pt}
-  \caption{\laurie{This table is doing, I think, 3 things: summarising each benchmark's suite performance; boehm's overhead vs jemalloc; and wall-clock vs. user time. that means that i have trouble focussing on this table's message. i think we should (a) put wall-clock vs. user-time in its own table (because it needs careful explaining e.g. fd has lower user time because of IO costs punishing wall-clock time) (b) put the summary data (that is: the `Alloy (default)' and `Rc (gcmalloc)' data) in the main body of the paper if we have room (c) have a table in the appendix which is just `boehm vs jemalloc on Rc'.} Wall-clock and user time results for each benchmark suite for the
-    \Egcrc experiment. Geometric mean wall-clock and user times for each
-    configuration are provided; both values are in seconds. We also provide the
-    ratios (×) of other configurations relative to the baseline (Reference
-    counting with jemalloc). Each benchmark in the suite was run for
-    \benchmarkpexecs iterations. We provide 99\% confidence intervals.}
-    \label{table:app:gcvs:perf:summary}
+  \caption{Comparison of wallclock execution times (in seconds, with 99\%
+  confidence intervals) for the \texttt{jemalloc} and \texttt{boehm} memory
+  allocators across each benchmark suite. For each suite, both the raw
+  execution times and the relative slowdown (showing the overhead of
+  the \texttt{boehm} allocator) are reported. All values are
+  geometric means over \benchmarkpexecs iterations.}
+  \label{tab:app:gcvs:alloc:cost}
 \end{table}
 
 \newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
@@ -1944,8 +1969,8 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark. Values show arithmetic means with 99\% confidence intervals.\jake{TODO: add missing CIs for most values as these do not have variance.}}
-    \label{table:app:elision:pct}
+    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark. Values show arithmetic means with 99\% confidence intervals.}
+    \label{tab:app:elision:pct}
 \end{table}
 
 \clearpage
@@ -2009,9 +2034,10 @@ In this appendix, we provide supplementary plots for our performance evaluation.
       }
   \end{subtable}
   \vspace{5pt}
-    \caption{\laurie{what VM(s) are being benchmarked here? what does \texttt{-i} mean? is the ordering of benchmarks meaningful in any way?} \jake{This is benchmarking before / after applying finalizer elision. The benchmarks belong to the suites in the left column. The ordering is not important, it was done this way so that it fits on the page. \texttt{-i} is a ripgrep flag for case insensitive. I agree something like \texttt{case insensitive} would be better but longer benchmark names break the plot and table layouts.}.Raw wall-clock time data for each benchmark on the finalizer elision
-    experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{table:app:elision:wallclock}
+    \caption{Raw wall-clock time data for each benchmark on the finalizer
+    elision experiment. Values show arithmetic means with 99\% confidence
+    intervals.}
+    \label{tab:app:elision:wallclock}
 \end{table}
 
 \begin{table}[t]
@@ -2031,7 +2057,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \vspace{5pt}
   \caption{Raw user time data for each benchmark on the finalizer elision
     experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{table:app:elision:user}
+    \label{tab:app:elision:user}
 \end{table}
 
 \begin{table}[t]
@@ -2052,7 +2078,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
     \caption{Raw data for the average heap size (in MiB) for each benchmark on
     the finalizer elision experiment. Values show arithmetic means with 99\%
     confidence intervals.}
-    \label{table:app:elision:heap}
+    \label{tab:app:elision:heap}
 \end{table}
 
 \begin{table}[t]
@@ -2072,7 +2098,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \vspace{5pt}
   \caption{Raw collection count data for each benchmark on the finalizer elision
     experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{table:app:elision:numgcs}
+    \label{tab:app:elision:numgcs}
 \end{table}
 
 \begin{table}[t]
@@ -2093,7 +2119,7 @@ In this appendix, we provide supplementary plots for our performance evaluation.
     \caption{Raw data for the number of \texttt{Gc<T>} objects allocated for
     each benchmark on the finalizer elision experiment. Values show arithmetic
     means with 99\% confidence intervals.}
-    \label{table:app:elision:numgcallocs}
+    \label{tab:app:elision:numgcallocs}
 \end{table}
 
 \clearpage
