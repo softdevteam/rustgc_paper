@@ -1,0 +1,37 @@
+\begin{tabular}{lrrrl}
+    Suite         & Heap Size (MiB) & Ratio & CI & Benchmarks failed \\
+\hline
+Alacritty      & 16  & 0.96 & \scriptsize\textcolor{gray!60}{[0.91, 0.99]} & \\
+Alacritty      & 32  & 0.98 & \scriptsize\textcolor{gray!60}{[0.95, 1.02]} & \\
+Alacritty      & 64 & 0.94 & \scriptsize\textcolor{gray!60}{[0.89, 0.98]} & \\
+\midrule
+Binary Trees   & 4  & 0.88 & \scriptsize\textcolor{gray!60}{[0.82, 1.02]} & \\
+Binary Trees   & 8  & 0.90 & \scriptsize\textcolor{gray!60}{[0.80, 1.01]} & \\
+Binary Trees   & 16 & 0.87 & \scriptsize\textcolor{gray!60}{[0.82, 0.94]} & \\
+\midrule
+fd             & 16  & 0.94 & \scriptsize\textcolor{gray!60}{[0.90, 0.99]} & \\
+fd             & 32  & 0.94 & \scriptsize\textcolor{gray!60}{[0.88, 0.98]} & \\
+fd             & 64 & 0.94 & \scriptsize\textcolor{gray!60}{[0.89, 1.00]} & \\
+\midrule
+grmtools       & 1024  & 1.01 & \scriptsize\textcolor{gray!60}{[1.00, 1.02]} & 2/4 (Eclipse, Jenkins).  \\
+grmtools       & 2048  & 1.00 & \scriptsize\textcolor{gray!60}{[1.00, 1.01]} & \\
+grmtools       & 4096 & 1.01 & \scriptsize\textcolor{gray!60}{[1.00, 1.02]} & \\
+\midrule
+Regex-Redux    & 256  & 0.94 & \scriptsize\textcolor{gray!60}{[0.92, 0.95]} & \\
+Regex-Redux    & 512  & 0.93 & \scriptsize\textcolor{gray!60}{[0.90, 0.94]} & \\
+Regex-Redux    & 1024 & 0.96 & \scriptsize\textcolor{gray!60}{[0.92, 1.07]} & \\
+\midrule
+ripgrep        & 32  & 0.96 & \scriptsize\textcolor{gray!60}{[0.95, 0.96]} & \\
+ripgrep        & 64  & 0.95 & \scriptsize\textcolor{gray!60}{[0.94, 0.95]} & \\
+ripgrep        & 128 & 0.94 & \scriptsize\textcolor{gray!60}{[0.93, 0.95]} & \\
+\midrule
+    som-rs-ast     & 64  & 0.72 & \scriptsize\textcolor{gray!60}{[0.71, 0.74]} & 2/4 (Fannkuch, TreeSort) \\
+    som-rs-ast     & 96  & 0.74 & \scriptsize\textcolor{gray!60}{[0.73, 0.75]} & 2/4 (Fannkuch, TreeSort) \\
+som-rs-ast     & 128 & 0.75 & \scriptsize\textcolor{gray!60}{[0.74, 0.76]} & \\
+\midrule
+som-rs-bc      & 32  & 0.79 & \scriptsize\textcolor{gray!60}{[0.78, 0.80]} & \\
+som-rs-bc      & 64  & 0.79 & \scriptsize\textcolor{gray!60}{[0.77, 0.80]} & \\
+som-rs-bc      & 128 & 0.84 & \scriptsize\textcolor{gray!60}{[0.83, 0.86]} & \\
+\bottomrule
+\end{tabular}
+
