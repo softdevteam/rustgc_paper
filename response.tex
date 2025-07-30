@@ -81,16 +81,16 @@ We have made a large number of changes to the performance evaluation. These are
 mostly due to reviewer comments, but we also uncovered a mistake in our
 experiment. We previously used \boehm's \lstinline{GC_heapsize} metric:
 this does not, as we assumed, represent current heap usage, but total
-memory usage since the program's start. We now use the \laurie{XYZ} metric,
+memory usage since the program's start. We now use the \lstinline{GC_bytes_allocd} metric,
 which does measure the correct thing. This changes the results for finalizer
-elision in on way: previously this appeared to cause heap usage to grow, but in
+elision in one way: previously this appeared to cause heap usage to grow, but in
 fact it shrinks.
 
 The most significant changes are:
 
 \begin{itemize}
   \item We provide a comparison of \lstinline{Rc<T>} with jemalloc and \boehm
-    in Table~\laurie{3?} in the Appendix. This suggests that the inherent
+    in Table~4 in the Appendix. This suggests that the inherent
     overhead of \boehm ranges from 2--26\%, averaging around 11\%.
 
   \item We have standardized all visualizations by normalizing against
