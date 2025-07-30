@@ -1323,15 +1323,6 @@ potential confounding factor in our results. This binary includes a number of
 additional, opt-in, logging features that record additional data
 of interest (e.g.~number of finalizers).
 
-As we shall soon see, in order to understand our experiments, we needed to
-understand the memory usage of different allocation strategies over the
-lifetime of a benchmark. To do this we used Heaptrack~\cite{wolff14heaptrack}.
-Heaptrack takes a complete snapshot of the heap every nanosecond, tracking both
-the number of allocations, and the number of bytes allocated throughout a
-program's execution. We had to modify both \boehm and Heaptrack itself so that
-they worked correctly in the context of \ourgc. We added a hook into \boehm's
-collector so that each reclaimed object is reported to Heaptrack.
-
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
@@ -1343,6 +1334,13 @@ Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
 the allocator for all benchmarks.
+
+As we shall soon see, in order to understand our experiments, we needed to
+understand the memory usage of different allocation strategies over the
+lifetime of a benchmark. We thus use Heaptrack~\cite{wolff14heaptrack},
+which tracks the amount of memory (both the number of allocations and
+quantity of memory) requested during a program's execution. We modified \boehm's
+collector so that reclaimed memory is accurately reported to Heaptrack.
 
 We ran each benchmark in our suite 30 times reporting means and 99\% confidence intervals
 (note: that for individual benchmarks we report the arithmetic mean, and for benchmark
@@ -1371,7 +1369,8 @@ Our experiment is fully repeatable and downloadable from
         \includegraphics[width=1\textwidth]{plots/gcvs_mem_hsize_avg}
     \end{subfigure}
     \hfill
-    \caption{Wall-clock performance (left) and memory (right) comparison of
+    \caption{Wall-clock time (left) and average heap usage (the arithmetic mean
+    of the heap size at ms intervals) (right) of
     \lstinline{Gc<T>} versus reference counting
     (\lstinline{Rc<T>}/\lstinline{Arc<T>}) across all benchmark suites. Both
     configurations are controlled for allocator differences by using \boehm's
@@ -1385,6 +1384,16 @@ Our experiment is fully repeatable and downloadable from
     \gcvsoverallmemratio more memory (shown by the blue vertical lines).}
     \label{fig:gcvs:summary}
 \end{figure}
+
+Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
+in~\cref{fig:gcvs:summary}. The broad story we can see from this
+data is that \ourgc, after controlling for the allocator and considering
+confidence intervals, has an overhead of around 5\%, with some benchmarks
+slower and some faster. When this data is interpreted with
+the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
+metrics in \cref{subfig:elision:metrics}, these results suggest an
+interesting correlation: the more of a codebase you convert to use
+\lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
 
 \begin{figure}[t]
     \centering
@@ -1413,58 +1422,47 @@ Our experiment is fully repeatable and downloadable from
     \label{fig:gcvs:binary_trees}
 \end{figure}
 
-Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
-in~\cref{fig:gcvs:summary}. We suggest interpreting this in conjunction with
-the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
-metrics in \cref{subfig:elision:metrics}. The broad story we can see from this
-data is that \ourgc, after controlling for the allocator and considering
-confidence intervals, has a roughly 5\% overhead, with some benchmarks
-slower and some faster.
+\binarytrees is sufficiently simple that we used it to compare against
+two additional approaches in \cref{subfig:gcvs:wallclock:binary_trees}.
+\typedarena is hugely faster than the alternatives since it performs
+it performs a single (huge!) deallocation at the end of the benchmark.
+\ourgc is significantly faster than \rustgc. Although we caution against
+over-interpreting a single benchmark, this does give us at least some
+idea of the performance ceiling and floor for different approaches.
 
 \begin{figure}[t]
     \centering
-    \vspace{-25pt}
     \includegraphics[width=\textwidth]{plots/ripgrep_subset.pdf}
     \noindent
-    \caption{An example of surprising, though fairly rare, heap usage patterns
-    behaviour of \lstinline{Gc<T>} relative to \lstinline{Arc<T>}/\lstinline{Rc<T>}: on
+    \caption{Heap usage patterns in \ripgrep. On
     the $x$-axis is time (normalised across all three executions); on the
     $y$-axis is heap usage (in MiB, with 99\% confidence intervals).
-    The need to finalize large numbers of objects means that memory is not
-    instantly freed, giving the appearance of possible memory leaks: in
-    reality the memory is freed a little later than normal, hence the
+    \ripgrep both allocates a large number of short-lived objects and
+    needs many of those to be finalized. This may give the appearance of possible memory leaks,
+    but in reality the memory is freed a little later than normal, hence the
     seeming `growing' and `shrinking' phases in the plots.}
     \label{fig:ripgrep_subset}
 \end{figure}
 
-\cref{fig:ripgrep_subset} shows a representative subset of the data for
-\ripgrep (the complete data can be found in \cref{fig:app:gcvs:mem:ripgrep}
-in the appendix). At first
-glance, this may suggest that \ourgc is leaking memory. It is not, but understanding
-why requires considering three factors. First, \ripgrep depends
-heavily on a number of external libraries which are not converted to
-\lstinline{Gc<T>}. In this instance, \ripgrep is heavily intertwined with the
-\lstinline{regex} crate, which uses \lstinline{Arc<T>} extensively. In a number
-of cases, potentially many levels deep, a \lstinline{Gc<T>} can end up owning
-a \lstinline{Arc<T>}, which then requires the \lstinline{Gc<T>} to have to
-run a finalizer. Second,
-\lstinline{Arc<T>} (as with similar types such as \lstinline{Gc<T>}) is often the
-entry point to a large tree of objects. When placed inside a \lstinline{Gc<T>},
-that tree of objects is kept alive for a longer period of time than normal: only after the
-finalizer is run by the finalization thread can the underlying memory be freed.
-Third, until finalization occurs, that memory contributes to the conservative marking
-overhead, even though it will soon be freed.
+Larger heap sizes have a notable, though not total, correlation with
+performance overhead. There are several possible reasons for this, and it is
+not always to tease them apart. For example, the marking phase in \boehm can be
+a notable cost: objects on the finalizer queue can be marked more than once,
+adding additional overhead.
 
-Summarising this, these results suggest a counter-intuitive
-rule: the more of a codebase you convert to use
-\lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
+Using Heaptrack allows us to understand other causes. It
+showed us that the \somrsast can leak memory due to reference counting: this
+had a notable effect in the JSON SOM benchmark, but may have manifested
+elsewhere to a lesser extent. On \ourgc, \somrsast does not leak memory.
 
-Other aspects of \Egcrc are more straightforward.
-For example, we can see from \cref{subfig:gcvs:wallclock:binary_trees} that
-\typedarena is hugely faster than other allocation strategies for \binarytrees:
-it performs a single (huge!) deallocation at the end of the benchmark.
-Very differently, the heaptrack data allowed us to spot that, when using reference counting, the JSON SOM benchmark
-has a leak, which manifests in \somrsast.
+Heaptrack also helped us understand why some benchmarks, notably \grmtools and
+\ripgrep, have much higher average heap sizes in \cref{fig:gcvs:summary}. Both
+benchmarks allocate large numbers of short-lived objects: \boehm necessarily
+notices this much later than \lstinline{Rc<T>}. When we view heap usage for
+\ripgrep in \cref{fig:ripgrep_subset}, we can see that the heap usage pattern
+over time is more complex than mere GC reclamation latency would suggest. The
+reason for this is that a fairly high proportion of \ripgrep objects have
+finalizers.
 
 \begin{figure}[htbp]
     \centering
@@ -1529,15 +1527,6 @@ whereas for others it makes no difference. Unsurprisingly, there is a causal rel
 between the number of finalizers elided as shown in
 \cref{subfig:elision:metrics} and wall-clock performance as shown in
 \cref{subfig:elision:wallclock}.
-
-We can use the results of \cref{fig:elision:metrics} to infer an answer to
-another question. Because we lazily create the finalizer thread, we may change
-\boehm's performance characteristics, because it only enters a slower
-multi-threading mode when it is told that another thread has started. Those
-benchmarks that have no finalizers may thus benefit significantly from this.
-We can see from \ripgrep's results, where many, but not all, finalizers are elided, that
-finalizer elision still has a notable performance impact irrespective of whether
-\boehm has entered its multi-threading mode or not.
 
 \begin{figure}[t]
     \centering
