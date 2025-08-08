@@ -1537,13 +1537,31 @@ between the number of finalizers elided as shown in
         \centering
         \includegraphics[width=1\textwidth]{plots/premopt_wallclock}
     \end{subfigure}%
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth]{plots/premopt_mem_hsize_avg}
+    \end{subfigure}%
     \hfill
-    \caption{ Wall-clock performance for premature finalization barriers across all benchmarks normalised
-    to \emph{None} (i.e.~an unsound configuration with no fences). Grey
+    \caption{Wall-clock performance (left) and average heap usage (the
+    arithmetic mean of the heap size at ms intervals) (right) for premature
+    finalization barriers across all benchmarks normalised to \emph{None}
+    (i.e.~an unsound configuration with no fences). Grey
     bars represent the ratio for \emph{naive} (all possible fences)
     and blue bars \emph{optimised} (obviously unnecessary fences
     removed). Unfortunately, we can not measure any statistically
-    significant effect from this `optimisation`.}
+    significant effect from this `optimisation`.\jake{The only statistically
+    distinguishable difference here is the naive configuration for regex-redux
+    using approx. 7\% more heap on average. This makes sense to me in isolation
+    because naive builds have way more compiler barriers so the potential for
+    retention is greater. However, I don't yet have a good answer to ``why this
+    and not others?''. It's probably worth noting that regex-redux is a single
+    benchmark and not a suite, so what you see is what you get. For others,
+    deviations in individual benchmarks will be squashed down by taking the
+    geometric mean over that suite. Also, binary trees is a single benchmark
+    too, but there are no finalizers and thus the None and Opt configurations
+    are essentially the same binary. It makes sense that there is 0 difference
+    between them. However, it's still strange to me why in this particular
+    example there's also no difference between naive either. }}
     \label{fig:premopt:summary}
 \end{figure}
 
