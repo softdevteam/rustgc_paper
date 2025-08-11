@@ -1208,10 +1208,9 @@ package system) looking for suitable candidates.
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
 count the SOM implementations' (identical) benchmark suites collectively or
-separately -- 62 or 88 benchmarks. \cref{fig:mem:conversion} shows: how many
-source-level types are used in \lstinline{Rc<T>} (before porting) and
-\lstinline{Gc<T>} (after porting); and how much memory (after porting) is owned
-by \lstinline{Gc<T>}s. This shows that our benchmark suite contains benchmarks
+separately -- 62 or 88 benchmarks. \cref{fig:mem:conversion} shows how after porting: how many
+different source-level shared-memory types are used; and how much memory at runtime is owned
+by \gcs. This shows that our benchmark suite contains benchmarks
 with a good distribution of memory patterns.
 
 \binarytrees is allocation intensive and sufficiently simple that it
@@ -1219,7 +1218,7 @@ can be easily and meaningfully ported to a variety of shared ownership strategie
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites. We found an issue porting \alacritty's
 UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
-\grmtools is a parsing library which uses \lstinline{Rc<T>} extensively
+\grmtools is a parsing library which uses \rc extensively
 in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
 
@@ -1227,14 +1226,14 @@ SOM is a small, but complete, language in the Smalltalk mould, which has a wide
 variety of implementations. Our suite includes two of these: \somrsast
 (which represents programs as ASTs); and \somrsbc (which represents programs as
 bytecode). Both are existing ports of a Java SOM VM into Rust and use
-\lstinline{Rc<T>}. We use the same SOM \lstinline{core-lib} benchmarks for
+\rc. We use the same SOM \lstinline{core-lib} benchmarks for
 both, derived from git commit \#afd5a6.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
-we compare \lstinline{Gc<T>} against \lstinline{Rc<T>} and
-\lstinline{Arc<T>} (the latter being the thread-safe version of the former) for
-all benchmarks. For \binarytrees, we compare \lstinline{Gc<T>} with two
+we compare \gc against \rc and
+\arc (the latter being the thread-safe version of the former) for
+all benchmarks. For \binarytrees, we compare \gc with two
 additional allocation strategies: \rustgc (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
 arena~\cite{chiovoloni15typed}). The results are shown in \cref{fig:gcvs:binary_trees}.
@@ -1243,10 +1242,14 @@ arena~\cite{chiovoloni15typed}). The results are shown in \cref{fig:gcvs:binary_
     \centering
     \begin{subfigure}{0.49\textwidth}
         \centering
-            \begin{adjustbox}{width=0.8\linewidth, valign=t}
-                \input{tables/conversion_source}
+            \begin{adjustbox}{width=1\linewidth, valign=t}
+                \begingroup
+                    \setlength{\tabcolsep}{10pt}
+                    \renewcommand{\arraystretch}{1.4}
+                    \input{tables/conversion_source}
+                \endgroup
             \end{adjustbox}%
-           \vspace*{12pt}
+           \vspace*{7pt}
         \caption{Source-level type conversions}
         \label{subfig:mem:source}
     \end{subfigure}%
@@ -1256,21 +1259,15 @@ arena~\cite{chiovoloni15typed}). The results are shown in \cref{fig:gcvs:binary_
         \caption{Distribution of heap objects at runtime}
         \label{subfig:mem:runtime}
     \end{subfigure}
-    % \laurie{the brackets are just a bit confusing. i would format the table
-    % something like this:}
-    %           Gc<T>  Rc<T>      Arc<T>
-    %           #      #    Weak  #    Weak
-    % Alacritty 107    1904 45    7546 1925
-    \caption{(a) shows how many types in a benchmark suite (including its
-    dependencies) are ever used in a \lstinline{Gc<T>} (etc.). A given
-    \lstinline{struct} (or similar) can count at most once. The numbers in
-    brackets show the number of types that ever used in a weak reference:
-    in some cases, a large portion of these types are also used in weak references,
-    showing how much effort it can be to work around the
-    limitations of reference counting. (b) shows the run-time the proportion of
-    heap objects across the entire runtimes of each benchmark suites where `GC
-    owned' refers to all memory owned by \lstinline{Gc<T>}s. As this shows, our
-    benchmark suites have diverse memory usage patterns. The
+    \caption{(a) shows, after conversion, how many types in a benchmark suite
+    (including its dependencies) are ever used inside a \gc (etc.), counting
+    each \lstinline{struct} or equivalent at most once. For reference-counted
+    types we further separate strong and weak references, revealing how often
+    types must also be handled through weak references and thus the additional
+    effort imposed by reference-counting constraints. (b) shows the run-time
+    proportion of heap objects across the entire execution of each benchmark
+    suite where `\gc (+ owned)' refers to all memory owned by \gcs. As
+    this shows, our benchmark suites have diverse memory usage patterns. The
     raw runtime distribution values are available in
     \cref{tab:app:mem:conversion:runtime} in the Appendix.}
     \label{fig:mem:conversion}
@@ -1295,7 +1292,7 @@ Two programs (bevy and rust-analyzer) did not run correctly after
 porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
 functions in \lstinline{Rc<T>} which allow a programmer to mutate their contents
 if, at run-time, they only have a single owner. There is not,
-and cannot be, equivalent functionality with a copyable \lstinline{Gc<T>} type. We thus had to
+and cannot be, equivalent functionality with a copyable \gc type. We thus had to
 use alternative mechanisms to express the desired outcome, but found that
 this occasionally led to deadlocks (this same problem also occurred in
 one small portion of \alacritty, but we excluded the one benchmark affected).
@@ -1322,13 +1319,16 @@ explicitly opt into GC does \ourgc really become a `GC for Rust'. This allows
 us to use a single \rustc binary, standard library, and so on, removing a
 potential confounding factor in our results. This binary includes a number of
 additional, opt-in, logging features that record additional data
-of interest (e.g.~number of finalizers).
+of interest (e.g.~number of finalizers). \jake{We compile this binary without
+the additional logging features first to record wall-clock and user time. In
+our second binary where the logging information is included, we disregard the
+perf times of these.}
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
-for example, \lstinline{Rc<T>} can use a modern allocator such as jemalloc.
+for example, \rc can use a modern allocator such as jemalloc.
 Much has changed in the performance of our allocators since \boehm's 1980s
-roots: in \lstinline{Rc<T>}-only benchmarks, we observe an inherent overhead
+roots: in \rc-only benchmarks, we observe an inherent overhead
 from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
 and \cref{fig:app:gcvs:wallclock} in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
@@ -1354,8 +1354,7 @@ running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
 Our experiment is fully repeatable and downloadable from
-\emph{anonymised for submission}.
- %\url{https://github.com/softdevteam/rustgc_paper_experiment/}.
+ \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 
 \subsection{Results}
@@ -1373,16 +1372,16 @@ Our experiment is fully repeatable and downloadable from
     \hfill
     \caption{Wall-clock time (left) and average heap usage (the arithmetic mean
     of the heap size at ms intervals) (right) of
-    \lstinline{Gc<T>} versus reference counting
-    (\lstinline{Rc<T>}/\lstinline{Arc<T>}) across all benchmark suites. Both
+    \gc versus reference counting
+    (\rc/\arc) across all benchmark suites. Both
     configurations are controlled for allocator differences by using \boehm's
     allocator throughout (see \cref{tab:app:gcvs:alloc:cost} and
     \cref{fig:app:gcvs:wallclock} in the Appendix for comparisons which include
     the default allocator jemalloc). Each bar represents
-    \lstinline{Gc<T>} relative to the \lstinline{Arc<T>}/\lstinline{Rc<T>}
+    \lstinline{Gc<T>} relative to the \arc/\rc
     baseline (1.0, black horizontal line), showing the geometric mean of ratios
     across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
-    \lstinline{Gc<T>} is \gcvsoverallperfratio slower while consuming
+    \gc is \gcvsoverallperfratio slower while consuming
     \gcvsoverallmemratio more memory (shown by the blue vertical lines).}
     \label{fig:gcvs:summary}
 \end{figure}
@@ -1395,7 +1394,7 @@ slower and some faster. When this data is interpreted with
 the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
 metrics in \cref{subfig:elision:metrics}, these results suggest an
 interesting correlation: the more of a codebase you convert to use
-\lstinline{Gc<T>}, the less the \ourgc overhead tends to become.
+\gc, the less the \ourgc overhead tends to become.
 
 \begin{figure}[t]
     \centering
@@ -1405,7 +1404,7 @@ interesting correlation: the more of a codebase you convert to use
                 \input{tables/binary_trees}
             \end{adjustbox}%
            \vspace*{35pt}
-        \caption{Wall-clock relative to \texttt{Arc<T>}}
+        \caption{Wall-clock relative to \arc}
         \label{subfig:gcvs:wallclock:binary_trees}
     \end{subfigure}%
     \hfill
@@ -1416,7 +1415,7 @@ interesting correlation: the more of a codebase you convert to use
         \label{subfig:gcvs:mem:binary_trees}
     \end{subfigure}
         \caption{Wall-clock times of various configurations on the Binary Trees
-        benchmark relative to \texttt{Arc<T>} (left), and their heap usage over
+        benchmark relative to \arc (left), and their heap usage over
         time (right). As is evident from the heap profile, Arena is
         significantly faster than other approaches as it just does a single
         large deallocation at the end. In contrast, \texttt{rust-gc} uses on
@@ -1461,7 +1460,7 @@ elsewhere to a lesser extent. On \ourgc, \somrsast does not leak memory.
 Heaptrack also helped us understand why some benchmarks, notably \grmtools and
 \ripgrep, have much higher average heap sizes in \cref{fig:gcvs:summary}. Both
 benchmarks allocate large numbers of short-lived objects: \boehm necessarily
-notices this much later than \lstinline{Rc<T>}. When we view heap usage for
+notices this much later than \rc. When we view heap usage for
 \ripgrep in \cref{fig:ripgrep_subset}, we can see that the heap usage pattern
 over time is more complex than mere GC reclamation latency would suggest. The
 reason for this is that a fairly high proportion of \ripgrep objects have
@@ -1890,7 +1889,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 
     \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_gcvs_wallclock.pdf}
     \caption{A comparison of the wall-clock performance of GC (using \ourgc)
-    against two Rust reference counting (\rc) configurations across all
+    against two Rust reference counting (\arc, \rc) configurations across all
     benchmarks. The reference counting configurations are: \gcvsbaseline
     (standard RC with jemalloc allocator, using unmodified benchmarks) and
     \gcvsrc (RC configured to use \boehm's allocator for controlled comparison
