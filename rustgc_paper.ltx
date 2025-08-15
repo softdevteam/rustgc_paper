@@ -1342,16 +1342,12 @@ understand the memory usage of different allocation strategies over the
 lifetime of a benchmark. As we shall see, no single metric captures all aspects of
 our benchmarks, so we provide three: (1) \emph{Resident Set Size} (RSS), the
 total physical memory in RAM used by the process (including memory-mapped
-files, stack, and code/text segments), sampled at \laurie{100Hz?} \jake{10Hz, this is the lowest you can get away with on linux as proc stat doesn't update any faster}; (2)
-\emph{heap footprint}, the amount of live heap memory \laurie{sampled at ...?}
-\jake{heaptrack doesn't poll, instead it records each allocation. so it's more
-that we take that trace and resample it to 1KHz},
-obtained by using Heaptrack~\cite{wolff14heaptrack} to record allocations,
-deallocations, and \ourgc \laurie{sweeps == "number of collections"?} \jake{more accurately: memory reclaimed at each collection} sweeps;
-and (3) \emph{number of live heap objects} \laurie{presumably sampled at the
-same rate as heap footprint?}\jake{yes}, also measured via Heaptrack. We modified
-\boehm's collector \jake{and heaptrack itself, changes are now in master upstream} so that reclaimed memory is accurately reported to
-Heaptrack.
+files, stack, and code/text segments), sampled at 10Hz; (2)
+\emph{heap footprint}, the amount of live heap memory recorded by
+by Heaptrack~\cite{wolff14heaptrack} at every allocation and deallocation;
+and (3) \emph{number of live heap objects}, also recorded in the same
+way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
+the other (our changes to Heaptrack are now upstreamed).
 
 We ran each benchmark in our suite 30 times.
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
@@ -1371,8 +1367,8 @@ When plotting time-series (i.e.~sampled) memory metrics, we face the challenge
 that different configurations of the same benchmark can execute at different
 speeds, which makes comparisons difficult. We thus resampled each benchmark's
 data to 1000 evenly spaced points using linear interpolation and, for
-benchmarks with very short execution times \laurie{and what counts as
-`short'?} \jake{there is some subtlety here. From what I've said, it seems like any benchmark under 1 second would have too few samples and undergo extrapolation, but that's not true. In reality there are quite a few sub-second benchmarks, but they usually contain enough raw allocation data points in their heaptrack profile but they're just closer together as the benchmark is shorter. So here we take all of them. If there are more than 1000 we interpolate down to 1000, if there are fewer than 1000 we extrapolate. Not ideal but the best we can do IMHO. The reason we do the 'double' interpolation ordinarily is because it helps obtain a more evenly distributed set if there is a heavy bunching up of allocations at a particualr moment in time}, extrapolation. Normalisation inevitably `smooths' data but we found
+benchmarks with fewer than 1000 samples (a rare case \laurie{can we roughly quantify this?}) extrapolation.
+Normalisation inevitably `smooths' data but we found
 that 1000 points at the physical resolution of the plots we present to
 be a good balance between fidelity and readability. \jake{not that this suggests you didn't already know this but i'll clarify as it can be confusing:  we resample heaptrack data at 1KHz and then however many points that gives us is interpolated/extracted to a total 1K points. The fact both of these values are 1000 is coincidental.}
 
