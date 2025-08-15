@@ -1353,6 +1353,70 @@ other benchmarks. We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
+Interpreting memory usage from benchmarks (whether over time or as a summary)
+is more complex than reporting wall-clock time and involves important
+statistical trade-offs. Reporting a single number risks misinterpretation, so
+we provide three complementary metrics: (1) \emph{resident set size} (RSS), the
+total physical memory in RAM used by the process (including memory-mapped
+files, stack, and code/text segments); (2) \emph{heap footprint}, the amount of
+live heap memory, measured by instrumenting the program with Heaptrack to
+record allocations, deallocations, and \ourgc sweeps; and (3) the \emph{number
+of live heap objects}, also measured via Heaptrack.
+
+All three metrics are necessary because relying on just one can be misleading,
+as each captures different aspects of memory behavior. Although heap footprint
+is always a subset of RSS\footnote{This is not strictly true. RSS does not
+account for memory in swap, so in theory you could have scenario where a
+program that thrashes has a higher heap footprint than RSS. This would be
+highly unusual, and is certainly not the case for our experiments}, the two do
+not always align in phase: for example, heap drag can cause the footprint to
+increase due to uncollected (but unreachable) objects, yet as long as this drag
+remains within allocated pages, the RSS may remain unchanged. Meanwhile, the
+count of live heap objects provides further insight into collection performance
+that might be masked if, for example, the heap is dominated by a small number
+of unusually large objects.
+
+Also, because memory data is collected by sampling the program over time (RSS)
+or recording timestamps of allocator behaviour (footprint, number of objects)
+we must be careful not to mislead in our presentation.
+
+In \jake{figure} we present time series plots showing heap footprint over time.
+Different memory management strategies exhibit varying
+wall-clock execution times, so we resampled each benchmark run’s raw time
+series onto a temporal grid of 1000 evenly spaced points using linear
+interpolation and, for benchmarks with very short execution times,
+extrapolation. This normalization process places all runs on a common unitless
+time axis between 0 and 1, which lets us overlay and compare the heap dynamics
+of both fast and slow configurations on the same chart. Critically, by
+resampling onto a fixed grid, we ensure that the shapes and transitions of each
+run are shown without artificially stretching or compressing their profiles.
+
+After normalization, we calculated the arithmetic mean of the footprint
+measurement at each grid point across all runs of the same benchmark. We record
+99\% confidence intervals at each point; and show the result as a solid mean
+line surrounded by shaded regions depicting the confidence bounds.
+
+This resampling approach offers two main benefits. First, it allows for fair
+comparisons between benchmark configurations that may otherwise differ greatly
+in execution time, while still preserving the overall shape of each heap
+footprint profile. Second, by mapping footprint samples to a fixed grid, we can
+present the mean over multiple and highlight error regions.
+
+However, it is not without limitations. Linear interpolation can smooth out
+brief garbage collection spikes, potentially creating the false impression of a
+memory leak if collections occur between points. Additionally, while rarely
+needed in practice \jake{arena in binary trees, a couple of the som benchmarks
+for elision}, extrapolation can introduce artificial values that may not
+accurately reflect real program behavior. \jake{maybe these two paragraphs
+should go in the threats to validity?}
+
+The choice of 1000 samples per run was made empirically. Through
+experimentation, we determined this frequency best balances resolution with
+interpretability: higher sample counts produce excessive visual noise, making
+plots hard to read; fewer samples risk obscuring garbage collection spikes.
+This setting offers sufficient fidelity to capture key behaviors while
+remaining readable.
+
 Our experiment is fully repeatable and downloadable from
  \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
