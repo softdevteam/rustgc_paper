@@ -23,7 +23,7 @@ ARXIV_FILES = softdev.sty \
 
 ARXIV_BASE=arxiv
 
-all: appendices.pdf main.pdf rustgc_paper.pdf diff.pdf response.pdf
+all: appendices.pdf main.pdf rustgc_paper.pdf
 
 rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex
 	pdflatex rustgc_paper.ltx
