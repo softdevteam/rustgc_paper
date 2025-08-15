@@ -780,10 +780,10 @@ we need is a fence that prevents both: the compiler from reordering
 computations around a particular syntactic point; and the CPU from reordering
 computations around a particular address. We copy
 the platform specific code from the \boehm \lstinline{GC_reachable_here}
-macro \footnote{Initially we wrapped this macro in a function and called it.
+macro \footnote{Initially we wrapped this macro in a function.
 This led to surprising performance results: an analysis of LLVM IR suggests --
-but the sheer quantity of data makes it hard to confirm -- that this may have
-been due to an impact on inlining heuristics.} into \lstinline{Gc<T>}'s
+but the sheer quantity of data makes it hard to confirm -- that this may be
+due to the effect on inlining heuristics.} into \lstinline{Gc<T>}'s
 drop method, which achieves the effect we require.
 
 
