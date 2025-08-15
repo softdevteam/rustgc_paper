@@ -1191,6 +1191,8 @@ up, we carried out three experiments:
 \vspace{10pt}
 
 \noindent In this section we explain our methodology and our experimental results.
+Our experiment is fully repeatable and downloadable from
+ \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 
 \subsection{Methodology}
@@ -1337,14 +1339,19 @@ the allocator for all benchmarks.
 
 As we shall soon see, in order to understand our experiments, we needed to
 understand the memory usage of different allocation strategies over the
-lifetime of a benchmark. We thus use Heaptrack~\cite{wolff14heaptrack},
-which tracks the amount of memory (both the number of allocations and
-quantity of memory) requested during a program's execution. We modified \boehm's
-collector so that reclaimed memory is accurately reported to Heaptrack.
+lifetime of a benchmark. As we shall see, no single metric captures all aspects of
+our benchmarks, so we provide three: (1) \emph{Resident Set Size} (RSS), the
+total physical memory in RAM used by the process (including memory-mapped
+files, stack, and code/text segments), sampled at \laurie{100Hz?}; (2)
+\emph{heap footprint}, the amount of live heap memory \laurie{sampled at ...?},
+obtained by using Heaptrack~\cite{wolff14heaptrack} to record allocations,
+deallocations, and \ourgc \laurie{sweeps == "number of collections"?} sweeps;
+and (3) \emph{number of live heap objects} \laurie{presumably sampled at the
+same rate as heap footprint?}, also measured via Heaptrack. We modified
+\boehm's collector so that reclaimed memory is accurately reported to
+Heaptrack.
 
-We ran each benchmark in our suite 30 times reporting means and 99\% confidence intervals
-(note: that for individual benchmarks we report the arithmetic mean, and for benchmark
-suites the geometric mean).
+We ran each benchmark in our suite 30 times.
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
 utility. The SOM benchmarks are run using its conventional \emph{rebench} tool;
 we adjusted \emph{rebench} to use \lstinline{time} for consistency with our
@@ -1353,74 +1360,24 @@ running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
 
-\subsubsection{Interpreting memory usage}
+\subsubsection{Data presentation}
 
-Interpreting memory usage from benchmarks (whether over time or as a summary)
-is more complex than reporting wall-clock time and involves important
-statistical trade-offs. Reporting a single number risks misinterpretation, so
-we provide three complementary metrics: (1) \emph{resident set size} (RSS), the
-total physical memory in RAM used by the process (including memory-mapped
-files, stack, and code/text segments); (2) \emph{heap footprint}, the amount of
-live heap memory, measured by instrumenting the program with Heaptrack to
-record allocations, deallocations, and \ourgc sweeps; and (3) the \emph{number
-of live heap objects}, also measured via Heaptrack.
+For most metrics, we report means and 99\% confidence intervals. We report the arithmetic mean
+for individual benchmarks, the geometric mean for benchmark suites.
 
-All three metrics are necessary because relying on just one can be misleading,
-as each captures different aspects of memory behavior. Although heap footprint
-is always a subset of RSS\footnote{This is not strictly true. RSS does not
-account for memory in swap, so in theory you could have scenario where a
-program that thrashes has a higher heap footprint than RSS. This would be
-highly unusual, and is certainly not the case for our experiments}, the two do
-not always align in phase: for example, heap drag can cause the footprint to
-increase due to uncollected (but unreachable) objects, yet as long as this drag
-remains within allocated pages, the RSS may remain unchanged. Meanwhile, the
-count of live heap objects provides further insight into collection performance
-that might be masked if, for example, the heap is dominated by a small number
-of unusually large objects.
+When plotting time-series (i.e.~sampled) memory metrics, we face the challenge
+that different configurations of the same benchmark can execute at different
+speeds, which makes comparisons difficult. We thus resampled each benchmark's
+data to 1000 evenly spaced points using linear interpolation and, for
+benchmarks with very short execution times \laurie{and what counts as
+`short'?}, extrapolation. Normalisation inevitably `smooths' data but we found
+that 1000 points at the physical resolution of the plots we present to
+be a good balance between fidelity and readability.
 
-Also, because memory data is collected by sampling the program over time (RSS)
-or recording timestamps of allocator behaviour (footprint, number of objects)
-we must be careful not to mislead in our presentation.
-
-In \jake{figure} we present time series plots showing heap footprint over time.
-Different memory management strategies exhibit varying
-wall-clock execution times, so we resampled each benchmark run’s raw time
-series onto a temporal grid of 1000 evenly spaced points using linear
-interpolation and, for benchmarks with very short execution times,
-extrapolation. This normalization process places all runs on a common unitless
-time axis between 0 and 1, which lets us overlay and compare the heap dynamics
-of both fast and slow configurations on the same chart. Critically, by
-resampling onto a fixed grid, we ensure that the shapes and transitions of each
-run are shown without artificially stretching or compressing their profiles.
-
-After normalization, we calculated the arithmetic mean of the footprint
+After normalization, we calculated the arithmetic mean of the footprint \laurie{footprint?}
 measurement at each grid point across all runs of the same benchmark. We record
-99\% confidence intervals at each point; and show the result as a solid mean
+99\% confidence intervals at each point; and show the result as solid mean
 line surrounded by shaded regions depicting the confidence bounds.
-
-This resampling approach offers two main benefits. First, it allows for fair
-comparisons between benchmark configurations that may otherwise differ greatly
-in execution time, while still preserving the overall shape of each heap
-footprint profile. Second, by mapping footprint samples to a fixed grid, we can
-present the mean over multiple and highlight error regions.
-
-However, it is not without limitations. Linear interpolation can smooth out
-brief garbage collection spikes, potentially creating the false impression of a
-memory leak if collections occur between points. Additionally, while rarely
-needed in practice \jake{arena in binary trees, a couple of the som benchmarks
-for elision}, extrapolation can introduce artificial values that may not
-accurately reflect real program behavior. \jake{maybe these two paragraphs
-should go in the threats to validity?}
-
-The choice of 1000 samples per run was made empirically. Through
-experimentation, we determined this frequency best balances resolution with
-interpretability: higher sample counts produce excessive visual noise, making
-plots hard to read; fewer samples risk obscuring garbage collection spikes.
-This setting offers sufficient fidelity to capture key behaviors while
-remaining readable.
-
-Our experiment is fully repeatable and downloadable from
- \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 
 \subsection{Results}
@@ -1451,6 +1408,20 @@ Our experiment is fully repeatable and downloadable from
     \gcvsoverallmemratio more memory (shown by the blue vertical lines).}
     \label{fig:gcvs:summary}
 \end{figure}
+
+\laurie{
+All three metrics are necessary because relying on just one can be misleading,
+as each captures different aspects of memory behavior. Although heap footprint
+is always a subset of RSS\footnote{This is not strictly true. RSS does not
+account for memory in swap, so in theory you could have scenario where a
+program that thrashes has a higher heap footprint than RSS. This would be
+highly unusual, and is certainly not the case for our experiments}, the two do
+not always align in phase: for example, heap drag can cause the footprint to
+increase due to uncollected (but unreachable) objects, yet as long as this drag
+remains within allocated pages, the RSS may remain unchanged. Meanwhile, the
+count of live heap objects provides further insight into collection performance
+that might be masked if, for example, the heap is dominated by a small number
+of unusually large objects.}
 
 Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
 in~\cref{fig:gcvs:summary}. The broad story we can see from this
@@ -1667,7 +1638,7 @@ different benchmarks. The detailed results are presented in
 
 We cannot state with certainty that the solutions we have presented are
 complete or correct. We have tried to mitigate this by relatively extensive
-testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests).
+testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests \laurie{does this need updating?}).
 We also ported a number of existing programs to \ourgc --
 including programs that we did not expect to make good benchmarks -- since some
 GC problems only manifest at scale. However, we could undoubtedly have performed wider
@@ -1690,7 +1661,8 @@ The closest analogue we know of is the evolving research literature on memory
 models which, in a sense, modern GC is a superset of.
 
 Any performance judgements we make are necessarily contingent on our particular
-benchmark suite, including the proportion of benchmarks that we ported. For
+benchmark suite, including the proportion of benchmarks that we ported, and
+the way we process and present data. For
 example, we did not port external libraries to use \lstinline{Gc<T>} so many
 benchmarks use a variety of allocation strategies. Even had we ported
 everything, we would not be able to say, for example, that finalizer elision will always
