@@ -1316,13 +1316,12 @@ work.
 Our experiment can be seen as a comparison of \ourgc against `normal' Rust.
 Fortunately, \ourgc is a strict superset of `normal' Rust: only if users
 explicitly opt into GC does \ourgc really become a `GC for Rust'. This allows
-us to use a single \rustc binary, standard library, and so on, removing a
-potential confounding factor in our results. This binary includes a number of
-additional, opt-in, logging features that record additional data
-of interest (e.g.~number of finalizers). \jake{We compile this binary without
-the additional logging features first to record wall-clock and user time. In
-our second binary where the logging information is included, we disregard the
-perf times of these.}
+us to use the same compiler, standard library, and so on, removing several
+potential confounding factor in our results. We compile two binaries:
+one with logging features compiled in and one without. We use the latter
+when reporting wall-clock and user-time (where it is important that logging
+does not change our results); and the former for all other metrics (where,
+by definition, we have to use logging).
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
@@ -1352,6 +1351,9 @@ we adjusted \emph{rebench} to use \lstinline{time} for consistency with our
 other benchmarks. We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
+
+
+\subsubsection{Interpreting memory usage}
 
 Interpreting memory usage from benchmarks (whether over time or as a summary)
 is more complex than reporting wall-clock time and involves important
