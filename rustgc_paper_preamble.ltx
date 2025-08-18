@@ -15,9 +15,11 @@
 \usepackage{listings}
 \usepackage{listings-rust}
 \usepackage{microtype}
+\usepackage{import}
 \usepackage{multicol}
 \usepackage{multirow}
 \usepackage{pdflscape}
+\usepackage{pgfcache}
 \usepackage{siunitx}
 \usepackage{softdev}
 \usepackage{subcaption}
@@ -30,8 +32,19 @@
 
 % Must be loaded last
 \usepackage[capitalise]{cleveref}
+\def\mathdefault#1{#1}
 
-\usetikzlibrary{automata, positioning, arrows}
+\setpgfpreamble{
+    \usepackage[T1]{fontenc}
+    \usepackage[utf8]{inputenc}
+    \usepackage{listings}
+    \lstset{basicstyle=\ttfamily}
+    \usepackage{libertine}
+    \usepackage[inconsolata]{zi4}
+    \usepackage{newtxmath}
+    \usepackage{xspace}
+    \include{macros}
+}
 
 \lstset{
     language=Rust,

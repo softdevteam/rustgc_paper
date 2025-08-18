@@ -3,10 +3,11 @@
 .svg.pdf:
 	inkscape --export-filename=$@ $<
 
-LATEX_FILES = rustgc_paper.ltx
-
 LATEX_FILES = rustgc_paper.ltx macros.tex experiment_stats.tex
 PLOTS = $(patsubst %.svg,%.pdf, $(shell find . -type f -name "*.svg"))
+FIGURES = $(shell find figures/ -type f -name "*.pgf")
+PGFCACHE = _pgfcache
+TABLES = $(shell find tables/ -type f -name "*.tex")
 
 ARXIV_FILES = softdev.sty \
 		listings-rust.sty \
@@ -26,11 +27,11 @@ ARXIV_BASE=arxiv
 
 all: appendices.pdf main.pdf rustgc_paper.pdf
 
-rustgc_paper.pdf: bib.bib ${LATEX_FILES} ${PLOTS} rustgc_paper_preamble.fmt experiment_stats.tex
-	pdflatex rustgc_paper.ltx
+rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) rustgc_paper_preamble.fmt $(LATEX_FILES)
+	pdflatex  -shell-escape rustgc_paper.ltx
 	bibtex rustgc_paper
-	pdflatex rustgc_paper.ltx
-	pdflatex rustgc_paper.ltx
+	pdflatex  -shell-escape rustgc_paper.ltx
+	pdflatex  -shell-escape rustgc_paper.ltx
 
 appendices.pdf main.pdf: rustgc_paper.pdf
 	pdfjam -o main.pdf rustgc_paper.pdf 1-26
@@ -52,6 +53,9 @@ diff.pdf: rustgc_paper.pdf
 	bibtex diff
 	pdflatex diff.ltx
 	pdflatex diff.ltx
+
+$(PGFCACHE):
+	mkdir -p $@
 
 bib.bib: softdevbib/softdev.bib local.bib
 	softdevbib/bin/prebib softdevbib/softdev.bib > bib.bib
