@@ -1238,7 +1238,7 @@ we compare \gc against \rc and
 all benchmarks. For \binarytrees, we compare \gc with two
 additional allocation strategies: \rustgc (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
-arena~\cite{chiovoloni15typed}). The results are shown in \cref{fig:gcvs:binary_trees}.
+arena~\cite{chiovoloni15typed}).
 
 \begin{figure}[t]
     \centering
@@ -1431,34 +1431,6 @@ the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
 metrics in \cref{subfig:elision:metrics}, these results suggest an
 interesting correlation: the more of a codebase you convert to use
 \gc, the less the \ourgc overhead tends to become.
-
-\begin{figure}[t]
-    \centering
-    \begin{subfigure}{0.49\textwidth}
-        \centering
-            \begin{adjustbox}{width=0.8\linewidth, valign=t}
-                \input{tables/binary_trees}
-            \end{adjustbox}%
-           \vspace*{35pt}
-        \caption{Wall-clock relative to \arc}
-        \label{subfig:gcvs:wallclock:binary_trees}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.49\textwidth}
-        \centering
-        \includegraphics[width=0.7\textwidth]{plots/binary_trees_mem}
-        \caption{Heap usage over time}
-        \label{subfig:gcvs:mem:binary_trees}
-    \end{subfigure}
-        \caption{Wall-clock times of various configurations on the Binary Trees
-        benchmark relative to \arc (left), and their heap usage over
-        time (right). As is evident from the heap profile, Arena is
-        significantly faster than other approaches as it just does a single
-        large deallocation at the end. In contrast, \texttt{rust-gc} uses on
-        average between 3--4$\times$ as much memory as the other
-        configurations, whilst being over 2$\times$ slower.}
-    \label{fig:gcvs:binary_trees}
-\end{figure}
 
 \binarytrees is sufficiently simple that we used it to compare against
 two additional approaches in \cref{subfig:gcvs:wallclock:binary_trees}.
