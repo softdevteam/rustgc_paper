@@ -1359,6 +1359,7 @@ as both can colour results.
 
 
 \subsubsection{Data presentation}
+\label{sec:datapres}
 
 For most metrics, we report means and 99\% confidence intervals. We report the arithmetic mean
 for individual benchmarks, the geometric mean for benchmark suites.
@@ -1468,16 +1469,20 @@ over-interpreting a single benchmark, this does give us at least some
 idea of the performance ceiling and floor for different approaches.
 
 \begin{figure}[t]
-    \centering
-    \includegraphics[width=\textwidth]{plots/ripgrep_subset.pdf}
-    \noindent
-    \caption{Heap usage patterns in \ripgrep. On
-    the $x$-axis is time (normalised across all three executions); on the
-    $y$-axis is heap usage (in MiB, with 99\% confidence intervals).
-    \ripgrep both allocates a large number of short-lived objects and
-    needs many of those to be finalized. This may give the appearance of possible memory leaks,
-    but in reality the memory is freed a little later than normal, hence the
-    seeming `growing' and `shrinking' phases in the plots.}
+    \importpgf{figures}{profiles.pgf}
+    \caption{ Heap usage over normalised execution time for three benchmarks:
+    \binarytrees, \ripgrep alternates, and \somrsbc JSON-small (left to right).
+    The $x$-axis shows normalised time; the $y$-axis shows the heap footprint in
+    MiB with shaded regions for 99 \% CIs (see \cref{sec:datapres} for full methodology). \binarytrees is an example of where \typedarena
+    shines: it frees almost all objects in one batch at program end, making it
+    80\% faster than reference counting. \rustgc uses on average
+    3–4$\times$ more memory than other approaches, and is over 2$\times$
+    slower.
+    In the \ripgrep Alternates benchmark the apparent leak in \ourgc is an
+    artefact of an incomplete port: only 60\% of \arc objects were migrated, so
+    \gc objects must run finalizers to free interleaving \arc objects, creating heap
+    drag that we anticipate would be less severe after a full conversion.
+    \somrsbc's JSON-small benchmark stresses cyclic data. \gc handles these naturally but we see a memory leak in \somrsbc's \rc implemenation.}
     \label{fig:ripgrep_subset}
 \end{figure}
 
