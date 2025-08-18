@@ -5,6 +5,7 @@
 
 LATEX_FILES = rustgc_paper.ltx
 
+LATEX_FILES = rustgc_paper.ltx macros.tex experiment_stats.tex
 PLOTS = $(patsubst %.svg,%.pdf, $(shell find . -type f -name "*.svg"))
 
 ARXIV_FILES = softdev.sty \
