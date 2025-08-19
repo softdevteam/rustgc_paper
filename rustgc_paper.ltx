@@ -1257,8 +1257,7 @@ arena~\cite{chiovoloni15typed}).
     \end{subfigure}%
     \hfill
     \begin{subfigure}{0.49\textwidth}
-        \includegraphics[width=1\textwidth]{plots/mem_distribution}
-        \caption{Distribution of heap objects at runtime}
+        \importpgf{figures}{mem_distribution.pgf}
         \label{subfig:mem:runtime}
     \end{subfigure}
     \caption{(a) shows, after conversion, how many types in a benchmark suite
@@ -1268,7 +1267,7 @@ arena~\cite{chiovoloni15typed}).
     types must also be handled through weak references and thus the additional
     effort imposed by reference-counting constraints. (b) shows the run-time
     proportion of heap objects across the entire execution of each benchmark
-    suite where `\gc (+ owned)' refers to all memory owned by \gcs. As
+    suite where \gc refers to all memory owned by \gcs. As
     this shows, our benchmark suites have diverse memory usage patterns. The
     raw runtime distribution values are available in
     \cref{tab:app:mem:conversion:runtime} in the Appendix.}
