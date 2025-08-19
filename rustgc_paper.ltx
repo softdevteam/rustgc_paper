@@ -1413,6 +1413,7 @@ line surrounded by shaded regions depicting the confidence bounds.
     \label{fig:gcvs:summary}
 \end{figure}
 
+\laurie{define heap drag}
 \laurie{
 All three metrics are necessary because relying on just one can be misleading,
 as each captures different aspects of memory behavior. Although heap footprint
@@ -1447,19 +1448,24 @@ idea of the performance ceiling and floor for different approaches.
 
 \begin{figure}[t]
     \importpgf{figures}{profiles.pgf}
-    \caption{ Heap usage over normalised execution time for three benchmarks:
-    \binarytrees, \ripgrep alternates, and \somrsbc JSON-small (left to right).
-    The $x$-axis shows normalised time; the $y$-axis shows the heap footprint in
-    MiB with shaded regions for 99 \% CIs (see \cref{sec:datapres} for full methodology). \binarytrees is an example of where \typedarena
-    shines: it frees almost all objects in one batch at program end, making it
-    80\% faster than reference counting. \rustgc uses on average
-    3–4$\times$ more memory than other approaches, and is over 2$\times$
-    slower.
-    In the \ripgrep Alternates benchmark the apparent leak in \ourgc is an
-    artefact of an incomplete port: only 60\% of \arc objects were migrated, so
-    \gc objects must run finalizers to free interleaving \arc objects, creating heap
-    drag that we anticipate would be less severe after a full conversion.
-    \somrsbc's JSON-small benchmark stresses cyclic data. \gc handles these naturally but we see a memory leak in \somrsbc's \rc implemenation.}
+    \caption{A selection of time-series data with various GC approaches, showing normalised
+    time on the $x$-axis and heap footprint (with 99\% confidence intervals
+    shaded) on the $y$-axis. \laurie{the $y$ axis says ``heap size''}
+    (i.e.~the amount of live memory) over time.
+    \binarytrees shows an example
+    of \ourgc having a comparable heap footprint to \lstinline{Rc<T>};
+    \rustgc's heap footprint is about 3--4$\times$ greater. \binarytrees is a
+    perfect fit to \typedarena: it frees memory in one batch at the end, and
+    because it is 80\% faster than \lstinline{Rc<T>} this `wind down' period is
+    a substantial portion of the overall (quick!) execution.
+    \ripgrep Alternates may seem to be an example of a memory leak in \ourgc,
+    but it is really the result of a `worse case' partial port where \gc's often
+    own \lstinline{Arc<T>}s, requiring many finalisers, that then cause heap drag.
+    The frequent plateaus and dips show that memory is being freed, but slower
+    than one might hope.
+    In contrast, \somrsbc JSON Small shows an actual memory
+    leak due to cycling objects in \lstinline{Rc<T>}, where \ourgc's heap footprint
+    remains steady.}
     \label{fig:ripgrep_subset}
 \end{figure}
 
