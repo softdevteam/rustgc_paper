@@ -1383,13 +1383,19 @@ line surrounded by shaded regions depicting the confidence bounds.
 
 \begin{figure}[t]
     \centering
-    \begin{subfigure}{0.48\textwidth}
+    \begin{subfigure}{0.34\textwidth}
         \centering
-        \includegraphics[width=1\textwidth]{plots/gcvs_wallclock}
+        \importpgf{figures}{gcvs_wallclock.pgf}
     \end{subfigure}%
     \hfill
-    \begin{subfigure}{0.48\textwidth}
-        \includegraphics[width=1\textwidth]{plots/gcvs_mem_hsize_avg}
+    \begin{subfigure}{0.33\textwidth}
+        \centering
+        \importpgf{figures}{gcvs_mem_hsize_avg.pgf}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.33\textwidth}
+        \centering
+        \jake{RSS}
     \end{subfigure}
     \hfill
     \caption{Wall-clock time (left) and average heap usage (the arithmetic mean
@@ -1491,9 +1497,8 @@ finalizers.
     \end{subfigure}%
     \hfill
     \begin{subfigure}{0.33\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_total_collections}
-        \caption{Number of GC collections}
-        \label{subfig:elision:collections}
+        \importpgf{figures}{elision_mem_hsize_avg.pgf}
+        \label{subfig:elision:footprint}
     \end{subfigure}
     \begin{subfigure}{0.33\textwidth}
         \includegraphics[width=1\textwidth]{plots/elision_mem_hsize_avg}
