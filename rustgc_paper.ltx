@@ -1504,26 +1504,7 @@ finalizers.
         \caption{Avg. heap size}
         \label{subfig:elision:mem}
     \end{subfigure}
-    \begin{subfigure}{0.32\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/elision_wallclock}
-        \caption{Wall-clock time}
-        \label{subfig:elision:wallclock}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.33\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{plots/elision_user}
-        \caption{User time}
-        \label{subfig:elision:user}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_gc_time}
-        \caption{Total GC pause time}
-        \label{subfig:elision:pause}
-    \end{subfigure}
-    \hfill
+    \importpgf{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various programs. The table in
     the top-left shows how many finalizers are elided as a proportion of GC
     objects at run-time. The subsequent metrics are normalised against a
