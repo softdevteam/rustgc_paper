@@ -1367,15 +1367,13 @@ When plotting time-series (i.e.~sampled) memory metrics, we face the challenge
 that different configurations of the same benchmark can execute at different
 speeds, which makes comparisons difficult. We thus resampled each benchmark's
 data to 1000 evenly spaced points using linear interpolation and, for
-benchmarks with fewer than 1000 samples (a rare case \laurie{can we roughly quantify this?}) extrapolation.
-Normalisation inevitably `smooths' data but we found
-that 1000 points at the physical resolution of the plots we present to
-be a good balance between fidelity and readability. \jake{not that this suggests you didn't already know this but i'll clarify as it can be confusing:  we resample heaptrack data at 1KHz and then however many points that gives us is interpolated/extracted to a total 1K points. The fact both of these values are 1000 is coincidental.}
-
+benchmarks with fewer than 1000 samples (a rare case \laurie{can we roughly
+quantify this?}) \laurie{linear?} extrapolation. We chose 1000 samples because it is
+considerably above the visual resolution of our plots.
 After normalization, we calculated the arithmetic mean of the footprint \laurie{footprint?}
 measurement at each grid point across all runs of the same benchmark. We record
-99\% confidence intervals at each point; and show the result as solid mean
-line surrounded by shaded regions depicting the confidence bounds.
+99\% confidence intervals at each point and show the result as shaded
+regions around the mean.
 
 
 \subsection{Results}
