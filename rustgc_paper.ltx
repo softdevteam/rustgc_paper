@@ -263,8 +263,8 @@ objects, that are not reachable from the roots can then be \emph{reclaimed}. In
 contrast, a pure reference counting GC does not scan memory, and thus cannot
 free objects that form a cycle. Increasingly, GC implementations make use of
 multiple techniques (see~\citep{bacon04unified}) but, for simplicity's sake,
-at this stage of the paper we assume that implementations wholly use one
-technique or another. For brevity, we use `GC' as a short-hand for `tracing
+we assume that implementations wholly use one
+technique or another except otherwise stated. For brevity, we use `GC' as a short-hand for `tracing
 GC'; when we deal with other kinds of GC (e.g.~reference counting), we
 explicitly name them.
 
@@ -300,10 +300,10 @@ need.
 When a user calls \lstinline{Gc::new(v)}, the value \lstinline{v} is
 moved to the GC heap: the \lstinline{Gc<T>} value returned to the user is a
 simple wrapper around a pointer to \lstinline{v}'s new address. The same underlying GCed value
-may thus have multiple, partly overlapping, references active at any point.
+may thus have multiple, partly or wholly overlapping, references active at any point.
 To avoid undermining
-Rust's ownership system, this means that dereferencing a \lstinline{Gc<T>} must
-produce an immutable (i.e.~`\lstinline{&}') reference to the underlying value.
+Rust's ownership system, dereferencing a \lstinline{Gc<T>}
+produces an immutable (i.e.~`\lstinline{&}') reference to the underlying value.
 If the user wishes to mutate the underlying value, they must use other Rust
 types that enable \emph{interior mutability} (e.g.~\lstinline{RefCell<T>} or
 \lstinline{Mutex<T>}).
