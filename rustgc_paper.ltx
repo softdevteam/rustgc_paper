@@ -1386,25 +1386,11 @@ regions around the mean.
 
 \begin{figure}[t]
     \centering
-    \begin{subfigure}{0.34\textwidth}
-        \centering
-        \importpgf{figures}{gcvs_wallclock.pgf}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.33\textwidth}
-        \centering
-        \importpgf{figures}{gcvs_mem_hsize_avg.pgf}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.33\textwidth}
-        \centering
-        \jake{RSS}
-    \end{subfigure}
-    \hfill
-    \caption{Wall-clock time (left) and average heap usage (the arithmetic mean
-    of the heap size at ms intervals) (right) of
-    \gc versus reference counting
-    (\rc/\arc) across all benchmark suites. Both
+    \importpgf{figures}{gcvs_perf.pgf}
+    \caption{\jake{todo: needs x-label; should i use same xlim for wallclock as
+    heapsize; add back in missing vertical geomean line} Wall-clock time; average heap footprint; and average resident set
+    size (left to right) of \gc versus reference counting (\rc/\arc) across all
+    benchmark suites. Both
     configurations are controlled for allocator differences by using \boehm's
     allocator throughout (see \cref{tab:app:gcvs:alloc:cost} and
     \cref{fig:app:gcvs:wallclock} in the Appendix for comparisons which include
