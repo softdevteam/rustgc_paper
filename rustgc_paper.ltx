@@ -589,7 +589,7 @@ not suggest that it is missing optimisations which would overcome all of this ov
 Instead, whenever possible, \ourgc \emph{elides} finalizers so that they do not need to be run at all.
 We are able to do this because: (1) \boehm is responsible for all allocations and
 will, if necessary GC allocations even if they are not directly wrapped in a \lstinline{Gc<T>}; and (2) many Rust destructors
-only free memory which \boehm will do -- though often later in time -- anyway.
+only free memory which \boehm would, albeit with some latency, do anyway.
 
 Consider the standard Rust type \lstinline{Box<T>} which heap allocates space for a value;
 when a \lstinline{Box<T>} value is dropped, the heap allocation will be freed.
@@ -752,7 +752,7 @@ are `GC unaware', so optimisations such as scalar
 replacement can change the point in a program when GCed values appear to be
 finalizable.
 
-In our context, it is trivial to define premature finalization as a (dynamic) finalizer
+In our context, it is natural to define premature finalization as a (dynamic) finalizer
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
 has gone out of scope. Similar to the high-level proposal mooted
 in~\cite[Solution~1]{boehm07optimization}, we must ensure that the dynamic
@@ -783,7 +783,7 @@ we need is a fence that prevents both: the compiler from reordering
 computations around a particular syntactic point; and the CPU from reordering
 computations around a particular address. We copy
 the platform specific code from the \boehm \lstinline{GC_reachable_here}
-macro \footnote{Initially we wrapped this macro in a function.
+macro\footnote{Initially we wrapped this macro in a function.
 This led to surprising performance results: an analysis of LLVM IR suggests --
 but the sheer quantity of data makes it hard to confirm -- that this may be
 due to the effect on inlining heuristics.} into \lstinline{Gc<T>}'s
@@ -817,6 +817,31 @@ functions in the program, where each function consists of a sequence of basic
 blocks. Simplifying somewhat, function and drop method calls are represented as
 different kinds of \emph{terminators} on basic blocks. Terminators
 reference both a callee and a successor basic block.
+
+\begin{algorithm}[t]
+\small
+\caption{Removing elidable drops}
+\begin{algorithmic}
+\Function{RemoveElidableDrops}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
+                    \EndIf
+                \EndIf
+            \EndIf
+      \EndFor
+\EndFunction
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+    \State $block.terminator \gets last\_block.terminator$
+\EndFunction
+\end{algorithmic}
+  \label{alg:barrier_removal}
+\end{algorithm}
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies drop method terminators which reference elidable finalizers, and turns them into `goto' terminators
@@ -2123,39 +2148,6 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     means with 99\% confidence intervals.}
     \label{tab:app:elision:numgcallocs}
 \end{table}
-
-\clearpage
-
-\section*{Further details}
-
-In this appendix, we show additional formal algorithms and additional plots.
-None of these are necessary to understand the main part of the paper, but
-interested readers may find that they help flesh out some details.
-
-\begin{algorithm}[h]
-\small
-\caption{Removing elidable drops}
-\begin{algorithmic}
-\Function{RemoveElidableDrops}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-                \If {\Call{IsGcType}{$ty$}}
-                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
-                        \State \Call{ReplaceTerminator}{$basic\_block$}
-                    \EndIf
-                \EndIf
-            \EndIf
-      \EndFor
-\EndFunction
-\Function{ReplaceTerminator}{$basic\_block$}
-    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-    \State $block.terminator \gets last\_block.terminator$
-\EndFunction
-\end{algorithmic}
-  \label{alg:barrier_removal}
-\end{algorithm}
 
 \clearpage
 
