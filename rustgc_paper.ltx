@@ -1321,6 +1321,7 @@ work.
 
 
 \subsubsection{Running the experiment}
+\label{sec:running_the_experiment}
 
 Our experiment can be seen as a comparison of \ourgc against `normal' Rust.
 Fortunately, \ourgc is a strict superset of `normal' Rust: only if users
@@ -1355,6 +1356,19 @@ by Heaptrack~\cite{wolff14heaptrack} at every allocation and deallocation;
 and (3) \emph{number of live heap objects}, also recorded in the same
 way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
 the other (our changes to Heaptrack are now upstreamed).
+
+Another confounding factor for GC is RSS: too-small values can lead
+to `thrashing' and poor performance; large values to fewer
+collections and, in general, better performance. What `small' and `large' are varies by benchmark,
+and `careful' (or thoughtless) choices can significantly distort one's view of
+performance. \boehm uses an adaptive strategy by default, growing its RSS
+as it detects that it would benefit from doing so. To give some sense of
+whether a different strategy and/or RSS size would make a difference,
+we ran our benchmarks with three different fixed-RSS sizes. In general
+this affected wall-clock time by under 10\% and at most by 28\% (the detailed results are presented in
+\cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, we
+feel comfortable that \boehm's default approach does not lead to misleading
+results.
 
 We ran each benchmark in our suite 30 times.
 We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
@@ -1500,14 +1514,14 @@ thread to do less work.
 \begin{figure}[t]
     \centering
     \importpgf{figures}{premopt_perf.pgf}
-    \caption{\jake{TODO: plot order needs flipping. i need to fix why alacritty avg heap footprint not generating but in the raw data it is similar to rss and is not statistically distinguishable.}Wall-clock performance (left) and average heap usage (the
-    arithmetic mean of the heap size at ms intervals) (right) for premature
-    finalization barriers across all benchmarks normalised to \emph{None}
+    \caption{\jake{TODO: plot order needs flipping. i need to fix why alacritty avg heap footprint not generating but in the raw data it is similar to rss and is not statistically distinguishable.}
+    The effect of premature finalization optimisation,
+    normalised to \emph{None}
     (i.e.~an unsound configuration with no fences). Grey
     bars represent the ratio for \emph{naive} (all possible fences)
     and blue bars \emph{optimised} (obviously unnecessary fences
-    removed). Unfortunately, we can not measure any statistically
-    significant effect from this `optimisation`.}
+    removed). As this shows, there are no statistically significant
+    effects of this `optimisation'.}
     \label{fig:premopt:summary}
 \end{figure}
 
@@ -1531,18 +1545,11 @@ three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
 but allows us to approximate (allowing for possible vagaries from running
 unsound code!) the best possible situation for fence removal. \emph{Naive}
 inserts all possible fences. \emph{Optimised} inserts only necessary fences.
-Unfortunately, once confidence intervals are taken into account, there are
-simply no statistically significant results for this experiment. It is
-impossible for us to say whether this is an artefact of benchmarking `noise' or
-whether real benchmarks really are not meaningfully affected by fence insertion
-or removal.
+Once confidence intervals are taken into account, there are
+simply no statistically significant results for this experiment. Although
+it is possible that benchmarking `noise' is hiding a meaningful result, our
+data suggests that any such differences are likely to be minimial.
 
-For completeness, we also assessed each suite using three fixed size heap
-configurations. We observed that manually tuning the heap size can range from
-no performance change to a 25\% improvement on some benchmarks; however, this
-is not broadly applicable due to the variability in heap sizes required for
-different benchmarks. The detailed results are presented in
-\cref{tab:app:gcvs:fixed:heap} in the Appendix.
 
 \section{Threats to validity}
 
@@ -1924,22 +1931,13 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \input{tables/fixed_heaps}
 }
   \vspace{5pt}
-\caption{Wall-clock time ratios for three fixed heap sizes, relative to
-    \boehm’s default adaptive heap sizing, across all our benchmark suites.
-    Ratios are geometric means over 30 iterations, with 99\% confidence
-    intervals shown. Heap requirements differ greatly across suites, making
-    shared fixed sizes for all benchmarks impractical; instead, we select fixed
-    heap sizes per suite. The “Benchmarks failed” column indicates
-    configurations where not all tests completed due to insufficient memory.
-    Notably, for most suites and heap sizes permitting all benchmarks to run,
-    performance is typically very close to, or slightly faster than, the
-    default. However, grmtools and som-rs-ast are noticeable exceptions: failed
-    benchmarks in these suites exhibit severe allocation spikes, making it
-    difficult to choose a heap size that succeeds across all cases without
-    affording smaller benchmarks excessive memory. Overall, manual heap size
-    tuning offers small execution time improvements, but its effectiveness
-    varies widely depending on the allocation behavior and garbage collection
-    pressure encountered in each suite.}
+  \caption{The effects of fixing the RSS (see~\cref{sec:running_the_experiment})
+    on wall-clock time, reported as ratios relative to \boehm’s default
+    adaptive RSS strategy. We chose per-benchmark RSS values based on our
+    observations of their memory usage, though some benchmarks fail at smaller
+    values. Broadly speaking, these results show that the performance
+    differences due to RSS are relatively minor, and that \boehm's adaptive
+    strategy has not unduly coloured our results.}
 \label{tab:app:gcvs:fixed:heap}
 \end{table}
 
