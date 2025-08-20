@@ -1526,13 +1526,13 @@ thread to do less work.
 \begin{figure}[t]
     \centering
     \importpgf{figures}{premopt_perf.pgf}
-    \caption{The effect of premature finalization optimisation,
+    \caption{\laurie{we should change the $x$-axis to be 0.8-1.2x: there's nothing interesting past those points.} The effect of premature finalization optimisation,
     normalised to \emph{None}
     (i.e.~an unsound configuration with no fences). Grey
     bars represent the ratio for \emph{naive} (all possible fences)
     and blue bars \emph{optimised} (obviously unnecessary fences
-    removed). As this shows, there are no statistically significant
-    effects of this `optimisation'.}
+    removed). Unfortunately, this attempted optimisation has no statistically
+    significant effects.}
     \label{fig:premopt:summary}
 \end{figure}
 
