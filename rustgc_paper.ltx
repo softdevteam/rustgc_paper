@@ -10,8 +10,8 @@ inefficient, or both. In this paper we explore a new design for, and implementat
 Rust, called \ourgc. Unlike previous
 approaches to GC in Rust, \ourgc allows existing Rust destructors to be automatically
 used as GC finalizers: this makes \ourgc integrate better with existing Rust code
-than previous solutions but introduces surprising soundness, performance, and
-ergonomic problems. \ourgc provides novel solutions for the core problems:
+than previous solutions but introduces surprising soundness and performance
+problems. \ourgc provides novel solutions for the core problems:
 \emph{finalizer safety analysis} rejects unsound destructors from
 automatically being reused as finalizers; \emph{finalizer elision} optimises
 away unnecessary finalizers; and \emph{premature finalizer prevention}
@@ -107,10 +107,10 @@ In a close cousin to our work,
 a GC proposal for C++, the reuse of destructors as finalizers was ruled out due to
 seemingly insoluble problems~\cite[p.~32]{boehm09garbage}, which we divide
 into four categories:
-(1) finalizers are prohibitively slower than destructors;
+(1) some safe destructors are not safe finalizers.
 (2) finalizers can be run prematurely;
 (3) running finalizers on the same thread as a paused mutator can cause race conditions and deadlocks;
-(4) and some safe destructors are not safe finalizers.
+(4) and finalizers are prohibitively slower than destructors;
 All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of \#2, has
 existing solutions.
@@ -120,25 +120,25 @@ Rust destructors as finalizers in a satisfying way. We introduce novel solutions
 long-standing problems this implies by making use of some of Rust's unusual
 static guarantees. We thus gain a better GC for
 Rust \emph{and} solutions to open GC problems. Our solutions, in order, are:
-(1) \emph{finalizer elision} statically optimises away finalizers if the
-underlying destructor duplicates the GC's work;
+(1) \emph{finalizer safety analysis}
+extends Rust's static analyses to reject programs whose destructors are not
+provably safe to be used as finalizers.
 (2) \emph{premature finalizer prevention} automatically inserts fences to prevent
 the GC from being `tricked' into collecting values before they are dead;
 (3) we run finalizers on a separate thread; and
-(4) \emph{finalizer safety analysis}
-extends Rust's static analyses to reject programs whose destructors are not
-provably safe to be used as finalizers.
+(4) and \emph{finalizer elision} statically optimises away finalizers if the
+underlying destructor duplicates the GC's work;
 
 Although \ourgc is not production ready, its performance is arguably
 good enough, and it is sufficiently polished (e.g.~good quality error messages)
-in other ways for it (1) to show a plausible path forwards for those who may
-wish to follow it (2) to allow others to evaluate whether GC for Rust is a good
+in other ways for it to: show a plausible path forwards for those who may
+wish to follow it; and to allow others to evaluate whether GC for Rust is a good
 idea or not.
 
 When we control for the
 (admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the performance of \ourgc varies from \gcvsgcperfbestratio to, in the worst case, \gcvsgcperfworstratio that of reference counting. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
-\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero.
+\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero \laurie{is this still true?}.
 Furthermore, although \ourgc as an implementation
 is necessarily tied to Rust, most of the novel techniques in this paper rely on
 general properties of affine types and ownership. Although we do not wish
