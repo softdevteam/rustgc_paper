@@ -1420,12 +1420,12 @@ regions around the mean.
 Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
 in~\cref{fig:gcvs:summary}. The broad story we can see from this
 data is that \ourgc, after controlling for the allocator and considering
-confidence intervals, has an overhead of around 5\% \laurie{is this correct?} \jake{yes, for wall-clock}, with some benchmarks
+confidence intervals, has an overhead on wall-clock time of around 5\%, with some benchmarks
 slower and some faster. When this data is interpreted with
 the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
 metrics in \cref{fig:elision:metrics}, these results suggest an
-interesting correlation: the more of a codebase you convert to use
-\gc, the less the \ourgc overhead tends to become \laurie{is this still true?} \jake{\somrsast is the counter argument}.
+interesting correlation: in general, the more of a codebase you convert to use
+\gc, the less the \ourgc overhead to become \jake{\somrsast is the counter argument} \laurie{why?}.
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgc. \laurie{we need a table, probably in the body but it
@@ -1472,7 +1472,7 @@ showed us that the \somrsbc can leak memory due
 to reference counting: this had a notable effect in the JSON Small benchmark
 (as can be seen in~\cref{fig:profiles}), and may have
 manifested elsewhere to a lesser extent. \ourgc does not leak memory for this
-benchmark.
+benchmark on \somrsbc.
 
 \laurie{needs revisiting}
 Heaptrack also helped us understand why some benchmarks, notably \grmtools and
