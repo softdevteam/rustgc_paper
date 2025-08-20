@@ -1357,7 +1357,7 @@ and (3) \emph{number of live heap objects}, also recorded in the same
 way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
 the other (our changes to Heaptrack are now upstreamed).
 
-Another confounding factor for GC is RSS: too-small values can lead
+Another confounding factor for GC is RSS\jake{I don't think RSS is the right term here because it refers to the memory allocated to the process but we then go on to talk about GC fixed heap sizes which is a subset as it doesn't include things that RSS includes (e.g. stack, shared libs, etc)}: too-small values can lead
 to `thrashing' and poor performance; large values to fewer
 collections and, in general, better performance. What `small' and `large' are varies by benchmark,
 and `careful' (or thoughtless) choices can significantly distort one's view of
