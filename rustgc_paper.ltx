@@ -1440,8 +1440,9 @@ regions around the mean.
     \lstinline{Gc<T>} relative to the \arc/\rc
     baseline (1.0, black horizontal line), showing the geometric mean of ratios
     across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
-    \gc is \gcvsoverallperfratio slower while consuming
-    \gcvsoverallmemratio more memory (shown by the blue vertical lines).}
+    \gc is \gcvsoverallperfratio slower with a \gcvsoverallfootprintratio bigger heap
+    footprint, and a \gcvsoverallrssratio bigger RSS (shown by the blue
+    vertical lines). \jake{should we use percentages instead?}}
     \label{fig:gcvs:summary}
 \end{figure}
 
