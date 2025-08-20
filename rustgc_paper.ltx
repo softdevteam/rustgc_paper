@@ -1426,19 +1426,17 @@ regions around the mean.
     \centering
     \importpgf{figures}{gcvs_perf.pgf}
     \caption{\jake{todo: needs x-label; should i use same xlim for wallclock as
-    heapsize} Wall-clock time; average heap footprint; and average resident set
-    size (left to right) of \gc versus reference counting (\rc/\arc) across all
-    benchmark suites. Both
-    configurations are controlled for allocator differences by using \boehm's
-    allocator throughout (see \cref{tab:app:gcvs:alloc:cost} and
-    \cref{fig:app:gcvs:wallclock} in the Appendix for comparisons which include
-    the default allocator jemalloc). Each bar represents
-    \lstinline{Gc<T>} relative to the \arc/\rc
-    baseline (1.0, black horizontal line), showing the geometric mean of ratios
-    across \benchmarkpexecs iterations with 99\% confidence intervals. Overall,
-    \gc is \gcvsoverallperfratio slower with a \gcvsoverallfootprintratio bigger heap
-    footprint, and a \gcvsoverallrssratio bigger RSS (shown by the blue
-    vertical lines). \jake{should we use percentages instead?}}
+    heapsize}
+    Comparing the effects of \gc and \rc on wall-clock time; heap footprint (i.e.~the size of
+    the live set); and RSS. The baseline at 1 is \rc; values less than 1 show
+    \gc as faster; and the blue vertical line shows the geometric mean of ratios. The wall-clock time of \gc and
+    \rc is very similar (\gc is \gcvsoverallperfratio slower); the RSS somewhat similar; and the heap footprint often
+    very different. Perhaps surprisingly, the heap footprint and RSS do not
+    correlate. This is because RSS includes `headroom', that is memory which
+    is unused for the live set but which has not yet been returned to the OS
+    (i.e.~the live set at many points may only consume a small portion of the RSS).
+    Put another way, the RSS changes much more slowly, and can be insensitive
+    to programs which tend to rapidly allocate and deallocate memory.}
     \label{fig:gcvs:summary}
 \end{figure}
 
