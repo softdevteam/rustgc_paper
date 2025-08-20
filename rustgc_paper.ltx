@@ -1489,38 +1489,8 @@ finalizers.
 
 \begin{figure}[tb]
     \centering
-    \begin{subfigure}{0.33\textwidth}
-        \centering
-            \begin{adjustbox}{width=0.6\linewidth, valign=t}
-                \input{tables/elision_metrics}
-            \end{adjustbox}%
-           \vspace*{12pt}
-        \caption{Finalizers elided at run-time}
-        \label{subfig:elision:metrics}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.33\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_total_collections}
-        \label{subfig:elision:footprint}
-    \end{subfigure}
-    \begin{subfigure}{0.33\textwidth}
-        \includegraphics[width=1\textwidth]{plots/elision_mem_hsize_avg}
-        \caption{Avg. heap size}
-        \label{subfig:elision:mem}
-    \end{subfigure}
     \importpgf{figures}{elision_perf.pgf}
-    \caption{The effects of finalizer elision on various programs. The table in
-    the top-left shows how many finalizers are elided as a proportion of GC
-    objects at run-time. The subsequent metrics are normalised against a
-    baseline of no finalizers elided (the black bar at 1.0) showing 99\%
-    confidence intervals; the blue vertical line and shaded area represent
-    the geometric mean (and 99\% confidence intervals) of all benchmarks.
-    Broadly speaking, the more finalizers \ourgc removes, the greater the performance benefit is. This
-    is particularly obvious on the three time-based metrics (wall-clock, user,
-    and pause times); the effect on heap size and number of GC collections is
-    less clear. The exceptions are \alacritty and \fd: in both cases, only
-    a small proportion of overall memory is in the GC heap (see~\cref{subfig:mem:runtime})
-    and the effects of elision thus minor.}
+    \caption{The effects of finalizer elision on various programs.}
     \label{fig:elision:metrics}
 \end{figure}
 
