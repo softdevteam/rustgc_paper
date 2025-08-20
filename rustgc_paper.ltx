@@ -1160,6 +1160,10 @@ but there are valid idioms of use where we found it necessary.
 \section{Performance Evaluation}
 \label{sec:evaluation}
 
+\laurie{let's use smallcaps for all benchmarks all the time, including captions. or, if
+that's not possible, let's at least consistently use the same capitalisation for
+all benchmarks at all points.}
+
 \begin{table}[t]
 \small
 \begin{center}
@@ -1201,10 +1205,11 @@ Our experiment is fully repeatable and downloadable from
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
-want to compare programs using existing shared ownership approaches (e.g.~\lstinline{Rc<T>} against
-\lstinline{Gc<T>}). We searched through roughly the 100 most popular
+want to compare programs using existing shared ownership approaches. We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
-package system) looking for suitable candidates.
+package system) looking for suitable candidates. In practise this meant we
+looked for crates using \lstinline{Rc<T>} (which, in the interests of
+brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
 
 \cref{tab:benchmarks} shows the resulting suite: note that, except
 for \binarytrees and \regexredux, the `benchmarks' are themselves
@@ -1218,8 +1223,7 @@ with a good distribution of memory patterns.
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
-of which have their own benchmark suites. We found an issue porting \alacritty's
-UTF-8 support (see below for discussion of deadlocking), so that part of \alacritty still uses \lstinline{Arc<T>}.
+of which have their own benchmark suites.
 \grmtools is a parsing library which uses \rc extensively
 in error recovery: we benchmarked it
 using 28KLoC of real Java source code into which we injected errors.
@@ -1231,11 +1235,23 @@ bytecode). Both are existing ports of a Java SOM VM into Rust and use
 \rc. We use the same SOM \lstinline{core-lib} benchmarks for
 both, derived from git commit \#afd5a6.
 
+We were not able to port all parts of all programs. In particular, some
+programs make extensive use of the \lstinline{make_mut} and \lstinline{get_mut}
+functions in \lstinline{Rc<T>}, which allow a programmer to mutate their contents
+if, at run-time, they only have a single owner. There is not, and cannot be,
+equivalent functionality with a copyable \gc type. In some cases we were able
+to successfully use alternative mechanisms. In others we judged the usages to
+either be rare at run-time (i.e.~not worth porting), or too difficult to port
+(i.e.~too much of the program is built around the resulting assumptions). In a
+small number of cases we ended up introducing bugs -- generally deadlocks -- at
+which point we reverted to \lstinline{Rc<T>}. For example, \alacritty's UTF-8
+support ran into this problem, and we had to revert back to \lstinline{Rc<T>}
+for that portion of our port.
+
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
-we compare \gc against \rc and
-\arc (the latter being the thread-safe version of the former) for
-all benchmarks. For \binarytrees, we compare \gc with two
+we compare \gc against \rc for
+all benchmarks. For \binarytrees, we are also able to compare \gc with two
 additional allocation strategies: \rustgc (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
 arena~\cite{chiovoloni15typed}).
@@ -1260,7 +1276,7 @@ arena~\cite{chiovoloni15typed}).
         \importpgf{figures}{mem_distribution.pgf}
         \label{subfig:mem:runtime}
     \end{subfigure}
-    \caption{(a) shows, after conversion, how many types in a benchmark suite
+    \caption{\laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
     (including its dependencies) are ever used inside a \gc (etc.), counting
     each \lstinline{struct} or equivalent at most once. For reference-counted
     types we further separate strong and weak references, revealing how often
@@ -1291,16 +1307,8 @@ Put another way: these programs are in a sense `the same' from our evaluation pe
 
 Two programs (bevy and rust-analyzer) did not run correctly after
 porting. Both extensively use the \lstinline{make_mut} or \lstinline{get_mut}
-functions in \lstinline{Rc<T>} which allow a programmer to mutate their contents
-if, at run-time, they only have a single owner. There is not,
-and cannot be, equivalent functionality with a copyable \gc type. We thus had to
-use alternative mechanisms to express the desired outcome, but found that
-this occasionally led to deadlocks (this same problem also occurred in
-one small portion of \alacritty, but we excluded the one benchmark affected).
-We attempted to fix such problems, but in some cases we suspect that
-important portions of the program's structure have been designed with the
-flexibilities and limitations of existing APIs in mind: adapting them may
-be no small effort.
+functions in \lstinline{Rc<T>} and reverting those changes made the benchmarks
+uninteresting.
 
 \label{rustpython}
 We also ported RustPython, but were unable to adjust it to faithfully implement Python-level
