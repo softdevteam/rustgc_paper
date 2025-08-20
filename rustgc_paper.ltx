@@ -1300,7 +1300,7 @@ arena~\cite{chiovoloni15typed}).
         \importpgf{figures}{mem_distribution.pgf}
         \label{subfig:mem:runtime}
     \end{subfigure}
-    \caption{\laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
+    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
     (including its dependencies) are ever used inside a \gc (etc.), counting
     each \lstinline{struct} or equivalent at most once. For reference-counted
     types we further separate strong and weak references, revealing how often
@@ -1523,54 +1523,34 @@ finalizers.
     \centering
     \importpgf{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various metrics. The top-left
-    plot shows \laurie{if we're going to keep 4a, we need to change it. i think the bars should be `num of objects directly finalizable whose finalizers are elided; num of objects freed indirectly by finalization whose finalizers are elided; all other objects' which should still add up to 100\%.}. The other
+    plot \laurie{i still struggle to understand the top-left plot e.g.~som-rs-bc}
+    should be read in conjunction with~\cref{subfig:mem:runtime}. The other
     plots use `no finalizer elision' as the normalization base (i.e.~values
     below 1 show that finalizer elision improves a metric). Total GC pause
     time is the cumulative time spent in stop-the-world collections. User time
     captures the time spent in all threads, including the finalizer thread.
-    There is a clear
-    correlation: the more finalizers are elided, the better the metrics
-    become. There are two outliers. Although \fd has many elidable finalizers
-    \laurie{it doesn't benefit in any way because ...?}\jake{I'm not sure that
-    \fd is really an outlier. We finalize ~29\% of \gc objects, but that only
-    equates to around ~14\% of all \gc objects. In addition, all \gc objects in
-    \fd only make up about ~6\% of the entire heap distribution. In other
-    words, we elide finalizers on 14\% of 6\% of heap allocations, so less than
-    1\% overall. To me this makes sense as a reason why the dial doesn't
-    move.}.\jake{that leaves \ripgrep as the most
-    difficult suite to explain, because it seems for others, where elision made
-    a difference to wall-clock (as it has done with \ripgrep), there was also
-    an improvement on both heap metrics which is not the case here. The major
-    difference I think with \ripgrep is that it is the only benchmark suite
-    that does not lie in the extremes: for \alacritty, and \binarytrees elision
-    found no (or a negligable amount) candidates for optimisatiom, we'd thus expect it
-    to make no real difference; for \fd and \regexredux, we were able to elide a modest
-    number of \gc objects, but these made up a tiny fraction of the
-    overall heap memory distribution, so any changes are within the noise; In
-    contrast, \grmtools, \somrsast, \somrsbc performed very well after elision.
-    this is because we were able to elide all finalizers (bar a handful on
-    \somrsast). In the naive configuration, these suites were constantly
-    processing finalizers in the 5 to 6 figure totals, you can see how much
-    work was saved in GC pause time. Note that \grmtools doesn't seem to get
-    the same heap usage wins, but this is because its error recovery is able to
-    allocate more objects because it can do more work before timing out. That
-    leaves \ripgrep as the only suite we have where we can observe the effects
-    of a modest finalizer elision improvement. It may be that in such cases, we
-    trade wall-clock for more heap drag because finalizers will reclaim owned
-    objects earlier. It's hard to extrapolate this reasoning with only 1 suite
-    though. Finally, at first glance \somrsbc looks like elision shouldn't make a difference given that most of the objects were not elidable to begin with. However, there are two surprising reasons for this IMO: first, elision tips the suite over from ``mostly no finalizers'' to ``no finalizers at all'', we thus benefit from the removal of Boehm's punishing heap allocation locking and, less importantly, no fin. thread overhead. Second, though there were comparitavely few finalizable \gc objects, after looking at the source for \somrsbc, i can see that they were in critical performance areas. Finalizable \gc objects were wrapping the hashmaps for all object and class fields. These ``root'' potentially large chains of boxed and rawvec'd allocations which then need a finalizer to free. That's bad because: (1) though the top-level fin. queue appears small, each finalizer has to do lots of recursive work as it works its way through all the nested drops, that means constant aquisition of the global allocator lock interrupting the mutator; (2) those nested structures can contain pointers to inner non-finalizable \gc objects. even if those are the last references, they can't be reclaimed until at least the next cycle, keeping floating garbage and more stuff to mark around for longer; (3) this is probably less significant, but iterating a hashmap to drop its contents is more expensive than in a vec where you just do a linear scan over the buffer. this will add to finalizer time}  }
+    Broadly speaking, the more finalizers are removed, and the
+    greater the proportion of the overall heap the memory owned by
+    \lstinline{Gc<T>} is, the better the metrics become.}
     \label{fig:elision:metrics}
 \end{figure}
 
-The results of \Eelision are shown in \cref{fig:elision:metrics}. Some
-benchmarks (e.g.~the SOM VMs) benefit significantly in terms of both performance and memory usage from finalizer elision,
-whereas for others it makes no difference. Unsurprisingly, there is a strong correlation
-between the number of finalizers elided as shown in
-\cref{subfig:elision:metrics} and wall-clock performance as shown in
-\cref{subfig:elision:wallclock}. Because user time includes the time spent
-in all threads, including the finalizer thread, it tends to improve even
-more than wall-clock time, because finalizer elision causes the finalizer
-thread to do less work.
+The results of \Eelision are shown in \cref{fig:elision:metrics}. In general,
+there is a fairly clear correlation: the more finalizers are removed, and the
+greater the proportion of the overall heap the memory owned by
+\lstinline{Gc<T>} is, the better the metrics become. However, there are several
+caveats. First, in cases where all finalizers are removed, \boehm will not pay
+the cost of starting the finalizer thread, unduly flattering the time-based
+metrics. Second, the number of finalizers is only a loose proxy for the cost of
+finalizers. \somrsbc, for example, has very few finalizers, but those
+finalizers free up large object graphs, which can be slow, and so removing them
+is particularly beneficial. Third, some benchmarks change the work they do:
+\grmtools speeds up so much that its error recovery algorithm has time to do
+more work, so while finalizer hugely benefits its GC pause time, its wall-clock
+time changes much less. Finally, removing finalizers can cause increased
+latency, in the sense that finalizers can cause memory to be freed earlier than
+the GC itself does naturally: \ripgrep particularly suffers from this.
+
 
 \begin{figure}[t]
     \centering
@@ -1615,7 +1595,7 @@ data suggests that any such differences are likely to be minimial.
 
 We cannot state with certainty that the solutions we have presented are
 complete or correct. We have tried to mitigate this by relatively extensive
-testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests \laurie{does this need updating?}\jake{There are many additional unit tests too but those are harder to quantify because they are spread out and aren't a 1-1 file mapping.}).
+testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests \laurie{does this need updating?}\jake{There are many additional unit tests too but those are harder to quantify because they are spread out and aren't a 1-1 file mapping.} \laurie{an order of magnitude would be fine}).
 We also ported a number of existing programs to \ourgc --
 including programs that we did not expect to make good benchmarks -- since some
 GC problems only manifest at scale. However, we could undoubtedly have performed wider
