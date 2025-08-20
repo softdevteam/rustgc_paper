@@ -1430,13 +1430,25 @@ interesting correlation: in general, the more of a codebase you convert to use
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgc. \laurie{we need a table, probably in the body but it
 could be in the appendix, with two columns: benchmark name and time in seconds
-for each approach.}
+for each approach.} \jake{like this? \cref{tab:gcvs:raw}}
 \typedarena is much faster than the alternatives since it deallocates
 memory in one go at the end of the benchmark (as can clearly be
 seen in the time-series data in~\cref{fig:profiles}).
 \ourgc is significantly faster than \rustgc. Although we caution against
 over-interpreting a single benchmark, this does give us at least some
 idea of the performance ceiling and floor for different approaches.
+
+\begin{table}[t]
+    \input{tables/gcvs_raw}
+    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
+    different memory management strategies across our benchmark suites. We
+    report the mean of 30 runs, with 99\% confidence intervals (CIs) shown as
+    upper and lower bounds. For all benchmark suites we use the geometric mean,
+    except for \emph{binary trees} and \emph{regex redux}, which are single
+    benchmarks where the arithmetic mean is reported.}
+    \label{tab:gcvs:raw}
+\end{table}
+
 
 \begin{figure}[t]
     \importpgf{figures}{profiles.pgf}
