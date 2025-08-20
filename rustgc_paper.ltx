@@ -1406,12 +1406,12 @@ regions around the mean.
 Starting with \Egcrc, wall-clock performance and average heap-size comparisons be found
 in~\cref{fig:gcvs:summary}. The broad story we can see from this
 data is that \ourgc, after controlling for the allocator and considering
-confidence intervals, has an overhead of around 5\% \laurie{is this correct?}, with some benchmarks
+confidence intervals, has an overhead of around 5\% \laurie{is this correct?} \jake{yes, for wall-clock}, with some benchmarks
 slower and some faster. When this data is interpreted with
 the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
-metrics in \cref{subfig:elision:metrics} \laurie{where?}, these results suggest an
+metrics in \cref{fig:elision:metrics}, these results suggest an
 interesting correlation: the more of a codebase you convert to use
-\gc, the less the \ourgc overhead tends to become \laurie{is this still true?}.
+\gc, the less the \ourgc overhead tends to become \laurie{is this still true?} \jake{\somrsast is the counter argument}.
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgc. \laurie{we need a table, probably in the body but it
@@ -1419,7 +1419,7 @@ could be in the appendix, with two columns: benchmark name and time in seconds
 for each approach.}
 \typedarena is much faster than the alternatives since it deallocates
 memory in one go at the end of the benchmark (as can clearly be
-seen in the time-series data in~\cref{fig:ripgrep_subset}).
+seen in the time-series data in~\cref{fig:profiles}).
 \ourgc is significantly faster than \rustgc. Although we caution against
 over-interpreting a single benchmark, this does give us at least some
 idea of the performance ceiling and floor for different approaches.
@@ -1444,7 +1444,7 @@ idea of the performance ceiling and floor for different approaches.
     In contrast, \somrsbc JSON Small shows an actual memory
     leak due to cycling objects in \lstinline{Rc<T>}, where \ourgc's heap footprint
     remains steady.}
-    \label{fig:ripgrep_subset}
+    \label{fig:profiles}
 \end{figure}
 
 Larger heap sizes have a notable, though not total, correlation with
@@ -1454,9 +1454,9 @@ a notable cost: objects on the finalizer queue can be marked more than once,
 adding additional overhead.
 
 Using Heaptrack allows us to understand other causes. It
-showed us that the \laurie{fig 3 says som-rs-bc!} \somrsast can leak memory due
+showed us that the \somrsbc can leak memory due
 to reference counting: this had a notable effect in the JSON Small benchmark
-for \somrsbc (as can be seen in~\cref{fig:ripgrep_subset}), and may have
+(as can be seen in~\cref{fig:profiles}), and may have
 manifested elsewhere to a lesser extent. \ourgc does not leak memory for this
 benchmark.
 
