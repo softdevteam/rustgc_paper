@@ -1491,6 +1491,7 @@ for \somrsbc (as can be seen in~\cref{fig:ripgrep_subset}), and may have
 manifested elsewhere to a lesser extent. \ourgc does not leak memory for this
 benchmark.
 
+\laurie{needs revisiting}
 Heaptrack also helped us understand why some benchmarks, notably \grmtools and
 \ripgrep, have much higher average heap sizes in \cref{fig:gcvs:summary}. Both
 benchmarks allocate large numbers of short-lived objects: \boehm necessarily
@@ -1504,18 +1505,28 @@ finalizers.
     \centering
     \importpgf{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various metrics. The top-left
-    plot shows \laurie{i don't understand the top-left bar chart}. The other
+    plot shows \laurie{if we're going to keep 4a, we need to change it. i think the bars should be `num of objects directly finalizable whose finalizers are elided; num of objects freed indirectly by finalization whose finalizers are elided; all other objects' which should still add up to 100\%.}. The other
     plots use `no finalizer elision' as the normalization base (i.e.~values
-    below 1 show that finalizer elision improves a metric). \laurie{needs finishing}}
+    below 1 show that finalizer elision improves a metric). Total GC pause
+    time is the cumulative time spent in stop-the-world collections. User time
+    captures the time spent in all threads, including the finalizer thread.
+    There is a clear
+    correlation: the more finalizers are elided, the better the metrics
+    become. There are two outliers. Although \fd has many elidable finalizers
+    \laurie{it doesn't benefit in any way because ...?}. \ripgrep's memory
+    usage increases \laurie{because...}.}
     \label{fig:elision:metrics}
 \end{figure}
 
 The results of \Eelision are shown in \cref{fig:elision:metrics}. Some
 benchmarks (e.g.~the SOM VMs) benefit significantly in terms of both performance and memory usage from finalizer elision,
-whereas for others it makes no difference. Unsurprisingly, there is a causal relationship
+whereas for others it makes no difference. Unsurprisingly, there is a strong correlation
 between the number of finalizers elided as shown in
 \cref{subfig:elision:metrics} and wall-clock performance as shown in
-\cref{subfig:elision:wallclock}.
+\cref{subfig:elision:wallclock}. Because user time includes the time spent
+in all threads, including the finalizer thread, it tends to improve even
+more than wall-clock time, because finalizer elision causes the finalizer
+thread to do less work.
 
 \begin{figure}[t]
     \centering
