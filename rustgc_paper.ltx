@@ -1374,9 +1374,7 @@ for individual benchmarks, the geometric mean for benchmark suites.
 When plotting time-series (i.e.~sampled) memory metrics, we face the challenge
 that different configurations of the same benchmark can execute at different
 speeds, which makes comparisons difficult. We thus resampled each benchmark's
-data to 1000 evenly spaced points using linear interpolation and, for
-benchmarks with fewer than 1000 samples (a rare case \laurie{can we roughly
-quantify this?}) \laurie{linear?} extrapolation. \jake{I think we can drop this. We extrapolated originally for displaying time-series data in the plots. But we don't plot any of these short running benchmarks anymore. When we take the average value for a benchmark run, we don't extrapolate.} We chose 1000 samples because it is
+data to 1000 evenly spaced points using linear interpolation. We chose 1000 samples because it is
 considerably above the visual resolution of our plots.
 After normalization, we calculated the arithmetic mean of the memory footprint
 measurement at each grid point across all runs of the same benchmark. We record
