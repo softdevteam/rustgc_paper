@@ -1357,17 +1357,17 @@ and (3) \emph{number of live heap objects}, also recorded in the same
 way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
 the other (our changes to Heaptrack are now upstreamed).
 
-Another confounding factor for GC is RSS\jake{I don't think RSS is the right term here because it refers to the memory allocated to the process but we then go on to talk about GC fixed heap sizes which is a subset as it doesn't include things that RSS includes (e.g. stack, shared libs, etc)}: too-small values can lead
+Another confounding factor is the maximum size of the GC heap: too-small values can lead
 to `thrashing' and poor performance; large values to fewer
 collections and, in general, better performance. What `small' and `large' are varies by benchmark,
 and `careful' (or thoughtless) choices can significantly distort one's view of
-performance. \boehm uses an adaptive strategy by default, growing its RSS
-as it detects that it would benefit from doing so. To give some sense of
-whether a different strategy and/or RSS size would make a difference,
-we ran our benchmarks with three different fixed-RSS sizes. In general
-this affected wall-clock time by under 10\% and at most by 28\% (the detailed results are presented in
+performance. \boehm uses an adaptive strategy by default, growing the heap
+size as it detects that it would benefit from doing so. To give some sense of
+whether a different strategy and/or heap size would make a difference,
+we ran our benchmarks with three different fixed heap sizes. Doing so
+affected wall-clock time by under 10\% and at most by 28\% (the detailed results are presented in
 \cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, we
-feel comfortable that \boehm's default approach does not lead to misleading
+feel comfortable in saying that \boehm's default approach does not lead to misleading
 results.
 
 We ran each benchmark in our suite 30 times.
@@ -1942,12 +1942,12 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \input{tables/fixed_heaps}
 }
   \vspace{5pt}
-  \caption{The effects of fixing the RSS (see~\cref{sec:running_the_experiment})
+  \caption{The effects of fixing the heap size (see~\cref{sec:running_the_experiment})
     on wall-clock time, reported as ratios relative to \boehm’s default
-    adaptive RSS strategy. We chose per-benchmark RSS values based on our
+    adaptive RSS strategy. We chose per-benchmark heap sizes based on our
     observations of their memory usage, though some benchmarks fail at smaller
     values. Broadly speaking, these results show that the performance
-    differences due to RSS are relatively minor, and that \boehm's adaptive
+    differences due to different heap sizes are relatively minor, and that \boehm's adaptive
     strategy has not unduly coloured our results.}
 \label{tab:app:gcvs:fixed:heap}
 \end{table}
