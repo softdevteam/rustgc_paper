@@ -1133,7 +1133,7 @@ of various checks to avoid pointlessly repeating work. We also extend
 and \lstinline{Sync}, we know that there can be no unsafe projections used in a
 destructor, and can bypass most FSA checks entirely (though we still need to check
 for thread local accesses). Across our benchmark suite, FSA increases compilation
-time in release mode by a modest 0.8--1.6\%.
+time in release mode by a modest 0.8--1.6\%\jake{TODO: convert all percentages to ratios}.
 
 \cref{alg:fsa} also captures \ourgc's approach to error messages.
 Rather than just inform a user that `your drop method has not passed FSA', \ourgc
