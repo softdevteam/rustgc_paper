@@ -1499,7 +1499,7 @@ Larger heap sizes have a notable, though not total, correlation with
 performance overhead. There are several possible reasons for this, and it is
 not always to tease them apart. For example, the marking phase in \boehm can be
 a notable cost: objects on the finalizer queue can be marked more than once,
-adding additional overhead.
+adding additional overhead. \jake{This doesn't parse very well. I'm not sure that the finalizer queue is the best explanatory clause here, I think the easier point to grasp would be that the more live stuff you have in the heap, the more objects you have to trace and thus \ourgc has to do more work.}
 
 Using Heaptrack allows us to understand other causes. It
 showed us that the \somrsbc can leak memory due
@@ -1508,15 +1508,25 @@ to reference counting: this had a notable effect in the JSON Small benchmark
 manifested elsewhere to a lesser extent. \ourgc does not leak memory for this
 benchmark on \somrsbc.
 
-\laurie{needs revisiting}
+\jake{I think we need a short sentence here too about the first plot in fig 3, and that's that heaptrack allowed us to easily see why \typedarena is so much faster, we can also state that its clear that \rustgc is implemented as a hybrid gc with ref counting for root-scanning because it cleans up the entire heap on exit unlike a traditional gc. this, coupled with its inefficient heap usage is likely a major factor in its slowdown}
+
 Heaptrack also helped us understand why some benchmarks, notably \grmtools and
 \ripgrep, have much higher average heap sizes in \cref{fig:gcvs:summary}. Both
 benchmarks allocate large numbers of short-lived objects: \boehm necessarily
 notices this much later than \rc. When we view heap usage for
-\ripgrep in \cref{fig:ripgrep_subset}, we can see that the heap usage pattern
+\ripgrep in \cref{fig:profiles}, we can see that the heap usage pattern
 over time is more complex than mere GC reclamation latency would suggest. The
 reason for this is that a fairly high proportion of \ripgrep objects have
 finalizers.
+\jake{both of these statements are true but we should separate them because
+\grmtools doesn't have a time series plot in figure 2 that we can point to. we
+allude to this in the elision section but we should probably mention it here
+too: the reason for this in \grmtools is that by delaying reclamation until
+later, we get to do less work in the time-bound error recovery part of the
+algorithm and thus can allocate more objects in pursuit of a solution. i think
+this is a contributing factor to why we get a modest wall-clock speed up, but
+you are the \grmtools expert so correct me if i'm wrong!}
+
 
 \begin{figure}[tb]
     \centering
