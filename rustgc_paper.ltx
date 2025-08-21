@@ -1643,6 +1643,22 @@ modern, generic conservative, GC we could use instead, though we are aware of
 at least one attempt to create such an alternative: it will be interesting to rerun our
 experiments if and when that arrives.
 
+\jake{While we measure the wall-clock time of different fixed heap sizes, our
+main evaluation for \Eelision \Epremopt is carried out on a single heap
+configuration (\boehm's growing default). This means that we must scope our
+conclusions to this alone and that they may not necessarily be true for other
+heap sizes. see section 3.1
+\url{https://dl.acm.org/doi/pdf/10.1145/1378704.1378723} }
+
+\jake{for memory metrics, should we mention that for RSS we are at the whims of
+/proc/stats update frequency, which if not granular enough, can smooth out mmap
+spikes and give the illusion that we use less memory than we do. We should also
+say that when interpolating to a fixed grid this is by definition lossy and we
+can hide GC spikes in our visualizations. We mitigate this by choosing our
+sampling rate empirically by carefully checking that we don't elide spikes that
+would tell a different story and also by providing 99\% CIs from 30 runs those
+GC spikes will likely show up as additional shaded regions because the
+likelihood is they will never be phase aligned across multiple runs}
 
 \section{Related work}
 \label{sec:related_work}
