@@ -1231,7 +1231,7 @@ brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
         \importpgf{figures}{mem_distribution.pgf}
         \label{subfig:mem:runtime}
     \end{subfigure}
-    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
+    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?}\jake{Yes. In (b) \gc counts transitively reachable memory. box <T> is therefore not all boxes, but all the remaining ones that are unrelated to gc} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
     (including its dependencies) are ever used inside a \gc (etc.), counting
     each \lstinline{struct} or equivalent at most once. For reference-counted
     types we further separate strong and weak references, revealing how often
@@ -1262,7 +1262,16 @@ can be easily and meaningfully ported to a variety of shared ownership strategie
 of which have their own benchmark suites.
 \grmtools is a parsing library which uses \rc extensively
 in error recovery: we benchmarked it
-using 28KLoC of real Java source code into which we injected errors \jake{random syntax errors but with a consistent seed value so it can be reproduced} \laurie{does that mean: we always try exactly the same syntax errors or ...?}.
+using 28KLoC of real Java source code into which we injected errors
+\jake{random syntax errors but with a consistent seed value so it can be
+reproduced} \laurie{does that mean: we always try exactly the same syntax
+errors or ...?}
+
+\jake{we have a list of possible syntax errors that we can introduce. and for
+each source file we introduce random combination of them. but we use the same
+seed for RNG so that the exact results can be replicated. see line 28
+\url{https://github.com/softdevteam/rustgc_paper_experiment/blob/b52493ee0f0b3f8d9cf497acd4590c08a3c5e530/src/errorgen/src/main.rs}}
+
 
 SOM is a small, but complete, language in the Smalltalk mould, which has a wide
 variety of implementations. Our suite includes two of these: \somrsast
@@ -1302,7 +1311,7 @@ arena~\cite{chiovoloni15typed}).
       \laurie{let's remove the K from this table and report the literal numbers, to stop people (like me) thinking K == KiB}
       Run-time statistics. ‘Allocated’ shows how
     many \lstinline{Gc<T>} (etc.) objects were allocated. ‘GC Memory’ shows
-    what proportion of the heap \laurie{proportion in the sense of `proportion of number of objects' or `proportion of MiB'?} is directly or indirectly (via an embedded
+    what proportion of the heap \laurie{proportion in the sense of `proportion of number of objects' or `proportion of MiB'?} \jake{propertion of number of objects} is directly or indirectly (via an embedded
     smart pointer) allocated via \lstinline{Gc<T>}.}
 \label{tab:app:mem:conversion:runtime}
 \end{center}
@@ -1441,7 +1450,19 @@ slower and some faster. When this data is interpreted with
 the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
 metrics in \cref{fig:elision:metrics}, these results suggest an
 interesting correlation: in general, the more of a codebase you convert to use
-\gc, the less the \ourgc overhead to become \jake{\somrsast is the counter argument} \laurie{why?}.
+\gc, the less the \ourgc overhead to become \jake{\somrsast is the counter
+argument} \laurie{why?}. \jake{we addressed this offline yesterday, here's the
+conclusion: though the heap footprint for other benchmarks is larger, \somrsast
+has the highest avg. increase in RSS over all other benchmarks (2x). \ripgrep,
+the next worst suite is 1.4x. benchmarks that are heavy on recursion (e.g.
+fibonacci) perform the worst on \somrsast, so i would suggest that we leak
+memory in \somrsast (maybe by stale pointers to som objects which linger on the
+stack) and this is why our performance is worse. we also spend a higher
+proportion of marking time in \somrsast than we do in \somrsbc (though
+admittedly these are not not directly comparible). The increased RSS and
+increased proportion of the total program time spent marking tracks with this
+argument because when we have more objects to trace it becomes punishing in
+\boehm (we allude to this marking overhead in \cref{sec:elision} when we talk about the relationship between heapsize and wall-clock time) }
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgcproj.
@@ -1571,7 +1592,7 @@ data suggests that any such differences are likely to be minimial.
 
 We cannot state with certainty that the solutions we have presented are
 complete or correct. We have tried to mitigate this by relatively extensive
-testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests \laurie{does this need updating?}\jake{There are many additional unit tests too but those are harder to quantify because they are spread out and aren't a 1-1 file mapping.} \laurie{an order of magnitude would be fine}).
+testing. We have created a number of new tests inside our \rustc fork (11 files which constitute 39 tests \laurie{does this need updating?}\jake{There are many additional unit tests too but those are harder to quantify because they are spread out and aren't a 1-1 file mapping.} \laurie{an order of magnitude would be fine}\jake{how about ``...which constitute over 100 tests''}).
 We also ported a number of existing programs to \ourgc --
 including programs that we did not expect to make good benchmarks -- since some
 GC problems only manifest at scale. However, we could undoubtedly have performed wider
