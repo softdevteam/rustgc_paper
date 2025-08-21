@@ -1502,7 +1502,8 @@ idea of the performance ceiling and floor for different approaches.
 \end{figure}
 
 Time-series data from Heaptrack highlights, and explains, various factors (see in~\cref{fig:profiles}).
-For example, it indirectly shows that \rustgcproj uses reference counting by default,
+For example, it provides indirect evidence that \rustgcproj uses reference counting by default
+(see~\cref{rustgc} for details of \rustgcproj),
 since all memory is freed on exit (unlike \ourgc which does not run queued finalizers on exit).
 It also shows that \somrsbc leaks memory due to reference counting and cycles:
 this had a notable effect in the JSON Small benchmark, and may have
@@ -1510,9 +1511,9 @@ manifested elsewhere to a lesser extent. \ourgc does not leak memory for this
 benchmark on \somrsbc.
 
 Heaptrack also helped us understand why some benchmarks such as \ripgrep
-have much higher average heap sizes in \cref{fig:gcvs:summary}. \ripgrep
+have much higher average heap sizes in \ourgc. \ripgrep
 allocates large numbers of short-lived objects: \boehm necessarily
-notices this much later than \rc. When we view its time-series data in,
+notices this much later than \rc. When we view its time-series data in~\cref{fig:profiles},
 we can see that the heap usage pattern
 over time is more complex than simply delaying deallocation would suggest.
 The reason for this is that many, but definitely not all, \ripgrep objects have
@@ -1684,6 +1685,7 @@ remaining lifetime of the program, a severe restriction. Unlike our approach to 
 of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
 such accesses at runtime, leading to a (safe) Rust \lstinline{panic}.
 
+\label{rustgc}
 Probably the best known GC for Rust is \rustgcproj~\cite{manish15rustgc} (partly
 covered in \cref{sec:destructor challenges}). \rustgcproj's \lstinline{Gc<T>} provides
 a similar API to \ourgc, with the notable exception that its \lstinline{Gc<T>}
