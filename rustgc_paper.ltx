@@ -219,7 +219,7 @@ compaction, and so on. In other words, the programmer
 ends up writing a partial GC themselves. A variant of this idea are
 \emph{arenas}, which gradually accumulate multiple values but free all of them in one go: values
 can no longer be reclaimed too early, though arenas tend to unnecessarily
-increase the lifetime of objects.
+increase the lifetime of values.
 
 A type-based approach is
 \lstinline{GhostCell}~\cite{yanovski21ghostcell}, which uses \emph{branding} to
@@ -257,10 +257,10 @@ collections always \emph{stop-the-world}, where all threads running
 mutator code are paused while collection occurs.
 
 A \emph{tracing} GC is one that scans memory looking
-for reachable objects from a program's roots: objects, including cycles of
-objects, that are not reachable from the roots can then be \emph{reclaimed}. In
+for reachable values from a program's roots: values , including cycles of
+values, that are not reachable from the roots can then be \emph{reclaimed}. In
 contrast, a pure reference counting GC does not scan memory, and thus cannot
-free objects that form a cycle. Increasingly, GC implementations make use of
+free values that form a cycle. Increasingly, GC implementations make use of
 multiple techniques (see~\citep{bacon04unified}) but, for simplicity's sake,
 we assume that implementations wholly use one
 technique or another except otherwise stated. For brevity, we use `GC' as a short-hand for `tracing
@@ -313,7 +313,7 @@ ways. \lstinline{Gc<T>} can be dereferenced to \lstinline{&T} which
 can then, as with any other reference, be converted to \texttt{*const T}
 (i.e.~a C-esque pointer to T). \lstinline{Gc<T>} also supports the common Rust
 functions (\lstinline{into_raw} and \lstinline{from_raw}) which wrap
-the object-to-pointer conversion in a slightly higher-level API. The ability to
+the value-to-pointer conversion in a slightly higher-level API. The ability to
 convert references to raw pointers is used in many places (e.g.~Rust's standard
 C Foreign Function Interface (FFI)).
 We believe that a viable GC for Rust must allow the same conversions,
@@ -549,7 +549,7 @@ resurrection can be prevented if object access requires a level of indirection.
 \ourgc benefits from our better shared understanding of such problems and the
 potential solutions: it trivially addresses per-object/value finalization
 (\lstinline{Gc::new_unfinalizable} function turns finalization off for specific
-objects) and, as we shall see later, via only slightly more involved means,
+values) and, as we shall see later, via only slightly more involved means,
 object resurrection.
 
 However, that leaves many problems that are potentially in the middle: they are
@@ -987,7 +987,7 @@ restricted to types that implement both \lstinline{Send} and
 implement \lstinline{Send} than \lstinline{Sync}.
 
 It may seem sufficient for \lstinline{T} to implement \lstinline{Send}
-alone so that the object can be safely sent to the finalizer thread. However,
+alone so that the value can be safely sent to the finalizer thread. However,
 this would not prevent a finalizer indirectly accessing
 state shared with a non-GCed value via a mechanism such as \lstinline{Arc},
 causing the very problems we are trying to avoid.
@@ -1142,7 +1142,7 @@ types have not yet been replaced. FSA can
 still run on such functions, but will reject them unless all
 generic types imply the \lstinline{FinalizerSafe}, \lstinline{Send}, and
 \lstinline{Sync} traits. Note that calling a method on a generically typed
-object will lead to FSA finding a method without a body: as in the first case
+value will lead to FSA finding a method without a body: as in the first case
 above, this will cause FSA to fail.
 
 The common theme to both is that we wish FSA to be sound, at which
@@ -1291,8 +1291,8 @@ arena~\cite{chiovoloni15typed}).
     Run-time heap distribution.
     `Allocated' shows how many values are allocated directly (note that values
     of other types are allocated, but not shown). The `GC Owned' columns show: the proportion
-    of \lstinline{Gc<T>} objects (`Direct'); the proportion of memory owned by
-    \lstinline{Gc<T>} objects (`Transitive'). For example, a program consisting
+    of \lstinline{Gc<T>} values (`Direct'); the proportion of memory owned by
+    \lstinline{Gc<T>} values (`Transitive'). For example, a program consisting
     of a single \lstinline{Gc<Box<T>>} would have a `Direct' \lstinline{Gc<T>}
     proportion of 50\% and a `Transitive' proportion of 100\% since the
     \lstinline{Gc<T>} owns, and will thus free, the \lstinline{Box<T>}.}
@@ -1362,7 +1362,7 @@ total physical memory in RAM used by the process (including memory-mapped
 files, stack, and code/text segments), sampled at 10Hz; (2)
 \emph{heap footprint}, the amount of live heap memory recorded by
 by Heaptrack~\cite{wolff14heaptrack} at every allocation and deallocation;
-and (3) \emph{number of live heap objects}, also recorded in the same
+and (3) \emph{number of live heap values}, also recorded in the same
 way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
 the other (our changes to Heaptrack are now upstreamed). \jake{In the end we didn't use (3) in our main paper figures because it would have been too much data. Since we have the tables, we could make them available as Appendix entries} \laurie{good idea, if we have time!}
 
@@ -1475,7 +1475,7 @@ idea of the performance ceiling and floor for different approaches.
     The frequent plateaus and dips show that memory is being freed, but at a later
     point than one might initially expect.
     In contrast, \somrsbc JSON Small shows an actual memory
-    leak due to cycling objects in \lstinline{Rc<T>}, where \ourgc's heap footprint
+    leak due to cyclic objects in \lstinline{Rc<T>}, where \ourgc's heap footprint
     remains steady.}
     \label{fig:profiles}
 \end{figure}
@@ -1491,11 +1491,11 @@ benchmark on \somrsbc.
 
 Heaptrack also helped us understand why some benchmarks such as \ripgrep
 have much higher average heap sizes in \ourgc. \ripgrep
-allocates large numbers of short-lived objects: \boehm necessarily
+allocates large numbers of short-lived values: \boehm necessarily
 notices this much later than \rc. When we view its time-series data in~\cref{fig:profiles},
 we can see that the heap usage pattern
 over time is more complex than simply delaying deallocation would suggest.
-The reason for this is that many, but definitely not all, \ripgrep objects have
+The reason for this is that many, but definitely not all, \ripgrep values have
 finalizers; thus any given allocations lifetime can vary more under \ourgc
 than may initially be expected.
 
@@ -1819,7 +1819,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
   \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
   \item \cref{tab:app:elision:numgcs} (page~\pageref{tab:app:elision:numgcs}): Raw collection count data.
-  \item \cref{tab:app:elision:numgcallocs} (page~\pageref{tab:app:elision:numgcallocs}): Raw GC object allocation count data.
+  \item \cref{tab:app:elision:numgcallocs} (page~\pageref{tab:app:elision:numgcallocs}): Raw GC value allocation count data.
 \end{itemize}
 
 \begin{algorithm}[h]
@@ -2152,7 +2152,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
       }
   \end{subtable}
   \vspace{5pt}
-    \caption{Raw data for the number of \texttt{Gc<T>} objects allocated for
+    \caption{Raw data for the number of \texttt{Gc<T>} values allocated for
     each benchmark on the finalizer elision experiment. Values show arithmetic
     means with 99\% confidence intervals.}
     \label{tab:app:elision:numgcallocs}
