@@ -1277,7 +1277,7 @@ Note that for \Egcrc, it is impractical, and often impossible, to adapt all exis
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
 we compare \gc against \rc for
 all benchmarks. For \binarytrees, we are also able to compare \gc with two
-additional allocation strategies: \rustgc (a user library for GC for
+additional allocation strategies: \rustgcproj (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
 arena~\cite{chiovoloni15typed}).
 
@@ -1452,13 +1452,13 @@ interesting correlation: in general, the more of a codebase you convert to use
 \gc, the less the \ourgc overhead to become \jake{\somrsast is the counter argument} \laurie{why?}.
 
 \binarytrees is sufficiently simple that we also used it to compare against
-\typedarena and \rustgc. \laurie{we need a table, probably in the body but it
+\typedarena and \rustgcproj. \laurie{we need a table, probably in the body but it
 could be in the appendix, with two columns: benchmark name and time in seconds
 for each approach.} \jake{like this? \cref{tab:gcvs:raw}}
 \typedarena is much faster than the alternatives since it deallocates
 memory in one go at the end of the benchmark (as can clearly be
 seen in the time-series data in~\cref{fig:profiles}).
-\ourgc is significantly faster than \rustgc. Although we caution against
+\ourgc is significantly faster than \rustgcproj. Although we caution against
 over-interpreting a single benchmark, this does give us at least some
 idea of the performance ceiling and floor for different approaches.
 
@@ -1482,7 +1482,7 @@ idea of the performance ceiling and floor for different approaches.
     (i.e.~the amount of live memory) over time.
     \binarytrees shows an example
     of \ourgc having a comparable heap footprint to \lstinline{Rc<T>};
-    \rustgc's heap footprint is about 3--4$\times$ greater. \binarytrees is a
+    \rustgcproj's heap footprint is about 3--4$\times$ greater. \binarytrees is a
     perfect fit to \typedarena: it frees memory in one batch at the end, and
     because it is 80\% faster than \lstinline{Rc<T>} this `wind down' period is
     a substantial portion of the overall (quick!) execution.
@@ -1673,38 +1673,38 @@ mechanism by which objects are collected is rather different: they have
 a naive reference count, which causes objects outside a cycle to
 have deterministic destruction; and users can manually invoke a cycle
 detector, which uses trial deletion in the style of \citep{bacon01concurrent}\footnote{The term
-`trial deletion' does not appear in this paper, but it is now commonly used
-to describe this part of the algorithm in retrospect.} to identify objects in unused cycles. Cycle detection requires
+`trial deletion' does not appear in this paper, but is now commonly used
+to describe this part of the algorithm.} to identify objects in unused cycles. Cycle detection requires
 users manually implementing a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
-\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T: 'Static}
+\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T:'Static}
 lifetime bound on the type parameter passed to \lstinline{Cc<T>}. Simplifying
 slightly, this means that any references in such a type must be valid for the
 remaining lifetime of the program, a severe restriction. Unlike our approach to the access
 of already-finalized values (\cref{sec:cycles_and_finalization}), it can only detect
 such accesses at runtime, leading to a (safe) Rust \lstinline{panic}.
 
-Probably the best known GC for Rust is \rustgc~\cite{manish15rustgc} (partly
-covered in \cref{sec:destructor challenges}). \rustgc's \lstinline{Gc<T>} provides
+Probably the best known GC for Rust is \rustgcproj~\cite{manish15rustgc} (partly
+covered in \cref{sec:destructor challenges}). \rustgcproj's \lstinline{Gc<T>} provides
 a similar API to \ourgc, with the notable exception that its \lstinline{Gc<T>}
 is not, and cannot be, copyable, thus always requiring calls to
-\lstinline{Gc::clone}. Although, like \ourgc, \rustgc allows \lstinline{Gc<T>} values to
+\lstinline{Gc::clone}. Although, like \ourgc, \rustgcproj allows \lstinline{Gc<T>} values to
 be converted into pointers, its lack of conservative GC means that users
 must ensure that a \lstinline{Gc<T>} wrapper is kept alive for the entire
 lifetime of pointers derived from it. Similarly to \rustbacon,
 GCed values are reference counted, with occasional
-tracing sweeps to identify cycles, though \rustgc performs cycle detection
+tracing sweeps to identify cycles, though \rustgcproj performs cycle detection
 automatically (i.e.~it doesn't require manual calls to a function such as
 \lstinline{collect_cycles}). Drop methods are not used as finalizers: if a
 finalizer is required, a manual implementation of the \lstinline{Finalize} trait
 must be provided; finalizer glue can be largely, though not fully (see
 \cref{sec:destructor challenges}), automatically created by the provided
-\lstinline{Trace} macro. \rustgc detects accesses to already-finalized values
+\lstinline{Trace} macro. \rustgcproj detects accesses to already-finalized values
 dynamically at run-time, panicking if they occur. Unlike \rustbacon, these accesses
 are detected by recording what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
-panic. We have not yet verified whether cross-thread collection / sweeping can
+panic. We have yet verified whether cross-thread collection / sweeping can
 evade this check.
 
 An example of moving beyond reference counting in a GC for Rust is
@@ -1713,7 +1713,7 @@ be created by a \lstinline{Root<'root>}: the resulting \lstinline{Gc<'root, T>}
 is then tied to the lifetime of the
 \lstinline{Root<'root>}. This allows roots to be precisely identified, but
 requires explicitly having access to a \lstinline{Root<'root>} whenever a
-\lstinline{Gc<'root, T>} is used. As with \rustgc, \shifgrethor requires users
+\lstinline{Gc<'root, T>} is used. As with \rustgcproj, \shifgrethor requires users
 to manually implement a \lstinline{Finalize} trait, though \shifgrethor's is
 more restrictive: not only can other GCed values not be accessed (implicitly
 solving the same problem as \cref{sec:cycles_and_finalization}) but any other
