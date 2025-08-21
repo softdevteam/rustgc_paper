@@ -1182,7 +1182,7 @@ FSA. Our aim is that users should rarely need to resort to this escape hatch,
 but there are valid idioms of use where we found it necessary.
 
 
-\section{Performance Evaluation}
+\section{Evaluation}
 \label{sec:evaluation}
 
 \laurie{let's use smallcaps for all benchmarks all the time, including captions. or, if
@@ -1236,6 +1236,40 @@ package system) looking for suitable candidates. In practise this meant we
 looked for crates using \lstinline{Rc<T>} (which, in the interests of
 brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
 
+\begin{figure}[t]
+    \centering
+    \begin{subfigure}{0.49\textwidth}
+        \centering
+            \begin{adjustbox}{width=1\linewidth, valign=t}
+                \begingroup
+                    \setlength{\tabcolsep}{10pt}
+                    \renewcommand{\arraystretch}{1.4}
+                    \input{tables/conversion_source}
+                \endgroup
+            \end{adjustbox}%
+           \vspace*{7pt}
+        \caption{Source-level type conversions}
+        \label{subfig:mem:source}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{0.49\textwidth}
+        \importpgf{figures}{mem_distribution.pgf}
+        \label{subfig:mem:runtime}
+    \end{subfigure}
+    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
+    (including its dependencies) are ever used inside a \gc (etc.), counting
+    each \lstinline{struct} or equivalent at most once. For reference-counted
+    types we further separate strong and weak references, revealing how often
+    types must also be handled through weak references and thus the additional
+    effort imposed by reference-counting constraints. (b) shows the run-time
+    proportion of heap objects across the entire execution of each benchmark
+    suite where \gc refers to all memory owned by \gcs. As
+    this shows, our benchmark suites have diverse memory usage patterns. The
+    raw runtime distribution values are available in
+    \cref{tab:app:mem:conversion:runtime} in the Appendix.}
+    \label{fig:mem:conversion}
+\end{figure}
+
 \cref{tab:benchmarks} shows the resulting suite: note that, except
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
@@ -1243,7 +1277,9 @@ count the SOM implementations' (identical) benchmark suites collectively or
 separately -- 62 or 88 benchmarks. \cref{fig:mem:conversion} shows how after porting: how many
 different source-level shared-memory types are used; and how much memory at runtime is owned
 by \gcs. This shows that our benchmark suite contains benchmarks
-with a good distribution of memory patterns.
+with a good distribution of memory patterns. \cref{tab:app:mem:conversion:runtime} shows
+the number of run-time objects allocated, showing that our benchmarks allocate
+very different quantities of memory.
 
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
@@ -1281,39 +1317,22 @@ additional allocation strategies: \rustgcproj (a user library for GC for
 Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
 arena~\cite{chiovoloni15typed}).
 
-\begin{figure}[t]
-    \centering
-    \begin{subfigure}{0.49\textwidth}
-        \centering
-            \begin{adjustbox}{width=1\linewidth, valign=t}
-                \begingroup
-                    \setlength{\tabcolsep}{10pt}
-                    \renewcommand{\arraystretch}{1.4}
-                    \input{tables/conversion_source}
-                \endgroup
-            \end{adjustbox}%
-           \vspace*{7pt}
-        \caption{Source-level type conversions}
-        \label{subfig:mem:source}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.49\textwidth}
-        \importpgf{figures}{mem_distribution.pgf}
-        \label{subfig:mem:runtime}
-    \end{subfigure}
-    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
-    (including its dependencies) are ever used inside a \gc (etc.), counting
-    each \lstinline{struct} or equivalent at most once. For reference-counted
-    types we further separate strong and weak references, revealing how often
-    types must also be handled through weak references and thus the additional
-    effort imposed by reference-counting constraints. (b) shows the run-time
-    proportion of heap objects across the entire execution of each benchmark
-    suite where \gc refers to all memory owned by \gcs. As
-    this shows, our benchmark suites have diverse memory usage patterns. The
-    raw runtime distribution values are available in
-    \cref{tab:app:mem:conversion:runtime} in the Appendix.}
-    \label{fig:mem:conversion}
-\end{figure}
+\begin{table}[t]
+\small
+\begin{center}
+\input{tables/migration_stats}
+  \vspace{5pt}
+    \caption{
+      \laurie{merge rc and arc}
+      \laurie{let's remove the K from this table and report the literal numbers, to stop people (like me) thinking K == KiB}
+      Run-time statistics. ‘Allocated’ shows how
+    many \lstinline{Gc<T>} (etc.) objects were allocated. ‘GC Memory’ shows
+    what proportion of the heap \laurie{proportion in the sense of `proportion of number of objects' or `proportion of MiB'?} is directly or indirectly (via an embedded
+    smart pointer) allocated via \lstinline{Gc<T>}.}
+\label{tab:app:mem:conversion:runtime}
+\end{center}
+  \vspace{-8pt}
+\end{table}
 
 
 \subsubsection{What we couldn't include in the benchmark suite}
@@ -1459,17 +1478,6 @@ seen in the time-series data in~\cref{fig:profiles}).
 \ourgc is significantly faster than \rustgcproj. Although we caution against
 over-interpreting a single benchmark, this does give us at least some
 idea of the performance ceiling and floor for different approaches.
-
-\begin{table}[t]
-    \input{tables/gcvs_raw}
-    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
-    different memory management strategies across our benchmark suites. We
-    report the mean of 30 runs, with 99\% confidence intervals (CIs) shown as
-    upper and lower bounds. For all benchmark suites we use the geometric mean,
-    except for \emph{binary trees} and \emph{regex redux}, which are single
-    benchmarks where the arithmetic mean is reported.}
-    \label{tab:gcvs:raw}
-\end{table}
 
 
 \begin{figure}[t]
@@ -1819,12 +1827,12 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 \textbf{Misc.}
 \begin{itemize}
   \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
-  \item \cref{tab:app:mem:conversion:runtime} (page~\pageref{tab:app:mem:conversion:runtime}): Runtime allocation distribution statistics for benchmarks.
 \end{itemize}
 \textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
 
 \begin{itemize}
-    \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
+  \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
+  \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
   \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock performance comparison for each benchmark.
   \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
   \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
@@ -1859,18 +1867,15 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \end{center}
 \end{table}
 
-\begin{table}[t]
-\small
-\begin{center}
-\input{tables/migration_stats}
-  \vspace{5pt}
-    \caption{Statistics about benchmarks at run-time. ‘Allocated’ shows how
-    many \lstinline{Gc<T>} (etc.) objects were allocated. ‘GC Memory’ shows
-    what proportion of the heap is directly or indirectly (via an embedded
-    smart pointer) allocated via \lstinline{Gc<T>}.}
-\label{tab:app:mem:conversion:runtime}
-\end{center}
-  \vspace{-8pt}
+\begin{table}[h]
+    \input{tables/gcvs_raw}
+    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
+    different memory management strategies across our benchmark suites. We
+    report the mean of 30 runs, with 99\% confidence intervals (CIs) shown as
+    upper and lower bounds. For all benchmark suites we use the geometric mean,
+    except for \emph{binary trees} and \emph{regex redux}, which are single
+    benchmarks where the arithmetic mean is reported.}
+    \label{tab:gcvs:raw}
 \end{table}
 
 \begin{table}[h]
