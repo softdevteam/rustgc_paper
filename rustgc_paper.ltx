@@ -1618,47 +1618,36 @@ temporal aspects of GC; and, possibly, a poor fit with existing formalisms.
 The closest analogue we know of is the evolving research literature on memory
 models which, in a sense, modern GC is a superset of.
 
-Any performance judgements we make are necessarily contingent on our particular
-benchmark suite, including the proportion of benchmarks that we ported, and
+Any performance judgements we make are necessarily contingent on our methodology
+the benchmark suite we chose, including the proportion of benchmarks that we ported, and
 the way we process and present data. For
 example, we did not port external libraries to use \lstinline{Gc<T>} so many
 benchmarks use a variety of allocation strategies. Even had we ported
 everything, we would not be able to say, for example, that finalizer elision will always
 improve performance by exactly the factor we see in our experiment: there
 undoubtedly exist reasonable, non-pathological, programs which will see
-performance changes outside the ranges that our results suggest. Although the \Egcrc
-experiment requires a very specific benchmark suite, our other experiments
-would probably be a good fit for a standard benchmarking suite.
-Since the benchmark suite in this paper is the largest for any GC in Rust, it
-may serve as a partial basis for such a suite in the future.
+performance changes outside the ranges that our results suggest.
 
 Using \boehm as the allocator for all benchmarks has the advantage of removing
 `pure' allocator performance as a confounding factor, but does mean that some
-of the performance characteristics of benchmarks will be changed (e.g.~the
-impact on CPU caches). A generic, modern conservative GC, using the insights of
-recent non-GC allocators, would probably give a better idea of the true
-performance of \ourgc relative to other shared ownership strategies. To the
-best of our knowledge there is not currently an alternative production-quality
+of the performance characteristics of benchmarks will be changed (e.g~due to
+the portion of time we spend in the allocator; or \boehm's adaptive heap
+sizing strategy). A generic, modern conservative GC, using the insights of
+recent non-GC allocators, would almost certainly give different -- though
+we suspect not profoundly different -- results.
+To the best of our knowledge there is not currently an alternative production-quality
 modern, generic conservative, GC we could use instead, though we are aware of
 at least one attempt to create such an alternative: it will be interesting to rerun our
 experiments if and when that arrives.
 
-\jake{While we measure the wall-clock time of different fixed heap sizes, our
-main evaluation for \Eelision \Epremopt is carried out on a single heap
-configuration (\boehm's growing default). This means that we must scope our
-conclusions to this alone and that they may not necessarily be true for other
-heap sizes. see section 3.1
-\url{https://dl.acm.org/doi/pdf/10.1145/1378704.1378723} }
+The RSS memory metric we collect is at Linux's whim: if it does not update as
+frequently as we expect, we will see artificially `smoothed' data that may
+miss out peaks and troughs. Similar, our interpolation of data onto a normalised
+grid can also smooth data. We manually checked a large quantity of data to
+ensure this was not a significant effect, and the fact that we run benchmarks
+30 times means makes it more likely that peaks and troughs are caught at least
+sometimes.
 
-\jake{for memory metrics, should we mention that for RSS we are at the whims of
-/proc/stats update frequency, which if not granular enough, can smooth out mmap
-spikes and give the illusion that we use less memory than we do. We should also
-say that when interpolating to a fixed grid this is by definition lossy and we
-can hide GC spikes in our visualizations. We mitigate this by choosing our
-sampling rate empirically by carefully checking that we don't elide spikes that
-would tell a different story and also by providing 99\% CIs from 30 runs those
-GC spikes will likely show up as additional shaded regions because the
-likelihood is they will never be phase aligned across multiple runs}
 
 \section{Related work}
 \label{sec:related_work}
