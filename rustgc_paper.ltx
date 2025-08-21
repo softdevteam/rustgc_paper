@@ -138,7 +138,7 @@ idea or not.
 When we control for the
 (admittedly somewhat slow) conservative GC (\boehm) \ourgc currently uses, the performance of \ourgc varies from \gcvsgcperfbestratio to, in the worst case, \gcvsgcperfworstratio that of reference counting. Perhaps
 surprisingly, our results suggest that as more of a codebase is ported to
-\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero \laurie{is this still true?}.
+\ourgc's \lstinline{Gc<T>} type, the overhead trends towards zero \laurie{is this still true?} \jake{This is our hypothesis from \ripgrep but it's only one data point so maybe too strong a claim}.
 Furthermore, although \ourgc as an implementation
 is necessarily tied to Rust, most of the novel techniques in this paper rely on
 general properties of affine types and ownership. Although we do not wish
@@ -473,7 +473,7 @@ Problem \#4 is impossible to solve in Rust as-is. One cannot define a function
 that can never be called --- what use would such a function have? It might seem
 tempting to have the \lstinline{finalize} method take ownership of the value,
 but \lstinline{Drop::drop} does not do so because that would not allow drop
-glue to be run afterwards.
+glue to be run afterwards. \jake{and this would only solve a subset of this problem -- use once. it wouldn't help with stopping the function being called at all}
 
 
 \subsection{General Challenges When Using Destructors as Finalizers}
@@ -501,7 +501,7 @@ First, if a thread exits due to an error, and the program is either not compiled
 unwinding, or the thread has crossed a non-unwinding ABI boundary, then
 destructors might not be run at all, where a GC will naturally run the
 equivalent finalizers: we do not dwell on this further, as both behaviours
-seem reasonable in their different contexts. Second, and more surprisingly, it is possible for finalizers in
+seem reasonable in their different contexts. \jake{We should definitely keep this as it's an important distinction when talking about finalizer/destructor trade-offs but I'm unconvinced that this is an example of finalizers running before equivalent destructors.   } Second, and more surprisingly, it is possible for finalizers in
 non-error situations to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}.
 
@@ -573,7 +573,7 @@ section, we tackle these problems in the order above, noting that we tackle prob
 
 As we shall see in \cref{sec:evaluation}, there is a correlation between the
 number of finalizers that are run and overhead from GC (with a worst case in
-our experiment of \elisionnaiveworstratio slowdown). In this section
+our experiment of \elisionnaiveworstratio slowdown \jake{This is on a single benchmark in the \somrsast suite. Should we mention this, or is this TMI at this stage? }). In this section
 we show how to reduce the number of finalizers that are run, which helps
 reduce this overhead.
 
@@ -581,7 +581,7 @@ A variety of factors contribute to the finalizer performance overhead, including
 a queue of finalizers
 must be maintained, whereas destructors can be run immediately; finalizers run
 some time after the last access of a value, making cache misses more likely; and
-finalizers cause objects to live for longer (e.g.~leading to increased marking overhead).
+finalizers cause objects to live for longer (e.g.~leading to increased marking overhead). \jake{This is true. But I worry that at face value it seems to contradict our observations in figure 4 in the evaluation. We claim that for \ripgrep elision can introduce heap drag. These are not mutually exclusive: in this section, i think we're talking about how if finalizers can hold references to other \gc then we have to wait multiple cycles for these to be reclaimed. In our \ripgrep example, we state that finalizers get run before the object is swept so the OS gets the memory back faster. These can both be true, but the wording of both sections right now makes it feel like they cant.}
 Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
 not suggest that it is missing optimisations which would overcome all of this overhead.
