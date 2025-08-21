@@ -819,34 +819,9 @@ blocks. Simplifying somewhat, function and drop method calls are represented as
 different kinds of \emph{terminators} on basic blocks. Terminators
 reference both a callee and a successor basic block.
 
-\begin{algorithm}[t]
-\small
-\caption{Removing elidable drops}
-\begin{algorithmic}
-\Function{RemoveElidableDrops}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-                \If {\Call{IsGcType}{$ty$}}
-                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
-                        \State \Call{ReplaceTerminator}{$basic\_block$}
-                    \EndIf
-                \EndIf
-            \EndIf
-      \EndFor
-\EndFunction
-\Function{ReplaceTerminator}{$basic\_block$}
-    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-    \State $block.terminator \gets last\_block.terminator$
-\EndFunction
-\end{algorithmic}
-  \label{alg:barrier_removal}
-\end{algorithm}
-
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies drop method terminators which reference elidable finalizers, and turns them into `goto' terminators
-to the successor basic basic block. \cref{alg:barrier_removal} presents a
+to the successor basic basic block. \cref{alg:barrier_removal} in the Appendix presents a
 more formal version of this algorithm.
 
 
@@ -1842,6 +1817,31 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \item \cref{tab:app:elision:numgcs} (page~\pageref{tab:app:elision:numgcs}): Raw collection count data.
   \item \cref{tab:app:elision:numgcallocs} (page~\pageref{tab:app:elision:numgcallocs}): Raw GC object allocation count data.
 \end{itemize}
+
+\begin{algorithm}[h]
+\small
+\caption{Removing elidable drops}
+\begin{algorithmic}
+\Function{RemoveElidableDrops}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
+                    \EndIf
+                \EndIf
+            \EndIf
+      \EndFor
+\EndFunction
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+    \State $block.terminator \gets last\_block.terminator$
+\EndFunction
+\end{algorithmic}
+  \label{alg:barrier_removal}
+\end{algorithm}
 
 \clearpage
 
