@@ -1251,7 +1251,7 @@ can be easily and meaningfully ported to a variety of shared ownership strategie
 of which have their own benchmark suites.
 \grmtools is a parsing library which uses \rc extensively
 in error recovery: we benchmarked it
-using 28KLoC of real Java source code into which we injected errors \jake{random syntax errors but with a consistent seed value so it can be reproduced}.
+using 28KLoC of real Java source code into which we injected errors \jake{random syntax errors but with a consistent seed value so it can be reproduced} \laurie{does that mean: we always try exactly the same syntax errors or ...?}.
 
 SOM is a small, but complete, language in the Smalltalk mould, which has a wide
 variety of implementations. Our suite includes two of these: \somrsast
@@ -1271,7 +1271,7 @@ either be rare at run-time (i.e.~not worth porting), or too difficult to port
 small number of cases we ended up introducing bugs -- generally deadlocks -- at
 which point we reverted to \lstinline{Rc<T>}. For example, \alacritty's UTF-8
 support ran into this problem, and we had to revert back to \lstinline{Rc<T>}
-for that portion of our port. \jake{Technically these are \arc. I wonder if we should mention earlier in our terminology section that when we talk about \rc we mean \rc and \arc unless otherwise stated. In various places I refer to them both with `\rc / \arc' which feels clumsy}
+for that portion of our port.
 
 Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
 programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
@@ -1353,10 +1353,8 @@ Fortunately, \ourgc is a strict superset of `normal' Rust: only if users
 explicitly opt into GC does \ourgc really become a `GC for Rust'. This allows
 us to use the same compiler, standard library, and so on, removing several
 potential confounding factor in our results. We compile two binaries:
-one with logging features compiled in and one without. We use the latter
-when reporting wall-clock and user-time (where it is important that logging
-does not change our results); and the former for all other metrics (where,
-by definition, we have to use logging). \jake{Technically we use the latter for our heaptrack and rss runs too because we don't log collector metrics when using these.}
+one without logging features compiled and one with. We only use the latter
+when reporting collector related metrics.
 
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
@@ -1380,24 +1378,24 @@ files, stack, and code/text segments), sampled at 10Hz; (2)
 by Heaptrack~\cite{wolff14heaptrack} at every allocation and deallocation;
 and (3) \emph{number of live heap objects}, also recorded in the same
 way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
-the other (our changes to Heaptrack are now upstreamed). \jake{In the end we didn't use (3) in our main paper figures because it would have been too much data. Since we have the tables, we could make them available as Appendix entries}
+the other (our changes to Heaptrack are now upstreamed). \jake{In the end we didn't use (3) in our main paper figures because it would have been too much data. Since we have the tables, we could make them available as Appendix entries} \laurie{good idea, if we have time!}
 
-Another confounding factor is the maximum \jake{one could argue the same for the initial heap size too. In our experiment we use a fixed size that never grows because that's what I observed Java GC papers do, but one could make the case that setting a higher initial heap size means that the GC does no work at all given sufficient headroom.} size of the GC heap: too-small values can lead
-to `thrashing' and poor performance; large values to fewer
-collections and, in general, better performance. What `small' and `large' are varies by benchmark,
+Another pair of confounding factors are the initial and maximum sizes of the GC heap: too-small values can lead
+to frequent resizing and/or `thrashing'; large values to unrealistically few
+collections. What `small' and `large' are varies by benchmark,
 and `careful' (or thoughtless) choices can significantly distort one's view of
 performance. \boehm uses an adaptive strategy by default, growing the heap
 size as it detects that it would benefit from doing so. To give some sense of
 whether a different strategy and/or heap size would make a difference,
 we ran our benchmarks with three different fixed heap sizes. Doing so
 affected wall-clock time by under 10\% and at most by 28\% (the detailed results are presented in
-\cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, we
-feel comfortable in saying that \boehm's default approach does not lead to misleading
-results.
+\cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, this
+suggests that \boehm's default heap sizing approach is reasonable, at least
+in our context.
 
 We ran each benchmark in our suite 30 times.
-We report wall-clock times in seconds recorded by the standard Unix \lstinline{time}
-utility \jake{Which records in ms but we post-process to seconds for formatting reasons}. The SOM benchmarks are run using its conventional \emph{rebench} tool;
+We report wall-clock times as returned by the standard Unix \lstinline{time}
+utility. The SOM benchmarks are run using its conventional \emph{rebench} tool;
 we adjusted \emph{rebench} to use \lstinline{time} for consistency with our
 other benchmarks. We ran all benchmarks on an \benchmarkcpu with \benchmarkram,
 running \benchmarkos. We turned off turbo boost and hyper-threading,
@@ -1416,9 +1414,9 @@ speeds, which makes comparisons difficult. We thus resampled each benchmark's
 data to 1000 evenly spaced points using linear interpolation. We chose 1000 samples because it is
 considerably above the visual resolution of our plots.
 After normalization, we calculated the arithmetic mean of the memory footprint
-measurement at each grid point across all runs of the same benchmark. We record
+measurement at each grid point (and not the raw underlying data) across all runs of the same benchmark. We record
 99\% confidence intervals at each point and show the result as shaded
-regions around the mean. \jake{Might be worth mentioning that when we show plots of average memory we take the arithmetic mean across all the points on the grid and not of the raw samples}
+regions around the mean.
 
 
 \subsection{Results}
