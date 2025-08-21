@@ -1211,50 +1211,29 @@ package system) looking for suitable candidates. In practise this meant we
 looked for crates using \lstinline{Rc<T>} (which, in the interests of
 brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
 
-\begin{figure}[t]
-    \centering
-    \begin{subfigure}{0.49\textwidth}
-        \centering
-            \begin{adjustbox}{width=1\linewidth, valign=t}
-                \begingroup
-                    \setlength{\tabcolsep}{10pt}
-                    \renewcommand{\arraystretch}{1.4}
-                    \input{tables/conversion_source}
-                \endgroup
-            \end{adjustbox}%
-           \vspace*{7pt}
-        \caption{Source-level type conversions}
+\begin{table}[t]
+\small
+\begin{center}
+\input{tables/conversion_source}
+  \vspace{5pt}
+    \caption{ \laurie{remove the addlinespaces in this table and generally format it look more like the table on the following page}
+      How often each type is referenced in source code after our
+    porting. For reference-counted types, we further separate out strong and
+    weak references. This is a proxy for the extent of changes that cyclic
+    data-structures impose upon source code.}
         \label{subfig:mem:source}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{0.49\textwidth}
-        \importpgf{figures}{mem_distribution.pgf}
-        \label{subfig:mem:runtime}
-    \end{subfigure}
-    \caption{\laurie{is gc<t> here counting transitively reachable memory or not?}\jake{Yes. In (b) \gc counts transitively reachable memory. box <T> is therefore not all boxes, but all the remaining ones that are unrelated to gc} \laurie{in (a), let's merge rc<t> and gc<t> into one to match (b)} (a) shows, after conversion, how many types in a benchmark suite
-    (including its dependencies) are ever used inside a \gc (etc.), counting
-    each \lstinline{struct} or equivalent at most once. For reference-counted
-    types we further separate strong and weak references, revealing how often
-    types must also be handled through weak references and thus the additional
-    effort imposed by reference-counting constraints. (b) shows the run-time
-    proportion of heap objects across the entire execution of each benchmark
-    suite where \gc refers to all memory owned by \gcs. As
-    this shows, our benchmark suites have diverse memory usage patterns. The
-    raw runtime distribution values are available in
-    \cref{tab:app:mem:conversion:runtime} in the Appendix.}
-    \label{fig:mem:conversion}
-\end{figure}
+\end{center}
+  \vspace{-8pt}
+\end{table}
 
 \cref{tab:benchmarks} shows the resulting suite: note that, except
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
 count the SOM implementations' (identical) benchmark suites collectively or
-separately -- 62 or 88 benchmarks. \cref{fig:mem:conversion} shows how after porting: how many
-different source-level shared-memory types are used; and how much memory at runtime is owned
-by \gcs. This shows that our benchmark suite contains benchmarks
-with a good distribution of memory patterns. \cref{tab:app:mem:conversion:runtime} shows
-the number of run-time objects allocated, showing that our benchmarks allocate
-very different quantities of memory.
+separately -- 62 or 88 benchmarks. \cref{subfig:mem:source} shows how many
+different source-level shared-memory types are used after porting. \cref{tab:app:mem:conversion:runtime}
+shows the distribution of heap data at run-time. This shows that our benchmark suite contains benchmarks
+with a variety of memory patterns.
 
 \binarytrees is allocation intensive and sufficiently simple that it
 can be easily and meaningfully ported to a variety of shared ownership strategies.
@@ -1307,12 +1286,16 @@ arena~\cite{chiovoloni15typed}).
 \input{tables/migration_stats}
   \vspace{5pt}
     \caption{
-      \laurie{merge rc and arc}
+      \laurie{merge rc and arc} \laurie{change `GC Memory (\%)' to `GC Owned (\%)'}
       \laurie{let's remove the K from this table and report the literal numbers, to stop people (like me) thinking K == KiB}
-      Run-time statistics. ‘Allocated’ shows how
-    many \lstinline{Gc<T>} (etc.) objects were allocated. ‘GC Memory’ shows
-    what proportion of the heap \laurie{proportion in the sense of `proportion of number of objects' or `proportion of MiB'?} \jake{propertion of number of objects} is directly or indirectly (via an embedded
-    smart pointer) allocated via \lstinline{Gc<T>}.}
+    Run-time heap distribution.
+    `Allocated' shows how many values are allocated directly (note that values
+    of other types are allocated, but not shown). The `GC Owned' columns show: the proportion
+    of \lstinline{Gc<T>} objects (`Direct'); the proportion of memory owned by
+    \lstinline{Gc<T>} objects (`Transitive'). For example, a program consisting
+    of a single \lstinline{Gc<Box<T>>} would have a `Direct' \lstinline{Gc<T>}
+    proportion of 50\% and a `Transitive' proportion of 100\% since the
+    \lstinline{Gc<T>} owns, and will thus free, the \lstinline{Box<T>}.}
 \label{tab:app:mem:conversion:runtime}
 \end{center}
   \vspace{-8pt}
@@ -1447,7 +1430,7 @@ in~\cref{fig:gcvs:summary}. The broad story we can see from this
 data is that \ourgc, after controlling for the allocator and considering
 confidence intervals, has an overhead on wall-clock time of around 5\%, with some benchmarks
 slower and some faster. When this data is interpreted with
-the heap distribution data found in \cref{subfig:mem:runtime}, and finalizer
+the heap distribution data found in \cref{tab:app:mem:conversion:runtime}, and finalizer
 metrics in \cref{fig:elision:metrics}, these results suggest an
 interesting correlation: in general, the more of a codebase you convert to use
 \gc, the less the \ourgc overhead to become \jake{\somrsast is the counter
@@ -1521,7 +1504,7 @@ than may initially be expected.
     \importpgf{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various metrics. The top-left
     plot \laurie{i still struggle to understand the top-left plot e.g.~som-rs-bc}
-    should be read in conjunction with~\cref{subfig:mem:runtime}. The other
+    should be read in conjunction with~\cref{tab:app:mem:conversion:runtime}. The other
     plots use `no finalizer elision' as the normalization base (i.e.~values
     below 1 show that finalizer elision improves a metric). Total GC pause
     time is the cumulative time spent in stop-the-world collections. User time
@@ -1986,7 +1969,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
         \caption{Heap usage behaviour of all \ripgrep benchmarks. The $x$-axis
         shows time (normalised across all executions). The $y$-axis shows
         heap usage (in MiB, with 99\% confidence intervals). A subset of these
-        benchmarks is used in the main paper in \cref{fig:ripgrep_subset}. }
+        benchmarks is used in the main paper in \cref{fig:profiles}. }
         \label{fig:app:gcvs:mem:ripgrep}
     \end{figure}
 \end{landscape}
