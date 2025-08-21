@@ -1740,18 +1740,18 @@ part of the \emph{Piccolo} VM  (which was itself previously called
 main loop which is a natural point for a program to relinquish references
 to the GCed heap, but this is not true of many other GCed programs.
 
-One of several extensions of \rustgc is \bronze, which aims to improve
-upon \rustgc in two ways~\citep{coblenz21bronze}. First, \bronze tries
+One of several extensions of \rustgcproj is \bronze, which aims to improve
+upon \rustgcproj in two ways~\citep{coblenz21bronze}. First, \bronze tries
 to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stack-maps (a run-time mechanism for accurately
 tracking active pointers). This rules out the false positives that are
 inevitable in conservative GC. However, \bronze
 does not track nested references: if a \lstinline{Gc<T>} is used as a field in a struct, it
-will not be tracked by the GC, leading to undefined behaviour. Second, \bronze tries to give GC in
+will not be tracked by the GC, leading to undefined behaviour. Second, \bronze tried\footnote{This
+feature was recently disabled in the main branch of \bronze.} to give GC in
 Rust similar semantics to non-ownership languages such as Java. It does this by
 allowing shared mutation, undermining Rust's borrow checker, and also leading
-to undefined behaviour. See \cref{lst:bronze_unsound} for an
-example of a problematic program in \bronze.
+to undefined behaviour.
 
 Chrome's rendering engine \emph{Blink} uses the conservative GC
 \textsc{Oilpan}. It has the interesting property that it has two classes of
@@ -2150,44 +2150,5 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     means with 99\% confidence intervals.}
     \label{tab:app:elision:numgcallocs}
 \end{table}
-
-\clearpage
-
-\begin{figure}[!t]
-\begin{lstlisting}[
-  language=Rust,
-  basicstyle=\footnotesize\ttfamily,
-  caption={An example of unsoundness in Bronze (directly inspired by
-    \url{https://github.com/mcoblenz/Bronze/issues/2\#issue-1021510658}) based on
-    its ability to allow
-    aliased mutable references. Here, we obtain two mutable references to the
-    same underlying vector (lines 5-6), before using the second reference to
-    resize the vector, which forces its backing store to be reallocated in
-    memory (line 15). Later, when we try to access an element through the first
-    reference, it no longer points to valid memory (line 15).
-    },
-  label={lst:bronze_unsound}
-]
-fn main() {
-  let mut gr1 = GcRef::new(vec![1u16,2,3]);
-  let mut gr2 = gr1.clone();
-
-  let ref1 = gr1.as_mut();
-  let ref2 = gr2.as_mut();
-
-  // ref1 and ref2 now reference the same object:
-  ref1.push(4);
-  ref2.push(5);
-  ref1.push(6);
-
-  let ref1elem0 = ref1.get_mut(0).unwrap();
-  // Force reallocation of the underlying vec
-  ref2.resize(1024, 0);
-  // Now this writes to deallocated memory
-  *ref1elem0 = 42;
-}
-\end{lstlisting}
-\end{figure}
-
 
 \end{document}
