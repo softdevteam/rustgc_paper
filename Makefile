@@ -27,7 +27,7 @@ ARXIV_BASE=arxiv
 
 all: appendices.pdf main.pdf rustgc_paper.pdf
 
-rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) rustgc_paper_preamble.fmt $(LATEX_FILES)
+rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) $(LATEX_FILES)
 	pdflatex  -shell-escape rustgc_paper.ltx
 	bibtex rustgc_paper
 	pdflatex  -shell-escape rustgc_paper.ltx
