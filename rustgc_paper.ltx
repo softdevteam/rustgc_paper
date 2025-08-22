@@ -1546,7 +1546,7 @@ for example, \rc can use a modern allocator such as jemalloc.
 Much has changed in the performance of allocators since \boehm's 1980s
 roots: in \rc-only benchmarks, we observe an inherent overhead
 from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
-and \cref{fig:app:gcvs:wallclock} in the Appendix), which is a significant, and variable, confounding factor.
+in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
@@ -1985,7 +1985,6 @@ In this appendix, we provide supplementary plots for our performance evaluation.
 \begin{itemize}
   \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
   \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
-  \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock performance comparison for each benchmark.
   \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
   \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
   \item \cref{tab:app:gcvs:fixed:heap}
@@ -2059,31 +2058,6 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     \label{tab:app:gcvs:alloc:cost}
 \end{table}
 
-\newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
-\begin{figure}[htbp!]
-    \centering
-
-    \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_gcvs_wallclock.pdf}
-    \caption{\laurie{this caption no longer reflects the labels} A comparison of the wall-clock performance of GC (using \ourgc)
-    against two Rust reference counting (\arc, \rc) configurations across all
-    benchmarks. The reference counting configurations are: \gcvsbaseline
-    (standard RC with jemalloc allocator, using unmodified benchmarks) and
-    \gcvsrc (RC configured to use \boehm's allocator for controlled comparison
-    with GC). Note that \fd, \ripgrep, and \alacritty use atomic reference
-    counting, while all other benchmarks use non-atomic reference counting.\\\\
-    Performance is shown as relative speedup/slowdown, with all
-    results normalized to \gcvsbaseline (represented by the black horizontal
-    line at x=1.0). Blue bars show GC performance and orange bars show \gcvsrc
-    performance. Each bar represents the geometric mean across \benchmarkpexecs
-    iterations, with error bars indicating 99\% confidence intervals. The solid
-    vertical lines display the overall geometric mean performance ratio across
-    all benchmarks for each configuration, with shaded regions showing 99\%
-    confidence intervals. Raw wall-clock measurements (non-normalized) are
-    provided in \cref{tab:app:gcvs:wallclock} on the following page.}
-    \label{fig:app:gcvs:wallclock}
-\end{figure}
-\restoregeometry
-
 \begin{table}[t]
   \begin{subtable}{0.49\textwidth}
     \centering
@@ -2103,9 +2077,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
     and include 99\% confidence intervals. Because \binarytrees and \regexredux
     are stand-alone benchmarks they are omitted here; their timings appear in
-    \cref{tab:gcvs:raw}. These raw results form the basis of the normalised
-    performance ratios plotted in \cref{fig:app:gcvs:wallclock} on the previous
-    page.}
+    \cref{tab:gcvs:raw}.}
     \label{tab:app:gcvs:wallclock}
 \end{table}
 
