@@ -3,6 +3,26 @@
 
 \begin{document}
 
+\title{Garbage Collection for Rust: The Finalizer Frontier}
+
+\author{Jacob Hughes}
+\orcid{0009-0002-5321-0645}
+\affiliation{%
+  \institution{King's College London}
+  \city{London}
+  \country{United Kingdom}
+}
+\email{jh@jakehughes.uk}
+
+\author{Laurence Tratt}
+\orcid{0000-0002-5258-3805}
+\affiliation{%
+  \institution{King's College London}
+  \city{London}
+  \country{United Kingdom}
+}
+\email{laurie@tratt.net}
+
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
 makes expressing data-structures that require shared ownership awkward,
@@ -17,6 +37,26 @@ automatically being reused as finalizers; \emph{finalizer elision} optimises
 away unnecessary finalizers; and \emph{premature finalizer prevention}
 ensures that finalizers are only run when it is provably safe to do so.
 \end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+<concept>
+<concept_id>10011007.10011006.10011041</concept_id>
+<concept_desc>Software and its engineering~Compilers</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+<concept>
+<concept_id>10011007.10010940.10010941.10010949.10010950.10010954</concept_id>
+<concept_desc>Software and its engineering~Garbage collection</concept_desc>
+<concept_significance>500</concept_significance>
+</concept>
+</ccs2012>
+\end{CCSXML}
+
+\ccsdesc[500]{Software and its engineering~Compilers}
+\ccsdesc[500]{Software and its engineering~Garbage collection}
+
+\keywords{Compilers, Garbage collection, Rust}
 
 \maketitle
 
