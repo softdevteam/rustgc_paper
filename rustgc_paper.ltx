@@ -1,5 +1,4 @@
 \documentclass[acmsmall]{acmart}
-% \citestyle{acmnumeric}
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -162,9 +161,6 @@
 
 \newcommand\rustcversion{1.79.0\xspace}
 
-\include{experiment_stats}
-\include{macros}
-
 %%% The following is specific to OOPSLA2 '25 and the paper
 %%% 'Garbage Collection for Rust: The Finalizer Frontier'
 %%% by Jacob Hughes and Laurence Tratt.
@@ -181,6 +177,9 @@
 \received[accepted]{2025-08-12}
 
 \begin{document}
+
+\include{experiment_stats}
+\include{macros}
 
 \title{Garbage Collection for Rust: The Finalizer Frontier}
 
