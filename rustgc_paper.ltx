@@ -1277,14 +1277,14 @@ arena~\cite{chiovoloni15typed}).
 \input{tables/mem_dist_raw}
   \vspace{5pt}
     \caption{
-    Run-time heap distributions. The `Allocated (\#)' column shows the number
+    Run-time heap distributions. The `Allocated (\#)' columns shows the number
     of values of each type that are allocated (note that most programs
     also allocate values of other types, but those are not shown directly here).
     The `GC Owned' columns shows the proportion of allocated values that
     are owned, directly and indirectly, by \lstinline{Gc<T>} values. 
     For example, a program consisting of a single \lstinline{Gc<Box<T>>} would have
-    100\% `GC Owned' because the \lstinline{Box<T>} is owned by the
-    \lstinline{Gc<T>}. As we shall later see, there can be a number of knock-on
+    a `GC Owned' value of 100\% because the \lstinline{Box<T>} is owned by the
+    \lstinline{Gc<T>}. As we shall see later, there can be a number of knock-on
     effects when a \lstinline{Gc<T>} owns other such values.}
 \label{tab:app:mem:conversion:runtime}
 \end{center}
