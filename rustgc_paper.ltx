@@ -1277,27 +1277,15 @@ arena~\cite{chiovoloni15typed}).
 \input{tables/mem_dist_raw}
   \vspace{5pt}
     \caption{
-      \laurie{merge rc and arc} \laurie{change `GC Memory (\%)' to `GC Owned (\%)'}
-      \laurie{let's remove the K from this table and report the literal numbers, to stop people (like me) thinking K == KiB}
-    Run-time heap distribution.
-    `Allocated' shows how many values are allocated directly (note that values
-    of other types are allocated, but not shown). The `GC Owned' columns show: the proportion
-    of \lstinline{Gc<T>} values (`Direct'); the proportion of memory owned by
-    \lstinline{Gc<T>} values (`Transitive'). For example, a program consisting
-    of a single \lstinline{Gc<Box<T>>} would have a `Direct' \lstinline{Gc<T>}
-    proportion of 50\% and a `Transitive' proportion of 100\% since the
-    \lstinline{Gc<T>} owns, and will thus free, the \lstinline{Box<T>}.}
-\label{tab:app:mem:conversion:runtime}
-\end{center}
-  \vspace{-8pt}
-\end{table}
-
-\begin{table}[t]
-\small
-\begin{center}
-\input{tables/mem_dist_pct}
-  \vspace{5pt}
-    \caption{With PCT}
+    Run-time heap distributions. The `Allocated (\#)' column shows the number
+    of values of each type that are allocated (note that most programs
+    also allocate values of other types, but those are not shown directly here).
+    The `GC Owned' columns shows the proportion of allocated values that
+    are owned, directly and indirectly, by \lstinline{Gc<T>} values. 
+    For example, a program consisting of a single \lstinline{Gc<Box<T>>} would have
+    100\% `GC Owned' because the \lstinline{Box<T>} is owned by the
+    \lstinline{Gc<T>}. As we shall later see, there can be a number of knock-on
+    effects when a \lstinline{Gc<T>} owns other such values.}
 \label{tab:app:mem:conversion:runtime}
 \end{center}
   \vspace{-8pt}
