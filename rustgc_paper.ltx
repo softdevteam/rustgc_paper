@@ -283,7 +283,7 @@ Workarounds such as reference counting impose an extra burden on the programmer,
 make mistakes more likely, and often come with a performance penalty.
 
 In an attempt to avoid such problems, there are now a number of GCs for Rust
-(e.g.~\citet{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
+(e.g.~\cite{manish15rustgc, coblenz21bronze, gcarena, boa, shifgrethor}). Most
 introduce a user-visible type \lstinline{Gc<T>} which takes a value $v$
 of type \lstinline{T} and moves $v$ to the `GC heap'. The \lstinline{Gc<T>}
 value itself is a wrapper around a pointer to $v$ on the GC heap.
@@ -480,7 +480,7 @@ for reachable values from a program's roots: values , including cycles of
 values, that are not reachable from the roots can then be \emph{reclaimed}. In
 contrast, a pure reference counting GC does not scan memory, and thus cannot
 free values that form a cycle. Increasingly, GC implementations make use of
-multiple techniques (see~\citep{bacon04unified}) but, for simplicity's sake,
+multiple techniques (see~\cite{bacon04unified}) but, for simplicity's sake,
 we assume that implementations wholly use one
 technique or another except otherwise stated. For brevity, we use `GC' as a short-hand for `tracing
 GC'; when we deal with other kinds of GC (e.g.~reference counting), we
@@ -562,8 +562,8 @@ speaking, unsound; and furthermore some languages (including Rust) allow
 arbitrary `bit fiddling' on pointers that temporarily
 obscures the address they are referring to. Despite this, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink
-rendering engine~\citep{ager13oilpan} and Safari uses it in its JavaScript VM
-JavaScriptCore~\citep{pizlo17riptide}. Even in 2025, we lack good alternatives
+rendering engine~\cite{ager13oilpan} and Safari uses it in its JavaScript VM
+JavaScriptCore~\cite{pizlo17riptide}. Even in 2025, we lack good alternatives
 to conservative GC: there is no cross-platform API for precise GC; and while
 some compilers such as LLVM provide some support for GC
 features~\cite{llvm14statepoints}, we have found them incomplete and buggy.
@@ -1136,7 +1136,7 @@ or wholly `finalized'.
 
 Most languages and systems we are aware of assume that users either don't run into
 this problem (finalization cycles are considered rare in GCed
-languages~\citep[p.~229]{jones23garbage}) or know how to deal
+languages~\cite[p.~229]{jones23garbage}) or know how to deal
 with it when they do (e.g.~refactoring the types into parts that do and don't
 require finalization~\cite[p.~11]{boehm03destructors}). There is no fully
 automatic solution to this problem. Some GCs
@@ -1827,17 +1827,17 @@ short-lived, cycle detectors~\cite{hoare22cycles}. Managed pointer support was r
 \url{https://github.com/rust-lang/rust/commit/ade807c6dcf6dc4454732c5e914ca06ebb429773}.}
 around a year before the first stable release of Rust. This was not the end
 of the story for `GC as a core part of Rust', with core Rust developers exploring
-the problem space in more detail~\citep{felix15specifying, felix16roots,
+the problem space in more detail~\cite{felix15specifying, felix16roots,
 manish16gc}. Over time these efforts dwindled, and those interested in GC for Rust largely moved from anticipating
 \rustc support to expecting to have to do everything in user-level libraries.
 
 One of the earliest user-level GC for Rust libraries is
-\rustbacon~\citep{rustbacon}. This provides a type \lstinline{Cc<T>}
+\rustbacon~\cite{rustbacon}. This provides a type \lstinline{Cc<T>}
 which is similar in intention to \ourgc's \lstinline{Gc<T>}.  The
 mechanism by which objects are collected is rather different: they have
 a naive reference count, which causes objects outside a cycle to
 have deterministic destruction; and users can manually invoke a cycle
-detector, which uses trial deletion in the style of \citep{bacon01concurrent}\footnote{While
+detector, which uses trial deletion in the style of \citet{bacon01concurrent}\footnote{While
 the term `trial deletion' does not appear in the original paper, it is now widely used
 to describe part of the algorithm.} to identify objects in unused cycles. Cycle detection requires
 users manually implementing a \texttt{Trace} trait which
@@ -1890,7 +1890,7 @@ implementing the unsafe \lstinline{UnsafeFinalize} trait. We view
 in normal Rust without reference counting is possible, though it cannot
 deal with references being converted into pointers and \lstinline{usize}s.
 
-A different means of tackling the root-finding problem is \textsc{GcArena}~\citep{gcarena},
+A different means of tackling the root-finding problem is \textsc{GcArena}~\cite{gcarena},
 which uses branding in a similar way to
 \lstinline{GhostCell}s (see \cref{sec:background}). In essence, users provide
 a special `root' type which is the only place where roots can be stored.
@@ -1906,7 +1906,7 @@ part of the \emph{Piccolo} VM  (which was itself previously called
 main loop which is a natural point for a program to relinquish references
 to the GCed heap, but this is not true of many other GCed programs.
 
-One attempt to improve upon \rustgcproj is \bronze~\citep{coblenz21bronze},
+One attempt to improve upon \rustgcproj is \bronze~\cite{coblenz21bronze},
 though it shows how challenging it can be to meaningfully improve GC for Rust: both of
 its main advances have subsequently been disabled because they are not only unsound
 but lead to crashes. First, \bronze tried to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
