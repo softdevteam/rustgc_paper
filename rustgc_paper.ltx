@@ -1622,9 +1622,9 @@ which is similar in intention to \ourgc's \lstinline{Gc<T>}.  The
 mechanism by which objects are collected is rather different: they have
 a naive reference count, which causes objects outside a cycle to
 have deterministic destruction; and users can manually invoke a cycle
-detector, which uses trial deletion in the style of \citep{bacon01concurrent}\footnote{The term
-`trial deletion' does not appear in this paper, but is now commonly used
-to describe this part of the algorithm.} to identify objects in unused cycles. Cycle detection requires
+detector, which uses trial deletion in the style of \citep{bacon01concurrent}\footnote{While
+the term `trial deletion' does not appear in the original paper, it is now widely used
+to describe part of the algorithm.} to identify objects in unused cycles. Cycle detection requires
 users manually implementing a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
