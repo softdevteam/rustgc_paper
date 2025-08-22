@@ -1692,10 +1692,9 @@ main loop which is a natural point for a program to relinquish references
 to the GCed heap, but this is not true of many other GCed programs.
 
 One attempt to improve upon \rustgcproj is \bronze~\citep{coblenz21bronze},
-though it shows the difficulties faced in advancing GC for Rust: both of
-its main advances have subsequently been disabled because they are unsound
-and lead to undefined behaviour.
-First, \bronze tried to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
+though it shows how challenging it can be to meaningfully improve GC for Rust: both of
+its main advances have subsequently been disabled because they are not only unsound
+but lead to crashes. First, \bronze tried to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stack-maps (a run-time mechanism for accurately
 tracking active pointers). This rules out the false positives that are
 inevitable in conservative GC. However, \bronze
