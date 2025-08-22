@@ -1213,7 +1213,7 @@ to cover both the \lstinline{Rc<T>} and \lstinline{Arc<T>} reference counting ty
 \begin{center}
 \input{tables/mem_dist_src}
   \vspace{5pt}
-    \caption{How often each type is referenced in source code after our
+    \caption{How often relevant types are referenced in source code after our
     porting. For \rc, we also show how many weak references are left in:
     this is a proxy both for partial porting, and also how the extent
     weak references. This is a proxy for the extent of changes that cyclic
@@ -1227,13 +1227,15 @@ to cover both the \lstinline{Rc<T>} and \lstinline{Arc<T>} reference counting ty
 for \binarytrees and \regexredux, the `benchmarks' are themselves
 benchmark suites. Collectively, our suite contains -- depending on whether you
 count the SOM implementations' (identical) benchmark suites collectively or
-separately -- 62 or 88 benchmarks. \cref{subfig:mem:source} shows how many
-different source-level shared-memory types are used after porting. \cref{tab:app:mem:conversion:runtime}
-shows the distribution of heap data at run-time. This shows that our benchmark suite contains benchmarks
+separately -- 62 or 88 benchmarks. \cref{subfig:mem:source} shows how often
+relevant types are used after porting. \cref{tab:app:mem:conversion:runtime}
+shows the distribution of heap data at run-time. This shows that our suite contains benchmarks
 with a variety of memory patterns.
 
 \binarytrees is allocation intensive and sufficiently simple that it
-can be easily and meaningfully ported to a variety of shared ownership strategies.
+can be easily and meaningfully ported to additional shared ownership strategies
+(\rustgcproj, a user library for GC for Rust~\cite{manish15rustgc}; and \typedarena, a non-GC memory
+arena~\cite{chiovoloni15typed}).
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites.
 \grmtools is a parsing library which uses \rc extensively
@@ -1255,18 +1257,9 @@ equivalent functionality with a copyable \gc type. In some cases we were able
 to successfully use alternative mechanisms. In others we judged the usages to
 either be rare at run-time (i.e.~not worth porting), or too difficult to port
 (i.e.~too much of the program is built around the resulting assumptions). In a
-small number of cases we ended up introducing bugs -- generally deadlocks -- at
-which point we reverted to \lstinline{Rc<T>}. For example, \alacritty's UTF-8
-support ran into this problem, and we had to revert back to \lstinline{Rc<T>}
-for that portion of our port.
-
-Note that for \Egcrc, it is impractical, and often impossible, to adapt all existing
-programs in our benchmark suite to all allocation strategies. As shown in \cref{fig:gcvs:summary},
-we compare \gc against \rc for
-all benchmarks. For \binarytrees, we are also able to compare \gc with two
-additional allocation strategies: \rustgcproj (a user library for GC for
-Rust~\cite{manish15rustgc}); and \typedarena (a non-GC memory
-arena~\cite{chiovoloni15typed}).
+small number of cases we ended up introducing bugs. \alacritty's UTF-8 support
+is an example, resulting in deadlocks. Whenever we encountered a bug in our porting,
+we reverted back to \lstinline{Rc<T>} for that portion of the port.
 
 \begin{table}[t]
 \small
@@ -1361,10 +1354,11 @@ performance. \boehm uses an adaptive strategy by default, growing the heap
 size as it detects that it would benefit from doing so. To give some sense of
 whether a different strategy and/or heap size would make a difference,
 we ran our benchmarks with three different fixed heap sizes. Doing so
-affected wall-clock time by under 10\% and at most by 28\% (the detailed results are presented in
+either has little effect or speeds benchmarks up; when it does so,
+the impact is generally under 10\% and is at most 28\% (the detailed results are presented in
 \cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, this
-suggests that \boehm's default heap sizing approach is reasonable, at least
-in our context.
+suggests that \boehm's default heap sizing approach, at least in our context,
+is not significantly distorting our view of performance.
 
 We ran each benchmark in our suite 30 times.
 We report wall-clock times as returned by the standard Unix \lstinline{time}
@@ -1378,15 +1372,16 @@ as both can colour results.
 \subsubsection{Data presentation}
 \label{sec:datapres}
 
-For most metrics, we report means and 99\% confidence intervals. We report the arithmetic mean
-for individual benchmarks, the geometric mean for benchmark suites.
+Except where otherwise stated, we report means and 99\% confidence intervals
+for all metrics. We use the arithmetic mean
+for individual benchmarks and the geometric mean for benchmark suites.
 
 When plotting time-series (i.e.~sampled) memory metrics, we face the challenge
 that different configurations of the same benchmark can execute at different
-speeds, which makes comparisons difficult. We thus resampled each benchmark's
+speeds. We thus resample each benchmark's
 data to 1000 evenly spaced points using linear interpolation. We chose 1000 samples because it is
 considerably above the visual resolution of our plots.
-After normalization, we calculated the arithmetic mean of the memory footprint
+After normalization, we calculate the arithmetic mean of the memory footprint
 measurement at each grid point (and not the raw underlying data) across all runs of the same benchmark. We record
 99\% confidence intervals at each point and show the result as shaded
 regions around the mean.
@@ -1416,9 +1411,8 @@ regions around the mean.
 \end{figure}
 
 The main results for \Egcrc can be seen in~\cref{fig:gcvs:summary}. Though
-there is variation across benchmarks --
-and after controlling for the allocator and considering confidence intervals -- on
-our benchmark suite, \ourgc has an overhead on wall-clock time of 5\%. The
+there is variation, \ourgc has an overhead on wall-clock time of 5\% on
+our benchmark suite. The
 effect on memory is more variable though, unsurprisingly, \ourgc typically has
 a larger average heap footprint (i.e.~allocated memory lives for longer). This
 metric needs to treated with slight caution: benchmarks which allocate
@@ -1435,7 +1429,7 @@ phase, a (relatively moderate) `work' phase, and a (relatively short) deallocati
 Put another way: these clear phases make \binarytrees very well suited to
 an arena-based approach. In the other approaches, the `work' phase occupies a
 much greater proportion of their execution, because it also incorporates
-allocator work. \ourgc is around 0.7$\times$ faster than \rc, but both
+allocator work. \ourgc is around 1.3$\times$ faster than \rc, but both
 have similar memory profiles. \ourgc is around 3$\times$ faster than \rustgcproj
 and has an average heap footprint around 4$\times$ smaller, reflecting
 \ourgc's advantage in not being a user-land library that relies in part on \rc.
@@ -1467,8 +1461,9 @@ idea of the performance ceiling and floor for different approaches.
 
 The time-series data in~\cref{fig:profiles} helps explain other factors.
 For example, it shows that \somrsbc leaks memory on the JSON Small benchmark
-(it probably also leaks in some other benchmarks, though rarely as visibly).
-This is because \rc keeps alive value in cycles; \ourgc does not leak memory on \somrsbc.
+(we suspect it also leaks in some other benchmarks, though rarely as visibly).
+This is because \rc keeps alive values in cycles; \ourgc does not leak memory on \somrsbc,
+as it naturally deals correctly with cycles.
 
 We can see from the time-series data that \ripgrep has a complex heap footprint
 pattern. This may suggest a memory leak, but in fact it is a consequence of the
@@ -1479,8 +1474,8 @@ with finalizers tend to have longer lifetimes, because they have to wait
 in the finalizer queue. However, when a finalizer calls \lstinline{free}
 on indirectly owned values, those are immediately marked as not live,
 rather than having to wait until the next collection to be discovered as such.
-This, albeit indirectly, explains the interleaved allocation and deallocation phases
-one can observe in \ripgrep's time-series data.
+This, albeit indirectly, explains the seemingly random peaks and troughs in
+memory usage one can observe in \ripgrep's time-series data.
 
 \begin{figure}[tb]
     \centering
@@ -1514,8 +1509,8 @@ allocations to be freed earlier than the GC itself does naturally, removing
 them can cause indirectly owned values to live for longer: \ripgrep's average heap
 footprint highlights this issue.
 
-The results for \Epremopt are shown in \cref{fig:premopt:summary}. We create
-three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
+The results for \Epremopt are shown in \cref{fig:premopt:summary}. We created
+three configurations of \ourgc. \emph{None} has no fences, and thus is unsound,
 but allows us to approximate (allowing for possible vagaries from running
 unsound code!) the best possible situation for fence removal. \emph{Naive}
 inserts all possible fences. \emph{Optimised} inserts only necessary fences.
