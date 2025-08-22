@@ -1204,8 +1204,9 @@ may not have been suitable for our purposes because in experiment \Egcrc we
 want to compare programs using existing shared ownership approaches. We searched through roughly the 100 most popular
 Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates. In practise this meant we
-looked for crates using \lstinline{Rc<T>} (which, in the interests of
-brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
+looked for crates using reference counting. In the interests of brevity,
+for the rest of this section we use `\lstinline{Rc<T>}'
+to cover both the \lstinline{Rc<T>} and \lstinline{Arc<T>} reference counting types.
 
 \begin{table}[t]
 \small
