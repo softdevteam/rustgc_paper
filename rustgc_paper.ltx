@@ -1842,7 +1842,7 @@ to describe part of the algorithm.} to identify objects in unused cycles. Cycle 
 users manually implementing a \texttt{Trace} trait which
 traverses a type's fields. Destructors
 are used as finalizers: to avoid the problems with Rust references we solved in
-\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T:'Static}
+\cref{sec:fsa_rust_references}, \rustbacon imposes a \lstinline{T:'static}
 lifetime bound on the type parameter passed to \lstinline{Cc<T>}. Simplifying
 slightly, this means that any references in such a type must be valid for the
 remaining lifetime of the program, a severe restriction. Unlike our approach to the access
@@ -1869,7 +1869,7 @@ must be provided; finalizer glue can be largely, though not fully (see
 dynamically at run-time, panicking if they occur. Unlike \rustbacon, these accesses
 are detected by recording what the collector's state is in: if the
 collector is in a `sweep' phase, any access of a \lstinline{Gc<T>} leads to a
-panic. We have yet verified whether cross-thread collection / sweeping can
+panic. We have not yet verified whether cross-thread collection / sweeping can
 evade this check.
 
 An example of moving beyond reference counting in a GC for Rust is
