@@ -1162,8 +1162,8 @@ contains a field that is not itself \lstinline{A}. Informally, we
 say that a negative implementation of an auto-trait \emph{pollutes} containing
 types.
 
-Our new auto trait is \lstinline{FinalizerSafe} with a single
-a negative implementation \texttt{impl<T>} \lstinline{!FinalizerSafe for Gc<T>}.
+Our new auto trait is called \lstinline{FinalizerSafe}, and we provide a single
+negative implementation \texttt{impl<T>} \lstinline{!FinalizerSafe for Gc<T>}.
 This naturally handles transitively reachable code, allowing FSA itself to only
 check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
@@ -1209,9 +1209,9 @@ this would not prevent a finalizer indirectly accessing
 state shared with a non-GCed value via a mechanism such as \lstinline{Arc},
 causing the very problems we are trying to avoid.
 
-FSA's eventual approach is thus very different: it ignores whether a type
+FSA thus ignores whether a type
 implements \lstinline{Send} or \lstinline{Sync} (or not) and instead examines
-the code the destructor runs. To pass FSA: the destructor must not access thread
+the destructor directly. To pass FSA: the destructor must not access thread
 locals; and any types the destructor accesses via projections must implement
 both \lstinline{Send} and
 \lstinline{Sync}. Intuitively, this allows a
