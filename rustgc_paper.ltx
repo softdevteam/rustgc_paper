@@ -1611,17 +1611,17 @@ regions around the mean.
     \importpgf{figures}{gcvs_perf.pgf}
     \caption{Comparing the effects of \gc and \rc on wall-clock time; heap footprint (i.e.~the size of
     the live set); and RSS. The baseline at 1 is \rc; values less than 1 show
-    \gc as faster; and the blue vertical line shows the geometric mean of ratios. The wall-clock times of \gc and
+    \gc as better than \rc; and the blue vertical line shows the geometric mean of ratios. The wall-clock times of \gc and
     \rc are similar; the RSS somewhat similar; and the average heap footprint often
     very different. Broadly speaking, \gc increases the average heap footprint
-    because GC (and especially finalization) causes values to live for longer.
+    because GC, and especially finalization, causes values to live for longer.
     Benchmarks which allocate relatively little memory (particularly \ripgrep
     as shown in \cref{tab:app:mem:conversion:runtime}) can
     exaggerate this effect. Perhaps surprisingly, the heap footprint and RSS do not
     correlate. This is partly because the sample rate for RSS is rather low
-    (which notably affects fast running benchmarks such as those for \fd) but
-    partly because RSS includes `headroom', that is memory beyond that needed
-    for the live set but which has not yet been returned to the OS.}
+    (which notably affects fast running benchmarks such as those for \fd) and
+    partly because RSS necessarily includes headroom, that is memory beyond that needed
+    for the live set (and which may later be returned to the OS).}
     \label{fig:gcvs:summary}
 \end{figure}
 
@@ -1641,8 +1641,8 @@ particularly illuminating (for completeness, \cref{tab:gcvs:raw} in the Appendix
 raw timings). \ourgc is around 3.5$\times$ slower than \typedarena. The
 time-series data for the latter shows it going through distinct phases: a (relatively long) allocation
 phase, a (relatively moderate) `work' phase, and a (relatively short) deallocation phase.
-Put another way: these clear phases make \binarytrees very well suited to
-an arena-based approach. In the other approaches, the `work' phase occupies a
+Put another way: these clear phases make \binarytrees a perfect match for
+an arena. In the other approaches, the `work' phase occupies a
 much greater proportion of their execution, because it also incorporates
 allocator work. \ourgc is around 1.3$\times$ faster than \rc, but both
 have similar memory profiles. \ourgc is around 3$\times$ faster than \rustgcproj
@@ -1718,7 +1718,7 @@ greater the proportion of the overall heap the memory owned by
 \lstinline{Gc<T>} is, the better the metrics become. However, there are several
 caveats. First, when all finalizers are removed, \boehm does not
 start a finalizer thread or invoke locking related to it, unduly flattering the time-based
-metrics. Second, the quantity of finalizers is only a loose proxy for cost:
+metrics. Second, the quantity of finalizers is only a partial proxy for cost:
 some finalizers free up large graphs of indirectly owned values,
 which can take some time to run. Third, some benchmarks change the work they do:
 \grmtools speeds up so much that its error recovery algorithm has time to do
@@ -1736,7 +1736,10 @@ inserts all possible fences. \emph{Optimised} inserts only necessary fences.
 Once confidence intervals are taken into account, there are
 simply no statistically significant results for this experiment. Although
 it is possible that benchmarking `noise' is hiding a meaningful result, our
-data suggests that any such differences are likely to be minimial.
+data suggests that any such differences are likely to be minimal. To make
+up for this disappointment, the fact that there is no difference between
+any of these suggests that on non-artificial benchmarks, premature finalizer
+prevention is not a noticeable cost.
 
 
 \section{Threats to validity}
