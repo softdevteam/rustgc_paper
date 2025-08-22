@@ -325,10 +325,10 @@ In a close cousin to our work,
 a GC proposal for C++, the reuse of destructors as finalizers was ruled out due to
 seemingly insoluble problems~\cite[p.~32]{boehm09garbage}, which we divide
 into four categories:
-(1) some safe destructors are not safe finalizers.
+(1) some safe destructors are not safe finalizers;
 (2) finalizers can be run prematurely;
 (3) running finalizers on the same thread as a paused mutator can cause race conditions and deadlocks;
-(4) and finalizers are prohibitively slower than destructors;
+(4) and finalizers are prohibitively slower than destructors.
 All are, at least to some degree, classical GC problems; all are exacerbated
 in some way by Rust; and none, with the partial exception of \#2, has
 existing solutions.
@@ -340,16 +340,16 @@ static guarantees. We thus gain a better GC for
 Rust \emph{and} solutions to open GC problems. Our solutions, in order, are:
 (1) \emph{finalizer safety analysis}
 extends Rust's static analyses to reject programs whose destructors are not
-provably safe to be used as finalizers.
+provably safe to be used as finalizers;
 (2) \emph{premature finalizer prevention} automatically inserts fences to prevent
 the GC from being `tricked' into collecting values before they are dead;
 (3) we run finalizers on a separate thread; and
 (4) and \emph{finalizer elision} statically optimises away finalizers if the
-underlying destructor duplicates the GC's work;
+underlying destructor duplicates the GC's work.
 
-Although \ourgc as an implementation
-is necessarily tied to Rust, most of the novel techniques in this paper rely on
-general properties of affine types and ownership. Although we do not wish
+\ourgc as an implementation
+is necessarily tied to Rust, though most of the novel techniques in this paper rely on
+general properties of affine types and ownership. While we do not wish
 to claim generality without evidence, it seems likely that
 many of the techniques in this paper will generalise to other
 ownership-based languages, as and when such emerge.
@@ -391,7 +391,7 @@ readers to skip material they are already comfortable with.
     0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
     \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
     variables point to the same cyclic graph (line 10). Accessing a neighbour
-    node becomes a delicate dance requiring upgrading the weak reference (line 11).
+    node becomes a delicate dance requiring upgrading the weak reference (line 12).
     The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
     (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
     creates significant extra complexity relative to~\cref{fig:first_example}: compare
@@ -456,7 +456,7 @@ unsafe Rust are unlikely to immediately reach the same level of trustworthiness.
 
 While we do not believe that every Rust program would be improved by GC, the
 variety of workarounds already present in Rust code, and the difficultly
-of creating new ones, suggests that a substantial subset might benefit from GC.
+of creating new ones, suggests that there is a subset that would benefit from GC.
 
 
 \subsection{GC terminology}
@@ -558,8 +558,8 @@ it at under 0.01\% of the live set~\cite{shahriyar14fast}).
 Conservative GC occupies a grey zone in programming language semantics: in most
 languages, and most compiler's internal semantics, conservative GC is, formally
 speaking, unsound; and furthermore some languages (including Rust) allow
-arbitrary `bit fiddling' on pointers that temporarily
-obscures the address they are referring to. Despite this, conservative GC is widely used,
+arbitrary `bit fiddling' on pointers, temporarily
+obscuring the address they are referring to. Despite this, conservative GC is widely used,
 including in the two most widespread web browsers: Chrome uses it in its Blink
 rendering engine~\cite{ager13oilpan} and Safari uses it in its JavaScript VM
 JavaScriptCore~\cite{pizlo17riptide}. Even in 2025, we lack good alternatives
@@ -592,7 +592,7 @@ to be mutably borrowed at run-time if there is only a single reference to it
 In contrast, \lstinline{Gc<T>} cannot know how many references
 there are to the underlying data. As we shall see in~\cref{sec:evaluation}, some Rust programs
 are built around the performance advantages of this API (e.g.~turning
-`copy on write` into just `write' in some important cases).
+`copy on write' into just `write' in some important cases).
 
 
 \subsection{Basic Implementation}
@@ -600,7 +600,7 @@ are built around the performance advantages of this API (e.g.~turning
 The most visible aspect of \ourgc is its fork, and extension of, the standard
 Rust compiler \rustc. We forked \rustc~\rustcversion, adding
 or changing approximately 5,500 Lines of Code (LoC) in the core compiler,
-and approximately 2,250 LoC are tests.
+and adding approximately 2,250 LoC of tests.
 
 \ourgc uses \boehm~\cite{boehm88garbage} as the underlying conservative GC, because it is the
 most widely ported conservative GC we know of. We use \boehm's \lstinline{GC_set_finalize_on_demand(1)} API,
@@ -616,8 +616,8 @@ because these are platform dependent. Fortunately, \rustc uses LLVM's
 thread local storage implementation, which stores such pointers in the
 \lstinline{PT_TLS} segment of the ELF binary: we modified \boehm to scan
 this ELF segment during each collection. Third,
-\boehm dynamically intercepts thread creation calls so that it cannot a
-then can scan their stacks, but (for bootstrapping
+\boehm dynamically intercepts thread creation calls so that it can
+can scan their stacks, but (for bootstrapping
 reasons) is unable to do so in our context: we explicitly changed \ourgc
 to register new threads with \boehm.
 
