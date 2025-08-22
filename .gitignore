@@ -20,3 +20,4 @@ rustgc_paper_for_diff.ltx
 texput.log
 comment.cut
 _pgfcache
+.DS_Store

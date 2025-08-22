@@ -1971,6 +1971,36 @@ Steve Klabnik and Andy Wingo for comments.
 
 \appendix
 
+\section*{Appendices}
+
+\begin{algorithm}[h]
+\small
+\caption{Removing elidable drops}
+\begin{algorithmic}
+\Function{RemoveElidableDrops}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
+                    \EndIf
+                \EndIf
+            \EndIf
+      \EndFor
+\EndFunction
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+    \State $block.terminator \gets last\_block.terminator$
+\EndFunction
+\end{algorithmic}
+    \caption{The \emph{Remove Elidable Drops} algorithm from \cref{sec:optimising_prem}}
+  \label{alg:barrier_removal}
+\end{algorithm}
+
+\clearpage
+
 \section*{Additional Experiment Data}
 
 In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
@@ -1995,36 +2025,10 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \begin{itemize}
   \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
   \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
-  \item \cref{fig:app:elision:heap} (page~\pageref{fig:app:elision:heap}): Pause time and heap size.
   \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
   \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
   \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
 \end{itemize}
-
-\begin{algorithm}[h]
-\small
-\caption{Removing elidable drops}
-\begin{algorithmic}
-\Function{RemoveElidableDrops}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-                \If {\Call{IsGcType}{$ty$}}
-                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
-                        \State \Call{ReplaceTerminator}{$basic\_block$}
-                    \EndIf
-                \EndIf
-            \EndIf
-      \EndFor
-\EndFunction
-\Function{ReplaceTerminator}{$basic\_block$}
-    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-    \State $block.terminator \gets last\_block.terminator$
-\EndFunction
-\end{algorithmic}
-  \label{alg:barrier_removal}
-\end{algorithm}
 
 \clearpage
 
@@ -2143,12 +2147,12 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     \centering
     \begin{subfigure}{1\textwidth}
         \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_wallclock.pdf}
+        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_wallclock.pdf}
     \end{subfigure}%
     \hfill
     \begin{subfigure}{1\textwidth}
         \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_user.pdf}
+        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_user.pdf}
     \end{subfigure}
     \caption{Wall-clock and user time performance comparison for finalizer
     elision on each benchmark. The bars show the relative performance of \ourgc
@@ -2158,27 +2162,6 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     wall-clock time, as elision reduces the CPU overhead of the finalization
     thread.}
     \label{fig:app:elision:perf}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \begin{subfigure}{1\textwidth}
-        \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_gc_time.pdf}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{1\textwidth}
-        \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{plots/appendix_elision_mem_hsize_avg.pdf}
-    \end{subfigure}
-    \caption{Total pause time and average heap size on each benchmark after
-    applying finalizer elision. The plot follows the same conventions as
-    \cref{fig:app:elision:perf}. The average heap size is measured by taking
-    snapshots at the beginning of each collection. While this method is useful
-    for observing trends across the suite, it can also lead to high variance or
-    pathological behavior on individual benchmarks, particularly when phase
-    changes in the benchmark's execution affect GC scheduling.}
-    \label{fig:app:elision:heap}
 \end{figure}
 
 \clearpage

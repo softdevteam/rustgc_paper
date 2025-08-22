@@ -34,8 +34,8 @@ rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) $(LATEX_FILE
 	pdflatex  -shell-escape rustgc_paper.ltx
 
 appendices.pdf main.pdf: rustgc_paper.pdf
-	pdfjam -o main.pdf rustgc_paper.pdf 1-26
-	pdfjam -o appendices.pdf rustgc_paper.pdf 27-
+	pdfjam -o main.pdf rustgc_paper.pdf 1-27
+	pdfjam -o appendices.pdf rustgc_paper.pdf 28-
 
 rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	set -e; \
