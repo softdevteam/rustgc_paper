@@ -1892,24 +1892,21 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \begin{table}[t]
   \begin{subtable}{0.49\textwidth}
     \centering
-\scalebox{0.5}{%
+\scalebox{0.7}{%
   \input{tables/appendix_gcvs_user_1}
 }
   \end{subtable}
   \hfill
   \begin{subtable}{0.49\textwidth}
     \centering
-\scalebox{0.5}{%
+\scalebox{0.7}{%
   \input{tables/appendix_gcvs_user_2}
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{Raw user times (in seconds) for all benchmark
-    configurations. Shows absolute timing measurements for GC (\ourgc),
-    \gcvsbaseline, and \gcvsrc. Each value represents the arithmetic mean
-    across \benchmarkpexecs iterations, with 99\% confidence intervals. Note
-    that \fd, \ripgrep, and \alacritty use atomic reference counting, while all
-    other benchmarks use non-atomic reference counting.}
+  \caption{User times (in seconds) for each benchmark in the \Egcrc experiment.
+    Values show arithmetic means over \benchmarkpexecs runs and include 99\%
+    confidence intervals.}
     \label{tab:app:gcvs:user}
 \end{table}
 

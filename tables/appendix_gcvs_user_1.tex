@@ -1,9 +1,15 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llrlrlrl}
 \toprule
-Suite & Benchmark & \multicolumn{6}{c}{User time (seconds)} \\
- &  & \multicolumn{2}{c}{RC \texttt{[jemalloc]}} & \multicolumn{2}{c}{Alloy \texttt{[default]}} & \multicolumn{2}{c}{RC \texttt{[gcmalloc]}} \\
+& & \multicolumn{6}{c}{User time (s)} \\
+
+& & \multicolumn{2}{c}{jemalloc}
+& \multicolumn{4}{c}{\boehm} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-8}
+& & \multicolumn{2}{c}{\rc} &
+\multicolumn{2}{c}{\gc} &
+\multicolumn{2}{c}{\rc} \\
 \midrule
-\multirow{10}{*}{\rotatebox{90}{alacritty}} & Cur. Motion & 1.08 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.04} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
+\multirow{10}{*}{\rotatebox{90}{\alacritty}} & Cur. Motion & 1.08 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.04} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
  & Dense Cells & 6.66 & \scriptsize\textcolor{gray!60}{$\pm$0.13} & 6.62 & \scriptsize\textcolor{gray!60}{$\pm$0.12} & 6.58 & \scriptsize\textcolor{gray!60}{$\pm$0.15} \\
  & Light Cells & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
  & Scroll & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.11 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
@@ -14,7 +20,7 @@ Suite & Benchmark & \multicolumn{6}{c}{User time (seconds)} \\
  & Scroll Top (small) & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Unicode & 0.10 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
 \midrule
-\multirow{7}{*}{\rotatebox{90}{fd}} & Cmd Exec. & 1.05 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+\multirow{7}{*}{\rotatebox{90}{\fd}} & Cmd Exec. & 1.05 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
  & Cmd Exec. (large) & 1.02 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.10 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 1.11 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
  & File Extension & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & File Type & 0.03 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
@@ -22,7 +28,7 @@ Suite & Benchmark & \multicolumn{6}{c}{User time (seconds)} \\
  & Simple & 0.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.18 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.16 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Simple (-HI) & 0.03 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.04 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-ast}} & Bounce & 0.62 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.79 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsast}} & Bounce & 0.62 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.79 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & BubbleSort & 0.56 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.83 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.71 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & DeltaBlue & 0.77 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 1.07 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.97 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Dispatch & 0.59 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.76 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
