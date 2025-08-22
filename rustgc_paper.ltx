@@ -1293,6 +1293,7 @@ already synchronises all memory between threads.
     basicstyle=\fontsize{7.6pt}{7pt}\ttfamily,
     xleftmargin=6pt,
     numbers=none,
+    abovecaptionskip=10pt,
     caption={The compiler error produced by \ourgc for the example
     in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
     note that both the use of a type with a FSA-incompatible drop method (`has
@@ -1307,7 +1308,7 @@ FSA integrates the seemingly separate components presented above into one. It
 iterates over every function in a Rust program analysing destructors of types
 that are used in \lstinline{Gc<T>}.
 \cref{alg:fsa} shows the essence of FSA
-(minus details of caching which \ourgc uses to speed up compile times).
+(for example eliding details of caching which \ourgc uses to speed up compile times).
 
 Because FSA is a form of abstract interpretation, we need to determine when to
 run FSA on a program. In essence, whenever a previously unchecked type \lstinline{T} is used
@@ -1326,7 +1327,7 @@ of various checks to avoid pointlessly repeating work. We also extend
 and \lstinline{Sync}, we know that there can be no unsafe projections used in a
 destructor, and can bypass most FSA checks entirely (though we still need to check
 for thread local accesses). Across our benchmark suite, FSA increases compilation
-time in release mode by a modest 0.8--1.6\%\jake{TODO: convert all percentages to ratios}.
+time in release mode by a modest 0.8--1.6\%.
 
 \cref{alg:fsa} also captures \ourgc's approach to error messages.
 Rather than just inform a user that `your drop method has not passed FSA', \ourgc
@@ -1371,7 +1372,7 @@ We experimented with a per-type approach, but found that unduly restrictive: we
 therefore provide a per-value escape hatch with the \lstinline{unsafe FinalizerUnchecked<T>}
 type. Values wrapped in this type are considered safe to use at all points in
 FSA. Our aim is that users should rarely need to resort to this escape hatch,
-but there are valid idioms of use where we found it necessary.
+but, as is not uncommon in Rust, there are valid idioms of use where we found it necessary.
 
 
 \section{Evaluation}
@@ -1423,7 +1424,7 @@ Rust libraries on \lstinline{crates.io} (the \emph{de facto} standard Rust
 package system) looking for suitable candidates. In practise this meant we
 looked for crates using reference counting. In the interests of brevity,
 for the rest of this section we use `\lstinline{Rc<T>}'
-to cover both the \lstinline{Rc<T>} and \lstinline{Arc<T>} reference counting types.
+to cover both \lstinline{Rc<T>} and its thread-safe cousin \lstinline{Arc<T>}.
 
 \begin{table}[t]
 \small
@@ -1450,9 +1451,9 @@ shows the distribution of heap data at run-time. This shows that our suite conta
 with a variety of memory patterns.
 
 \binarytrees is allocation intensive and sufficiently simple that it
-can be easily and meaningfully ported to additional shared ownership strategies
-(\rustgcproj, a user library for GC for Rust~\cite{manish15rustgc}; and \typedarena, a non-GC memory
-arena~\cite{chiovoloni15typed}).
+can be easily and meaningfully ported to additional shared ownership strategies:
+\rustgcproj, a user library for GC for Rust~\cite{manish15rustgc}; and \typedarena, a non-GC memory
+arena~\cite{chiovoloni15typed}.
 \alacritty, \fd, and \ripgrep are well known Rust programs, all
 of which have their own benchmark suites.
 \grmtools is a parsing library which uses \rc extensively
@@ -1542,7 +1543,7 @@ when reporting collector related metrics.
 A challenge in our experiment is that different allocation strategies can use
 different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \rc can use a modern allocator such as jemalloc.
-Much has changed in the performance of our allocators since \boehm's 1980s
+Much has changed in the performance of allocators since \boehm's 1980s
 roots: in \rc-only benchmarks, we observe an inherent overhead
 from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
 and \cref{fig:app:gcvs:wallclock} in the Appendix), which is a significant, and variable, confounding factor.
@@ -1553,15 +1554,14 @@ the allocator for all benchmarks.
 
 We want to understand the memory usage of different allocation strategies over the
 lifetime of a benchmark. However, there is no single metric which captures
-`memory usage', nor even an agreed set of metrics~\cite{dacapo25}. We use three
-metrics to capture various facets: (1) \emph{Resident Set Size} (RSS), the
-total physical memory in RAM used by the process (including memory-mapped
-files, stack, and code/text segments), sampled at 10Hz; (2)
-\emph{heap footprint}, the amount of live heap memory recorded by
-by Heaptrack~\cite{wolff14heaptrack} at every allocation and deallocation;
-and (3) \emph{number of live heap values}, also recorded in the same
-way via Heaptrack. We modified \boehm and Heaptrack so that both are aware of
-the other (our changes to Heaptrack are now upstreamed). \jake{In the end we didn't use (3) in our main paper figures because it would have been too much data. Since we have the tables, we could make them available as Appendix entries} \laurie{good idea, if we have time!}
+`memory usage', nor even an agreed set of metrics~\cite{dacapo25}. We use two
+metrics to capture different facets: (1) \emph{heap footprint}, the amount of
+live heap memory recorded by by Heaptrack~\cite{wolff14heaptrack} at every
+allocation and deallocation; and (2) \emph{Resident Set Size} (RSS), the total
+physical memory in RAM used by the process (including memory-mapped files,
+stack, and code/text segments), sampled at 10Hz. The overhead of recording
+heap footprint is much greater than RSS, but it provides a more detailed
+view of memory usage.
 
 Another pair of confounding factors are the initial and maximum sizes of the GC heap: too-small values can lead
 to frequent resizing and/or `thrashing'; large values to unrealistically few
