@@ -1,9 +1,15 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llrlrlrl}
 \toprule
-Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
- &  & \multicolumn{2}{c}{RC \texttt{[jemalloc]}} & \multicolumn{2}{c}{Alloy \texttt{[default]}} & \multicolumn{2}{c}{RC \texttt{[gcmalloc]}} \\
+& & \multicolumn{6}{c}{Wall-clock (s) + 99\% CIs} \\
+
+& & \multicolumn{2}{c}{jemalloc}
+& \multicolumn{4}{c}{gcmalloc} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-8}
+& & \multicolumn{2}{c}{\rc} &
+\multicolumn{2}{c}{\gc} &
+\multicolumn{2}{c}{\rc} \\
 \midrule
-\multirow{10}{*}{\rotatebox{90}{alacritty}} & Cur. Motion & 0.65 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.66 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.66 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+\multirow{10}{*}{\rotatebox{90}{\alacritty}} & Cur. Motion & 0.65 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.66 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.66 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Dense Cells & 2.16 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 2.16 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 2.14 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
  & Light Cells & 0.37 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.37 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.38 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Scroll & 0.25 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.26 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.26 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
@@ -14,7 +20,7 @@ Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
  & Scroll Top (small) & 0.32 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.32 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.33 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Unicode & 0.23 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
 \midrule
-\multirow{7}{*}{\rotatebox{90}{fd}} & Cmd Exec. & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.28 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
+\multirow{7}{*}{\rotatebox{90}{\fd}} & Cmd Exec. & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.28 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
  & Cmd Exec. (large) & 1.24 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.25 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 1.26 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & File Extension & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & File Type & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
@@ -22,7 +28,7 @@ Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
  & Simple & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.33 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.32 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Simple (-HI) & 0.12 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.15 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.13 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-ast}} & Bounce & 0.62 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.80 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsast}} & Bounce & 0.62 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.96 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 0.80 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & BubbleSort & 0.56 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.84 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.71 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & DeltaBlue & 0.77 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 1.09 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.98 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Dispatch & 0.59 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 0.97 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.77 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
@@ -50,3 +56,4 @@ Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
  & WhileLoop & 0.48 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.72 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.60 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
 \bottomrule
 \end{tabular}
+

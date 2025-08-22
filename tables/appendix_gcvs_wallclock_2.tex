@@ -1,14 +1,20 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llrlrlrl}
 \toprule
-Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
- &  & \multicolumn{2}{c}{RC \texttt{[jemalloc]}} & \multicolumn{2}{c}{Alloy \texttt{[default]}} & \multicolumn{2}{c}{RC \texttt{[gcmalloc]}} \\
+& & \multicolumn{6}{c}{Wall-clock (s) + 99\% CIs} \\
+
+& & \multicolumn{2}{c}{jemalloc}
+& \multicolumn{4}{c}{gcmalloc} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-8}
+& & \multicolumn{2}{c}{\rc} &
+\multicolumn{2}{c}{\gc} &
+\multicolumn{2}{c}{\rc} \\
 \midrule
-\multirow{4}{*}{\rotatebox{90}{grmtools}} & Eclipse & 3.48 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 3.44 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 3.74 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
+\multirow{4}{*}{\rotatebox{90}{\grmtools}} & Eclipse & 3.48 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 3.44 & \scriptsize\textcolor{gray!60}{$\pm$0.03} & 3.74 & \scriptsize\textcolor{gray!60}{$\pm$0.04} \\
  & Hadoop & 2.86 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 2.92 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 3.09 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Jenkins & 2.90 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 2.99 & \scriptsize\textcolor{gray!60}{$\pm$0.05} & 3.02 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Spring & 2.43 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 2.51 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 2.63 & \scriptsize\textcolor{gray!60}{$\pm$0.02} \\
 \midrule
-\multirow{13}{*}{\rotatebox{90}{ripgrep}} & Alternates & 1.18 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.21 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
+\multirow{13}{*}{\rotatebox{90}{\ripgrep}} & Alternates & 1.18 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.29 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.21 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Alternates (-i) & 1.31 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.42 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.33 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Literal & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.23 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.15 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
  & Literal (-i) & 1.19 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 1.27 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.20 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
@@ -22,7 +28,7 @@ Suite & Benchmark & \multicolumn{6}{c}{Wall-clock time (seconds)} \\
  & UTF Word (alt.) & 1.11 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.21 & \scriptsize\textcolor{gray!60}{$\pm$0.01} & 1.13 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Word & 1.12 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 1.22 & \scriptsize\textcolor{gray!60}{$\pm$0.02} & 1.14 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-bc}} & Bounce & 0.25 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.30 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsbc}} & Bounce & 0.25 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.30 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & BubbleSort & 0.23 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.27 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & DeltaBlue & 0.30 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.34 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.36 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
  & Dispatch & 0.25 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.28 & \scriptsize\textcolor{gray!60}{$\pm$0.00} & 0.29 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\

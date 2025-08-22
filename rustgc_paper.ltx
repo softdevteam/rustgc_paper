@@ -1867,26 +1867,25 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \begin{table}[t]
   \begin{subtable}{0.49\textwidth}
     \centering
-\scalebox{0.5}{%
+\scalebox{0.7}{%
   \input{tables/appendix_gcvs_wallclock_1}
 }
   \end{subtable}
   \hfill
   \begin{subtable}{0.49\textwidth}
     \centering
-\scalebox{0.5}{%
+\scalebox{0.7}{%
   \input{tables/appendix_gcvs_wallclock_2}
       }
   \end{subtable}
   \vspace{5pt}
-  \caption{Raw wall-clock execution times (in seconds) for all benchmark
-    configurations. Shows absolute timing measurements for GC (\ourgc),
-    \gcvsbaseline, and \gcvsrc. Each value represents the arithmetic mean
-    across \benchmarkpexecs iterations, with 99\% confidence intervals. Note
-    that \fd, \ripgrep, and \alacritty use atomic reference counting, while all
-    other benchmarks use non-atomic reference counting. These raw measurements
-    correspond to the normalized performance ratios shown in
-    \cref{fig:app:gcvs:wallclock} on the previous page.}
+  \caption{Wall-clock execution times (in seconds) for each benchmark in the
+    \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
+    and include 99\% confidence intervals. Because \binarytrees and \regexredux
+    are stand-alone benchmarks they are omitted here; their timings appear in
+    \cref{tab:gcvs:raw}. These raw results form the basis of the normalised
+    performance ratios plotted in \cref{fig:app:gcvs:wallclock} on the previous
+    page.}
     \label{tab:app:gcvs:wallclock}
 \end{table}
 
