@@ -1770,7 +1770,6 @@ In this appendix, we provide supplementary plots for our performance evaluation.
   \item \cref{fig:app:gcvs:wallclock} (page~\pageref{fig:app:gcvs:wallclock}): Wall-clock performance comparison for each benchmark.
   \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
   \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
-  \item \cref{fig:app:gcvs:mem:ripgrep} (page~\pageref{fig:app:gcvs:mem:ripgrep}): Time-series memory plots for \ripgrep.
   \item \cref{tab:app:gcvs:fixed:heap}
       (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
 default adaptive heap sizing and fixed size heap configurations.\end{itemize}
@@ -1922,19 +1921,6 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     other benchmarks use non-atomic reference counting.}
     \label{tab:app:gcvs:user}
 \end{table}
-
-
-\begin{landscape}
-    \begin{figure}[htbp!]
-        \centering
-        \includegraphics[height=0.7\textwidth]{plots/ripgrep_mem.pdf}
-        \caption{Heap usage behaviour of all \ripgrep benchmarks. The $x$-axis
-        shows time (normalised across all executions). The $y$-axis shows
-        heap usage (in MiB, with 99\% confidence intervals). A subset of these
-        benchmarks is used in the main paper in \cref{fig:profiles}. }
-        \label{fig:app:gcvs:mem:ripgrep}
-    \end{figure}
-\end{landscape}
 
 \begin{table}[h]
 \scalebox{0.9}{%
