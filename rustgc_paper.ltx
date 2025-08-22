@@ -1827,28 +1827,25 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
 \end{table}
 
 \begin{table}[h]
-    \input{tables/gcvs_raw}
+    \input{tables/appendix_gcvs_raw}
     \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
     different memory management strategies across our benchmark suites. We
     report the mean of 30 runs, with 99\% confidence intervals (CIs) shown as
     upper and lower bounds. For all benchmark suites we use the geometric mean,
-    except for \emph{binary trees} and \emph{regex redux}, which are single
+    except for \binarytrees and \regexredux, which are single
     benchmarks where the arithmetic mean is reported.}
     \label{tab:gcvs:raw}
 \end{table}
 
 \begin{table}[h]
 \scalebox{0.9}{%
-  \input{tables/gcvs_perf_summary}
+  \input{tables/appendix_alloc_comparison}
 }
   \vspace{5pt}
-  \caption{\laurie{rotate this table by 90degrees if there's time} Comparison of wallclock execution times (in seconds, with 99\%
-  confidence intervals) for the \texttt{jemalloc} and \texttt{boehm} memory
-  allocators across each benchmark suite. For each suite, both the raw
-  execution times and the relative slowdown (showing the overhead of
-  the \texttt{boehm} allocator) are reported. All values are
-  geometric means over \benchmarkpexecs iterations.}
-  \label{tab:app:gcvs:alloc:cost}
+    \caption{Wall-clock times (in seconds) comparing the \emph{jemalloc}
+    allocator and the \emph{gcmalloc} allocator from the \boehm across our
+    benchmark suite. We report the mean of 30 runs, with 99\% CIs shown as upper and lower bounds.}
+    \label{tab:app:gcvs:alloc:cost}
 \end{table}
 
 \newgeometry{bottom=1.5cm, left=1.5cm, right=1.5cm, top=1.5cm}
