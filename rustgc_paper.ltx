@@ -2268,9 +2268,11 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
       }
   \end{subtable}
   \vspace{5pt}
-    \caption{Raw data for the average heap size (in MiB) for each benchmark on
-    the finalizer elision experiment. Values show arithmetic means with 99\%
-    confidence intervals.}
+    \caption{Average heap footprint (MiB) across benchmarks in the \Eelision
+    experiment, measured before and after applying \ourgc’s finalizer elision
+    optimisation. Values are arithmetic means over \benchmarkpexecs runs with
+    resampled traces from heaptrack, with 99\% confidence intervals (see
+    \cref{sec:datapres} for details).}
     \label{tab:app:elision:heap}
 \end{table}
 

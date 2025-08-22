@@ -1,14 +1,15 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llrlrl}
 \toprule
-Suite & Benchmark & \multicolumn{4}{c}{Avg. Heap Size (MiB)} \\
- &  & \multicolumn{2}{c}{Before} & \multicolumn{2}{c}{After} \\
+& & \multicolumn{4}{c}{Avg. heap footprint (MiB)} \\
+\cmidrule(lr){3-6}
+ &  & \multicolumn{2}{c}{Before elision} & \multicolumn{2}{c}{After elision} \\
 \midrule
-\multirow{4}{*}{\rotatebox{90}{grmtools}} & Eclipse & 1993.86 & \scriptsize\textcolor{gray!60}{$\pm$9.04} & 1069.95 & \scriptsize\textcolor{gray!60}{$\pm$28.40} \\
+\multirow{4}{*}{\rotatebox{90}{\grmtools}} & Eclipse & 1993.86 & \scriptsize\textcolor{gray!60}{$\pm$9.04} & 1069.95 & \scriptsize\textcolor{gray!60}{$\pm$28.40} \\
  & Hadoop & 1882.88 & \scriptsize\textcolor{gray!60}{$\pm$1.55} & 800.15 & \scriptsize\textcolor{gray!60}{$\pm$48.62} \\
  & Jenkins & 1876.35 & \scriptsize\textcolor{gray!60}{$\pm$14.92} & 962.16 & \scriptsize\textcolor{gray!60}{$\pm$29.20} \\
  & Spring & 1752.72 & \scriptsize\textcolor{gray!60}{$\pm$1.68} & 1036.27 & \scriptsize\textcolor{gray!60}{$\pm$19.48} \\
 \midrule
-\multirow{13}{*}{\rotatebox{90}{ripgrep}} & Alternates & 28.23 & \scriptsize\textcolor{gray!60}{$\pm$1.59} & 15.80 & \scriptsize\textcolor{gray!60}{$\pm$0.40} \\
+\multirow{13}{*}{\rotatebox{90}{\ripgrep}} & Alternates & 28.23 & \scriptsize\textcolor{gray!60}{$\pm$1.59} & 15.80 & \scriptsize\textcolor{gray!60}{$\pm$0.40} \\
  & Alternates (-i) & 29.52 & \scriptsize\textcolor{gray!60}{$\pm$1.66} & 17.50 & \scriptsize\textcolor{gray!60}{$\pm$0.66} \\
  & Literal & 25.14 & \scriptsize\textcolor{gray!60}{$\pm$1.52} & 15.26 & \scriptsize\textcolor{gray!60}{$\pm$0.33} \\
  & Literal (-i) & 26.69 & \scriptsize\textcolor{gray!60}{$\pm$1.56} & 18.17 & \scriptsize\textcolor{gray!60}{$\pm$0.41} \\
@@ -22,7 +23,7 @@ Suite & Benchmark & \multicolumn{4}{c}{Avg. Heap Size (MiB)} \\
  & UTF Word (alt.) & 25.56 & \scriptsize\textcolor{gray!60}{$\pm$1.60} & 15.48 & \scriptsize\textcolor{gray!60}{$\pm$0.46} \\
  & Word & 29.35 & \scriptsize\textcolor{gray!60}{$\pm$2.05} & 15.82 & \scriptsize\textcolor{gray!60}{$\pm$0.51} \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-bc}} & bounce & 138.59 & \scriptsize\textcolor{gray!60}{$\pm$5.18} & 134.24 & \scriptsize\textcolor{gray!60}{$\pm$0.22} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsbc}} & bounce & 138.59 & \scriptsize\textcolor{gray!60}{$\pm$5.18} & 134.24 & \scriptsize\textcolor{gray!60}{$\pm$0.22} \\
  & bubblesort & 121.69 & \scriptsize\textcolor{gray!60}{$\pm$6.72} & 115.25 & \scriptsize\textcolor{gray!60}{$\pm$0.03} \\
  & deltablue & 186.12 & \scriptsize\textcolor{gray!60}{$\pm$1.32} & 135.10 & \scriptsize\textcolor{gray!60}{$\pm$2.09} \\
  & dispatch & 168.63 & \scriptsize\textcolor{gray!60}{$\pm$7.00} & 137.08 & \scriptsize\textcolor{gray!60}{$\pm$0.01} \\

@@ -1,9 +1,10 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llrlrl}
 \toprule
-Suite & Benchmark & \multicolumn{4}{c}{Avg. Heap Size (MiB)} \\
- &  & \multicolumn{2}{c}{Before} & \multicolumn{2}{c}{After} \\
+& & \multicolumn{4}{c}{Avg. heap footprint (MiB)} \\
+\cmidrule(lr){3-6}
+ &  & \multicolumn{2}{c}{Before elision} & \multicolumn{2}{c}{After elision} \\
 \midrule
-\multirow{10}{*}{\rotatebox{90}{alacritty}} & Cur. Motion & 3.76 & \scriptsize\textcolor{gray!60}{$\pm$0.06} & 3.79 & \scriptsize\textcolor{gray!60}{$\pm$0.06} \\
+\multirow{10}{*}{\rotatebox{90}{\alacritty}} & Cur. Motion & 3.76 & \scriptsize\textcolor{gray!60}{$\pm$0.06} & 3.79 & \scriptsize\textcolor{gray!60}{$\pm$0.06} \\
  & Dense Cells & 3.74 & \scriptsize\textcolor{gray!60}{$\pm$0.06} & 3.74 & \scriptsize\textcolor{gray!60}{$\pm$0.06} \\
  & Light Cells & 3.76 & \scriptsize\textcolor{gray!60}{$\pm$0.08} & 3.73 & \scriptsize\textcolor{gray!60}{$\pm$0.07} \\
  & Scroll & 3.88 & \scriptsize\textcolor{gray!60}{$\pm$0.13} & 3.87 & \scriptsize\textcolor{gray!60}{$\pm$0.12} \\
@@ -14,14 +15,14 @@ Suite & Benchmark & \multicolumn{4}{c}{Avg. Heap Size (MiB)} \\
  & Scroll Top (small) & 3.76 & \scriptsize\textcolor{gray!60}{$\pm$0.06} & 3.71 & \scriptsize\textcolor{gray!60}{$\pm$0.08} \\
  & Unicode & 3.73 & \scriptsize\textcolor{gray!60}{$\pm$0.15} & 3.77 & \scriptsize\textcolor{gray!60}{$\pm$0.09} \\
 \midrule
-\multirow{6}{*}{\rotatebox{90}{fd}} & execution & 17.18 & \scriptsize\textcolor{gray!60}{$\pm$0.33} & 17.89 & \scriptsize\textcolor{gray!60}{$\pm$0.87} \\
+\multirow{6}{*}{\rotatebox{90}{\fd}} & execution & 17.18 & \scriptsize\textcolor{gray!60}{$\pm$0.33} & 17.89 & \scriptsize\textcolor{gray!60}{$\pm$0.87} \\
  & extension & 13.52 & \scriptsize\textcolor{gray!60}{$\pm$0.75} & 13.68 & \scriptsize\textcolor{gray!60}{$\pm$0.84} \\
  & hi & 15.14 & \scriptsize\textcolor{gray!60}{$\pm$0.36} & 14.99 & \scriptsize\textcolor{gray!60}{$\pm$0.59} \\
  & output & 17.54 & \scriptsize\textcolor{gray!60}{$\pm$0.65} & 17.47 & \scriptsize\textcolor{gray!60}{$\pm$0.53} \\
  & pattern & 37.79 & \scriptsize\textcolor{gray!60}{$\pm$5.22} & 38.03 & \scriptsize\textcolor{gray!60}{$\pm$5.25} \\
  & type & 15.80 & \scriptsize\textcolor{gray!60}{$\pm$0.40} & 15.84 & \scriptsize\textcolor{gray!60}{$\pm$0.38} \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-ast}} & bounce & 309.85 & \scriptsize\textcolor{gray!60}{$\pm$43.90} & 362.44 & \scriptsize\textcolor{gray!60}{$\pm$7.24} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsast}} & bounce & 309.85 & \scriptsize\textcolor{gray!60}{$\pm$43.90} & 362.44 & \scriptsize\textcolor{gray!60}{$\pm$7.24} \\
  & bubblesort & 334.97 & \scriptsize\textcolor{gray!60}{$\pm$6.55} & 209.99 & \scriptsize\textcolor{gray!60}{$\pm$3.88} \\
  & deltablue & 305.24 & \scriptsize\textcolor{gray!60}{$\pm$31.74} & 310.83 & \scriptsize\textcolor{gray!60}{$\pm$5.32} \\
  & dispatch & 345.26 & \scriptsize\textcolor{gray!60}{$\pm$18.67} & 329.90 & \scriptsize\textcolor{gray!60}{$\pm$4.22} \\
