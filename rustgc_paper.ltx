@@ -1414,8 +1414,8 @@ regions around the mean.
 \end{figure}
 
 The main results for \Egcrc can be seen in~\cref{fig:gcvs:summary}. Though
-there is variation across benchmarks, the broad story shows that --
-after controlling for the allocator and considering confidence intervals -- on
+there is variation across benchmarks --
+and after controlling for the allocator and considering confidence intervals -- on
 our benchmark suite, \ourgc has an overhead on wall-clock time of 5\%. The
 effect on memory is more variable though, unsurprisingly, \ourgc typically has
 a larger average heap footprint (i.e.~allocated memory lives for longer). This
@@ -1426,14 +1426,14 @@ is in absolute terms.
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgcproj. The time-series data in~\cref{fig:profiles} is
-particularly illuminating (and~\cref{tab:gcvs:raw} in the Appendix has the
-raw timings). \ourgc is around 3.5$\times$ slower than \typedarena, and the
+particularly illuminating (for completeness, \cref{tab:gcvs:raw} in the Appendix has the
+raw timings). \ourgc is around 3.5$\times$ slower than \typedarena. The
 time-series data for the latter shows it going through distinct phases: a (relatively long) allocation
 phase, a (relatively moderate) `work' phase, and a (relatively short) deallocation phase.
 Put another way: these clear phases make \binarytrees very well suited to
 an arena-based approach. In the other approaches, the `work' phase occupies a
-much greater proportion of their execution, because it also incorporates a lot
-of memory allocator work. \ourgc is around 0.7$\times$ faster than \rc, but both
+much greater proportion of their execution, because it also incorporates
+allocator work. \ourgc is around 0.7$\times$ faster than \rc, but both
 have similar memory profiles. \ourgc is around 3$\times$ faster than \rustgcproj
 and has an average heap footprint around 4$\times$ smaller, reflecting
 \ourgc's advantage in not being a user-land library that relies in part on \rc.
@@ -1465,15 +1465,14 @@ idea of the performance ceiling and floor for different approaches.
 
 The time-series data in~\cref{fig:profiles} helps explain other factors.
 For example, it shows that \somrsbc leaks memory on the JSON Small benchmark
-(and, probably in smaller quantities, in other benchmarks too).
-This is because \rc keeps alive cycles; \ourgc does not leak memory on \somrsbc.
-It also helps explain why some benchmarks have much higher average heap footprints in \ourgc.
+(it probably also leaks in some other benchmarks, though rarely as visibly).
+This is because \rc keeps alive value in cycles; \ourgc does not leak memory on \somrsbc.
 
 We can see from the time-series data that \ripgrep has a complex heap footprint
-pattern. It may suggest a memory leak, but is in fact a consequence of the
-inevitable delay in freeing memory in a GC. In general, GC notices that allocations are unused later than reference counting,
-but this exacerbated further by finalizers, of which \ripgrep has a moderate
-amount. Surprisingly, finalizers can lengthen or shorten an allocation's lifetime. GCed values
+pattern. This may suggest a memory leak, but in fact it is a consequence of the
+inevitable delay in freeing memory in a GC. In general, GC notices that memory is unused later than reference counting,
+but this is exacerbated further by finalizers.
+Surprisingly, finalizers can lengthen or shorten an allocation's lifetime. GCed values
 with finalizers tend to have longer lifetimes, because they have to wait
 in the finalizer queue. However, when a finalizer calls \lstinline{free}
 on indirectly owned values, those are immediately marked as not live,
@@ -1501,19 +1500,17 @@ The results of \Eelision are shown in \cref{fig:elision:metrics}. In general,
 there is a fairly clear correlation: the more finalizers are removed, and the
 greater the proportion of the overall heap the memory owned by
 \lstinline{Gc<T>} is, the better the metrics become. However, there are several
-caveats. First, in cases where all finalizers are removed, \boehm does not
+caveats. First, when all finalizers are removed, \boehm does not
 start a finalizer thread or invoke locking related to it, unduly flattering the time-based
-metrics. Second, the number of finalizers is only a loose proxy for the cost of
-finalizers. \laurie{i am not convinced this explains the magnitude of the effect} \somrsbc, for example, has very few finalizers, but those
-finalizers free up large object graphs, which can be slow, and so removing them
-is particularly beneficial. Third, some benchmarks change the work they do:
+metrics. Second, the quantity of finalizers is only a loose proxy for cost:
+some finalizers free up large graphs of indirectly owned values,
+which can take some time to run. Third, some benchmarks change the work they do:
 \grmtools speeds up so much that its error recovery algorithm has time to do
 more work, so while finalizer hugely benefits its GC pause time, its wall-clock
 time changes much less. Finally, since finalizers can cause indirectly owned
 allocations to be freed earlier than the GC itself does naturally, removing
-them causes such allocations to live for longer: \ripgrep particularly suffers
-from this.
-
+them can cause indirectly owned values to live for longer: \ripgrep's average heap
+footprint highlights this issue.
 
 \begin{figure}[t]
     \centering
@@ -1860,7 +1857,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \input{tables/gcvs_perf_summary}
 }
   \vspace{5pt}
-  \caption{Comparison of wallclock execution times (in seconds, with 99\%
+  \caption{\laurie{rotate this table by 90degrees if there's time} Comparison of wallclock execution times (in seconds, with 99\%
   confidence intervals) for the \texttt{jemalloc} and \texttt{boehm} memory
   allocators across each benchmark suite. For each suite, both the raw
   execution times and the relative slowdown (showing the overhead of
