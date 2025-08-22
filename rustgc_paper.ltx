@@ -1805,7 +1805,7 @@ experiments if and when that arrives.
 
 The RSS memory metric we collect is at Linux's whim: if it does not update as
 frequently as we expect, we will see artificially `smoothed' data that may
-miss out peaks and troughs. Similar, our interpolation of data onto a normalised
+miss out peaks and troughs. Similar, our interpolation of time-series data onto a normalised
 grid can also smooth data. We manually checked a large quantity of data to
 ensure this was not a significant effect, and the fact that we run benchmarks
 30 times means makes it more likely that peaks and troughs are caught at least
@@ -1911,8 +1911,8 @@ to the GCed heap, but this is not true of many other GCed programs.
 
 One attempt to improve upon \rustgcproj is \bronze~\cite{coblenz21bronze},
 though it shows how challenging it can be to meaningfully improve GC for Rust: both of
-its main advances have subsequently been disabled because they are not only unsound
-but lead to crashes. First, \bronze tried to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
+its main advances have subsequently been disabled because they are not just unsound
+but actively lead to crashes. First, \bronze tried to solve the root-finding problem by using LLVM's \lstinline{gc.root} intrinsic
 at function entries to generate stack-maps (a run-time mechanism for accurately
 tracking active pointers). This rules out the false positives that are
 inevitable in conservative GC. However, \bronze
