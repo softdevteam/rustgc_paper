@@ -1274,7 +1274,7 @@ arena~\cite{chiovoloni15typed}).
 \begin{table}[t]
 \small
 \begin{center}
-\input{tables/migration_stats}
+\input{tables/mem_dist_raw}
   \vspace{5pt}
     \caption{
       \laurie{merge rc and arc} \laurie{change `GC Memory (\%)' to `GC Owned (\%)'}
@@ -1287,6 +1287,17 @@ arena~\cite{chiovoloni15typed}).
     of a single \lstinline{Gc<Box<T>>} would have a `Direct' \lstinline{Gc<T>}
     proportion of 50\% and a `Transitive' proportion of 100\% since the
     \lstinline{Gc<T>} owns, and will thus free, the \lstinline{Box<T>}.}
+\label{tab:app:mem:conversion:runtime}
+\end{center}
+  \vspace{-8pt}
+\end{table}
+
+\begin{table}[t]
+\small
+\begin{center}
+\input{tables/mem_dist_pct}
+  \vspace{5pt}
+    \caption{With PCT}
 \label{tab:app:mem:conversion:runtime}
 \end{center}
   \vspace{-8pt}

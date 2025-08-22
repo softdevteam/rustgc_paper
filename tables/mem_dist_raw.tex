@@ -1,0 +1,17 @@
+\begin{tabular}{lrrrr}
+  \toprule
+  Suite & \multicolumn{3}{c}{\# Allocated objects} & GC Transitive (\%) \\
+  \cmidrule(lr){2-4}
+        & \rc & \lstinline{Box<T>} & \gc & \\      % second header row
+  \midrule
+  \alacritty   & 125      & 8,770        & 2         &  2.70 \\
+  \binarytrees & 0        & 3,222,201    & 3,222,190 & 100.00 \\
+  \fd          & 17,821   & 306,902      & 61        &   1.23 \\
+  \grmtools    & 2,283    & 19,859,431   & 4,038,605 &  44.19 \\
+  \regexredux  & 45       & 3,132        & 78        &  15.39 \\
+  \ripgrep     & 12,786   & 521,366      & 26,069    &  17.97 \\
+  \somrsast    & 15       & 8,586,976    & 1,533,728 &  76.95 \\
+  \somrsbc     & 15       & 2,397,931    & 1,530,325 &  99.71 \\
+  \bottomrule
+\end{tabular}
+
