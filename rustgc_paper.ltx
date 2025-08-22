@@ -700,25 +700,25 @@ We have stated as our aim that \ourgc should use destructors as finalizers.
 Above we explained some Rust-specific challenges --- but there are several
 non-Rust-specific challenges too! Fundamentally, finalizers and destructors
 have different, and sometimes incompatible, properties. The best
-guide to these differences, and the resulting problems, is~\cite{boehm03destructors},
-supplemented by later work by some of the same authors on support
+guide to these differences, and the resulting problems, is~\citet{boehm03destructors},
+supplemented by later work on support
 for GC in the C++ specification~\cite{boehm09garbage}\footnote{These features
 were added to the C+11 specification but removed in C++23.}.
 
 An obvious difference between destructors and finalizers is when both
-are run. Where C++ and Rust define
+are run. While C++ and Rust define
 precisely when a destructor will be run\footnote{Mostly. Rust's `temporary
 lifetime extension' delays destruction, but for how long is currently
 unspecified.}, finalizers run at an unspecified point in time. This typically
 happens at some point after the equivalent destructor would run, though
 a program may exit before any given finalizer is run\footnote{A program could pause after `exit' while all queued finalizers are run. We are
-not aware of a system which does this.}. There are, however, two situations where
-this is inverted.
+not aware of a system which does this.}. There are, however, two situations which
+invert this.
 First, if a thread exits due to an error, and the program is either not compiled with
 unwinding, or the thread has crossed a non-unwinding ABI boundary, then
 destructors might not be run at all, where a GC will naturally run the
-equivalent finalizers: we do not dwell on this further, as both behaviours
-seem reasonable in their different contexts. Second, and more surprisingly, it is possible for finalizers in
+equivalent finalizers: we do not dwell on this, as both behaviours
+are reasonable in their different contexts. Second, and more surprisingly, it is possible for finalizers in
 non-error situations to run \emph{prematurely}, that is before the equivalent
 destructor~\cite[section~3.4]{boehm03destructors}.
 
@@ -755,7 +755,7 @@ whenever possible; but that finalizers, even in existing GCs, cause
 various problems.
 
 It is our belief that some problems with finalizers are fundamental. For
-example, finalizers necessarily introduce, in general, latency between the last
+example, finalizers inevitably introduce latency between the last
 use of a value and its finalization.
 
 Some problems with finalizers are best considered the accidental artefacts of
@@ -799,7 +799,7 @@ A variety of factors contribute to the finalizer performance overhead, including
 a queue of finalizers
 must be maintained, whereas destructors can be run immediately; finalizers run
 some time after the last access of a value, making cache misses more likely; and
-finalizers often cause values (including values they own) to live for longer
+finalizers can cause values (including values they own) to live for longer
 (e.g.~leading to increased memory usage and marking overhead).
 Most of these factors are inherent to any GC and
 our experience of using and working on \boehm -- a mature, widely used GC -- does
@@ -821,13 +821,12 @@ heap.
 
 When used as a finalizer,
 \lstinline{Box<T>}'s drop method is thus unneeded, as the underlying memory will
-naturally be freed by \boehm anyway.
+be freed by \boehm anyway.
 This means that there is no need to run a finalizer for a type such as
 \lstinline{Gc<Box<u8>>} at all, and the finalizer can be statically elided. However,
-we can not elide a finalizer for a type such as
-\lstinline{Gc<Box<Arc<u8>>} (where \lstinline{Arc<T>} is the thread-safe
-version of \lstinline{Rc<T>}) because
-\lstinline{Arc<T>}'s drop method must be run in order to decrement a reference count.
+we cannot elide a finalizer for a type such as
+\lstinline{Gc<Box<Rc<u8>>} because
+\lstinline{Rc<T>}'s drop method must be run for the reference count to be decremented.
 As this shows, we must consider the complete destructor, and not just the top-level
 drop method, when deciding whether a corresponding finalizer can be elided.
 
