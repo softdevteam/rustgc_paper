@@ -1213,7 +1213,8 @@ brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
 \input{tables/mem_dist_src}
   \vspace{5pt}
     \caption{How often each type is referenced in source code after our
-    porting. For \rc, we further separate out strong and
+    porting. For \rc, we also show how many weak references are left in:
+    this is a proxy both for partial porting, and also how the extent
     weak references. This is a proxy for the extent of changes that cyclic
     data-structures impose upon source code.}
         \label{subfig:mem:source}
