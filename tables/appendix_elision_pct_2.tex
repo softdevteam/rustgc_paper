@@ -1,52 +1,55 @@
-\begin{tabular}{ll@{\hspace{6pt}}r@{\hspace{3pt}}l}
+\begin{tabular}{llr}
 \toprule
-Suite & Benchmark & \multicolumn{2}{c}{\% Fin. elided} \\
+    & & \multicolumn{1}{c}{Fin. elided (\%)} \\
 \midrule
-\multirow{4}{*}{\rotatebox{90}{grmtools}} & Eclipse & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Hadoop & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Jenkins & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Spring & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{4}{*}{\rotatebox{90}{\grmtools}}
+ & Eclipse & 11.79  \\
+ & Hadoop & 32.99  \\
+ & Jenkins & 26.74  \\
+ & Spring & 37.25  \\
 \midrule
-\multirow{13}{*}{\rotatebox{90}{ripgrep}} & Alternates & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Alternates (-i) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal (-i) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal (default) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal (mmap) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal (mmap, -i) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Literal (regex) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & UTF Greek & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & UTF Greek (-i) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & UTF Word & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & UTF Word (alt.) & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & Word & 79.04 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{13}{*}{\rotatebox{90}{\ripgrep}}
+ & Alternates & 79.04  \\
+ & Alternates (-i) & 79.04  \\
+ & Literal & 79.04  \\
+ & Literal (-i) & 79.04  \\
+ & Literal (mmap, -i) & 79.04  \\
+ & Literal (default) & 79.04  \\
+ & Literal (mmap) & 79.04  \\
+ & Literal (regex) & 79.04  \\
+ & UTF Greek & 79.04  \\
+ & UTF Greek (-i) & 79.04  \\
+ & UTF Word & 79.04  \\
+ & UTF Word (alt.) & 79.04  \\
+ & Word & 79.04  \\
 \midrule
-\multirow{26}{*}{\rotatebox{90}{som-rs-bc}} & bounce & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & bubblesort & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & deltablue & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & dispatch & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & fannkuch & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & fibonacci & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & fieldloop & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & graphsearch & 99.99 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & integerloop & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & jsonsmall & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & list & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & loop & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & mandelbrot & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & nbody & 99.99 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & pagerank & 99.99 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & permute & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & queens & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & quicksort & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & recurse & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & richards & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & sieve & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & storage & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & sum & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & towers & 99.99 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & treesort & 99.99 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
- & whileloop & 100.00 & \scriptsize\textcolor{gray!60}{$\pm$0.00} \\
+\multirow{26}{*}{\rotatebox{90}{\somrsbc}}
+ & Bounce & 72.50  \\
+ & BubbleSort & 76.34  \\
+ & DeltaBlue & 73.86  \\
+ & Dispatch & 77.78  \\
+ & Fannkuch & 72.74  \\
+ & Fibonacci & 70.37  \\
+ & FieldLoop & 83.33  \\
+ & GraphSearch & 76.56  \\
+ & IntegerLoop & 75.00  \\
+ & JsonSmall & 71.85  \\
+ & List & 79.41  \\
+ & Loop & 74.82  \\
+ & Mandelbrot & 70.93  \\
+ & NBody & 86.17  \\
+ & PageRank & 70.95  \\
+ & Permute & 79.23  \\
+ & Queens & 79.04  \\
+ & QuickSort & 69.33  \\
+ & Recurse & 82.61  \\
+ & Richards & 71.17  \\
+ & Sieve & 73.15  \\
+ & Storage & 73.84  \\
+ & Sum & 75.00  \\
+ & Towers & 78.29  \\
+ & TreeSort & 65.19  \\
+ & WhileLoop & 74.98  \\
 \bottomrule
 \end{tabular}
 
