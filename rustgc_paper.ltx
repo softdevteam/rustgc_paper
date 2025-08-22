@@ -1513,34 +1513,6 @@ allocations to be freed earlier than the GC itself does naturally, removing
 them can cause indirectly owned values to live for longer: \ripgrep's average heap
 footprint highlights this issue.
 
-\begin{figure}[t]
-    \centering
-    \importpgf{figures}{premopt_perf.pgf}
-    \caption{\laurie{we should change the $x$-axis to be 0.8-1.2x: there's nothing interesting past those points.} The effect of premature finalization optimisation,
-    normalised to \emph{None}
-    (i.e.~an unsound configuration with no fences). Grey
-    bars represent the ratio for \emph{naive} (all possible fences)
-    and blue bars \emph{optimised} (obviously unnecessary fences
-    removed). Unfortunately, this attempted optimisation has no statistically
-    significant effects.}
-    \label{fig:premopt:summary}
-\end{figure}
-
-%\begin{table}[t]
-%\scalebox{0.7}{%
-%  \input{plots/premopt/perf_summary}
-%}
-%  \vspace{5pt}
-%  \caption{
-%  The effects of premature finalization fences on wall-clock performance. \emph{None} is unsound but shows
-%  the maximum possible performance from removing fences; \emph{Naive} inserts
-%  all possible fences; and \emph{Optimised} inserts fences when necessary.
-%  When confidence intervals are taken into account there
-%  no statistically significant differences between the approaches.}
-%  \label{table:Epremopt:perf}
-%\vspace{-18pt}
-%\end{table}
-
 The results for \Epremopt are shown in \cref{fig:premopt:summary}. We create
 three configuration of \ourgc. \emph{None} has no fences, and thus is unsound,
 but allows us to approximate (allowing for possible vagaries from running
@@ -1577,6 +1549,19 @@ a mixture of: a lack of research on this problem; the challenging
 temporal aspects of GC; and, possibly, a poor fit with existing formalisms.
 The closest analogue we know of is the evolving research literature on memory
 models which, in a sense, modern GC is a superset of.
+
+\begin{figure}[t]
+    \centering
+    \importpgf{figures}{premopt_perf.pgf}
+    \caption{\laurie{we should change the $x$-axis to be 0.8-1.2x: there's nothing interesting past those points.} The effect of premature finalization optimisation,
+    normalised to \emph{None}
+    (i.e.~an unsound configuration with no fences). Grey
+    bars represent the ratio for \emph{naive} (all possible fences)
+    and blue bars \emph{optimised} (obviously unnecessary fences
+    removed). Unfortunately, this attempted optimisation has no statistically
+    significant effects.}
+    \label{fig:premopt:summary}
+\end{figure}
 
 Any performance judgements we make are necessarily contingent on our methodology
 the benchmark suite we chose, including the proportion of benchmarks that we ported, and
