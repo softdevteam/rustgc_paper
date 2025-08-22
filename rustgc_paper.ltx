@@ -1699,15 +1699,18 @@ memory usage one can observe in \ripgrep's time-series data.
     \centering
     \importpgf{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various metrics. The top-left
-    plot \laurie{i still struggle to understand the top-left plot e.g.~som-rs-bc}
-    should be read in conjunction with~\cref{tab:app:mem:conversion:runtime}. The other
+    chart shows the proportion of run-time \gc values that: have had their finalizers elided;
+    cannot have their finalizers elided; have no finalizers to elide. This chart
+    is best read in conjunction in~\cref{tab:app:mem:conversion:runtime} to (a)
+    get a sense of the quantity of run-time memory involved (b) how much indirectly
+    owned memory the \gc values have. The other
     plots use `no finalizer elision' as the normalization base (i.e.~values
     below 1 show that finalizer elision improves a metric). Total GC pause
     time is the cumulative time spent in stop-the-world collections. User time
     captures the time spent in all threads, including the finalizer thread.
-    Broadly speaking, the more finalizers are removed, and the
+    Broadly speaking, the more finalizers are elided, and the
     greater the proportion of the overall heap the memory owned by
-    \lstinline{Gc<T>} is, the better the metrics become.}
+    \lstinline{Gc<T>}, the better the metrics become.}
     \label{fig:elision:metrics}
 \end{figure}
 
