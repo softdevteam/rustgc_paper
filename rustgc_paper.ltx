@@ -1778,8 +1778,7 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
   \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
   \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
   \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
-  \item \cref{tab:app:elision:numgcs} (page~\pageref{tab:app:elision:numgcs}): Raw collection count data.
-  \item \cref{tab:app:elision:numgcallocs} (page~\pageref{tab:app:elision:numgcallocs}): Raw GC value allocation count data.
+  \item \jake{TODO: table of gc pause time raw values}
 \end{itemize}
 
 \begin{algorithm}[h]
@@ -2056,45 +2055,5 @@ default adaptive heap sizing and fixed size heap configurations.\end{itemize}
     \label{tab:app:elision:heap}
 \end{table}
 
-\begin{table}[t]
-  \begin{subtable}{0.48\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_numgcs_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.48\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_numgcs_2}
-      }
-  \end{subtable}
-  \vspace{5pt}
-  \caption{Raw collection count data for each benchmark on the finalizer elision
-    experiment. Values show arithmetic means with 99\% confidence intervals.}
-    \label{tab:app:elision:numgcs}
-\end{table}
-
-\begin{table}[t]
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.75}{%
-  \input{tables/appendix_elision_numgcallocs_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.75}{%
-  \input{tables/appendix_elision_numgcallocs_2}
-      }
-  \end{subtable}
-  \vspace{5pt}
-    \caption{Raw data for the number of \texttt{Gc<T>} values allocated for
-    each benchmark on the finalizer elision experiment. Values show arithmetic
-    means with 99\% confidence intervals.}
-    \label{tab:app:elision:numgcallocs}
-\end{table}
 
 \end{document}
