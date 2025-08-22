@@ -1,0 +1,36 @@
+\begin{tabular}{lrlrlr}
+  \toprule
+      & \multicolumn{2}{c}{jemalloc} &
+        \multicolumn{3}{c}{gcmalloc} \\
+  \cmidrule(lr){2-3}\cmidrule(lr){4-6}
+    & \multicolumn{2}{c}{Wall-clock (s)}
+    & \multicolumn{2}{c}{Wall-clock (s)}
+    & Slowdown \\
+\midrule
+  \alacritty & 0.39 & \scriptsize\textcolor{gray!60}{[0.36,0.43]} &
+               0.40 & \scriptsize\textcolor{gray!60}{[0.38,0.43]} &
+               1.02$\times$ \\
+  \binarytrees & \jake{Regenerating} & & & \\
+  \fd        & 0.28 & \scriptsize\textcolor{gray!60}{[0.25,0.34]} &
+               0.31 & \scriptsize\textcolor{gray!60}{[0.27,0.35]} &
+               1.08$\times$ \\
+  \grmtools   & 2.89 & \scriptsize\textcolor{gray!60}{[2.82,2.97]} &
+               3.10 & \scriptsize\textcolor{gray!60}{[3.01,3.18]} &
+               1.07$\times$ \\
+  \regexredux & \jake{Regenerating} & & & \\
+  \ripgrep    & 1.43 & \scriptsize\textcolor{gray!60}{[1.36,1.51]} &
+               1.46 & \scriptsize\textcolor{gray!60}{[1.39,1.53]} &
+               1.02$\times$ \\
+  \somrsast   & 0.58 & \scriptsize\textcolor{gray!60}{[0.56,0.60]} &
+               0.73 & \scriptsize\textcolor{gray!60}{[0.70,0.75]} &
+               1.26$\times$ \\
+  \somrsbc    & 0.23 & \scriptsize\textcolor{gray!60}{[0.22,0.24]} &
+               0.27 & \scriptsize\textcolor{gray!60}{[0.26,0.29]} &
+               1.18$\times$ \\
+  \midrule
+  Overall     & 0.49 & \scriptsize\textcolor{gray!60}{[0.47,0.51]} &
+               0.56 & \scriptsize\textcolor{gray!60}{[0.53,0.58]} &
+               1.14$\times$ \\
+  \bottomrule
+\end{tabular}
+
