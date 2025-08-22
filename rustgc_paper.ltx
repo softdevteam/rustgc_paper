@@ -1210,11 +1210,10 @@ brevity, we use to include \lstinline{Arc<T>} for the rest of this section).
 \begin{table}[t]
 \small
 \begin{center}
-\input{tables/conversion_source}
+\input{tables/mem_dist_src}
   \vspace{5pt}
-    \caption{ \laurie{remove the addlinespaces in this table and generally format it look more like the table on the following page}
-      How often each type is referenced in source code after our
-    porting. For reference-counted types, we further separate out strong and
+    \caption{How often each type is referenced in source code after our
+    porting. For \rc, we further separate out strong and
     weak references. This is a proxy for the extent of changes that cyclic
     data-structures impose upon source code.}
         \label{subfig:mem:source}
