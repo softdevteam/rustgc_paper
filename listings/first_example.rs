@@ -13,5 +13,6 @@ fn main() {
   gc2.borrow_mut().nbr = Some(gc2);
   gc1 = gc2;
   force_gc();
-  println!("{} {}", gc1.borrow().value, gc1.borrow().nbr.unwrap().borrow().value);
+  println!("{} {}", gc1.borrow().value, 
+		    gc1.borrow().nbr.unwrap().borrow().value);
 }

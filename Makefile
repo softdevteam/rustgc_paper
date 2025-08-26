@@ -26,7 +26,7 @@ ARXIV_FILES = softdev.sty \
 ARXIV_BASE=arxiv
 
 ACM_FILES = acmart.cls \
-		  ACM-Reference-Format.cls \
+		  ACM-Reference-Format.bst \
 		  bib.bib \
 		  rustgc_paper.bbl \
 		  rustgc_paper.ltx \

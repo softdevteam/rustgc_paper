@@ -1,5 +1,5 @@
 \documentclass[acmsmall]{acmart}
-\settopmatter{printfolios=true,printccs=false,printacmref=false}
+%\settopmatter{printfolios=true,printccs=false,printacmref=false}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
 
@@ -160,11 +160,13 @@
 
 \newcommand\rustcversion{1.79.0\xspace}
 
+
 %%% The following is specific to OOPSLA2 '25 and the paper
 %%% 'Garbage Collection for Rust: The Finalizer Frontier'
 %%% by Jacob Hughes and Laurence Tratt.
 %%%
 \setcopyright{cc}
+\setcctype{by}
 \acmDOI{10.1145/3763179}
 \acmYear{2025}
 \acmJournal{PACMPL}
@@ -176,10 +178,6 @@
 \received[accepted]{2025-08-12}
 
 \begin{document}
-
-\include{experiment_stats}
-\include{macros}
-
 
 \author{Jacob Hughes}
 \orcid{0009-0002-5321-0645}
@@ -200,6 +198,8 @@
 \email{laurie@tratt.net}
 
 \title{Garbage Collection for Rust: The Finalizer Frontier}
+\include{experiment_stats}
+\include{macros}
 
 \begin{abstract}
 \noindent Rust is a non-Garbage Collected (GCed) language, but the lack of GC
