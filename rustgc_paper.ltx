@@ -18,7 +18,6 @@
 \usepackage{multicol}
 \usepackage{multirow}
 \usepackage{pdflscape}
-\usepackage{pgfcache}
 \usepackage{siunitx}
 \usepackage{softdev}
 \usepackage{subcaption}
@@ -33,17 +32,17 @@
 \usepackage[capitalise]{cleveref}
 \def\mathdefault#1{#1}
 
-\setpgfpreamble{
-    \usepackage[T1]{fontenc}
-    \usepackage[utf8]{inputenc}
-    \usepackage{listings}
-    \lstset{basicstyle=\ttfamily}
-    \usepackage{libertine}
-    \usepackage[inconsolata]{zi4}
-    \usepackage{newtxmath}
-    \usepackage{xspace}
-    \include{macros}
-}
+%\setpgfpreamble{
+%    \usepackage[T1]{fontenc}
+%    \usepackage[utf8]{inputenc}
+%    \usepackage{listings}
+%    \lstset{basicstyle=\ttfamily}
+%    \usepackage{libertine}
+%    \usepackage[inconsolata]{zi4}
+%    \usepackage{newtxmath}
+%    \usepackage{xspace}
+%    \include{macros}
+%}
 
 \lstset{
     language=Rust,
@@ -1609,7 +1608,7 @@ regions around the mean.
 
 \begin{figure}[t]
     \centering
-    \importpgf{figures}{gcvs_perf.pgf}
+    \import{figures}{gcvs_perf.pgf}
     \caption{Comparing the effects of \gc and \rc on wall-clock time; heap footprint (i.e.~the size of
     the live set); and RSS. The baseline at 1 is \rc; values less than 1 show
     \gc as better than \rc; and the blue vertical line shows the geometric mean of ratios. The wall-clock times of \gc and
@@ -1653,7 +1652,7 @@ Although we caution against over-interpreting a single benchmark, this does give
 idea of the performance ceiling and floor for different approaches.
 
 \begin{figure}[t]
-    \importpgf{figures}{profiles.pgf}
+    \import{figures}{profiles.pgf}
     \vspace{-15pt}
     \caption{A selection of time-series data with various GC approaches, showing normalised
     time on the $x$-axis and heap footprint (with 99\% confidence intervals
@@ -1696,7 +1695,7 @@ memory usage one can observe in \ripgrep's time-series data.
 
 \begin{figure}[tb]
     \centering
-    \importpgf{figures}{elision_perf.pgf}
+    \import{figures}{elision_perf.pgf}
     \caption{The effects of finalizer elision on various metrics. The top-left
     chart shows the proportion of run-time \gc values that: have had their finalizers elided;
     cannot have their finalizers elided; have no finalizers to elide. This chart
@@ -1771,7 +1770,7 @@ models which, in a sense, modern GC is a superset of.
 
 \begin{figure}[t]
     \centering
-    \importpgf{figures}{premopt_perf.pgf}
+    \import{figures}{premopt_perf.pgf}
     \caption{The effect of premature finalization optimisation,
     normalised to \emph{None}
     (i.e.~an unsound configuration with no fences). Grey
