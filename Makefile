@@ -25,6 +25,55 @@ ARXIV_FILES = softdev.sty \
 
 ARXIV_BASE=arxiv
 
+ACM_FILES = acmart.cls \
+		  ACM-Reference-Format.cls \
+		  bib.bib \
+		  rustgc_paper.bbl \
+		  rustgc_paper.ltx \
+		  experiment_stats.tex \
+		  macros.tex \
+		  listings-rust.sty \
+		  listings/dangling_reference.rs \
+		  listings/finalization_cycle.rs \
+		  listings/finalizer_deadlock.rs \
+		  listings/finalization_cycle.stderr \
+		  listings/first_example.rs \
+		  listings/rc_example.rs \
+		  listings/thread_unsafety.rs \
+		  figures/profiles.pgf \
+		  figures/gcvs_perf.pgf \
+		  figures/elision_perf.pgf \
+		  figures/premopt_perf.pgf \
+		  figures/appendix_elision_wallclock.pdf \
+		  figures/appendix_elision_user.pdf \
+		  tables/appendix_alloc_comparison.tex \
+		  tables/appendix_elision_heap_1.tex \
+		  tables/appendix_elision_heap_2.tex \
+		  tables/appendix_elision_pct_1.tex \
+		  tables/appendix_elision_pct_2.tex \
+		  tables/appendix_elision_user_1.tex \
+		  tables/appendix_elision_user_2.tex \
+		  tables/appendix_elision_wallclock_1.tex \
+		  tables/appendix_elision_wallclock_2.tex \
+		  tables/appendix_gcvs_raw.tex \
+		  tables/appendix_gcvs_user_1.tex \
+		  tables/appendix_gcvs_user_2.tex \
+		  tables/appendix_gcvs_wallclock_1.tex \
+		  tables/appendix_gcvs_wallclock_2.tex \
+		  tables/benchmarks.tex \
+		  tables/exclusions.tex \
+		  tables/fixed_heaps.tex \
+		  tables/gcvs_perf_individual.tex \
+		  tables/mem_dist_pct.tex \
+		  tables/mem_dist_raw.tex \
+		  tables/mem_dist_src.tex \
+		  main.pdf \
+		  rustgc_paper.pdf \
+		  appendices.pdf
+
+
+ACM_BASE = acm
+
 all: appendices.pdf main.pdf rustgc_paper.pdf
 
 rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) $(LATEX_FILES)
@@ -78,6 +127,10 @@ ${ARXIV_BASE}: rustgc_paper.pdf
 	tmpltx=`mktemp`; \
 	latexpand $@/rustgc_paper.tex > $${tmpltx} && cp $${tmpltx} $@/rustgc_paper.tex;
 	zip -r $@.zip ${ARXIV_BASE}
+
+$(ACM_BASE): appendices.pdf main.pdf rustgc_paper.pdf
+	rsync -Rav ${ACM_FILES} $@
+	zip -r $@.zip ${ACM_BASE}
 
 clean-arxiv:
 	rm -rf arxiv
