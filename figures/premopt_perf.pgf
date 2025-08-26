@@ -31,7 +31,7 @@
 \begingroup%
 \makeatletter%
 \begin{pgfpicture}%
-\pgfpathrectangle{\pgfpointorigin}{\pgfqpoint{5.470000in}{1.900000in}}%
+\pgfpathrectangle{\pgfpointorigin}{\pgfqpoint{5.470000in}{2.000000in}}%
 \pgfusepath{use as bounding box, clip}%
 \begin{pgfscope}%
 \pgfsetbuttcap%
@@ -5760,16 +5760,16 @@
 \definecolor{currentstroke}{rgb}{0.203922,0.286275,0.368627}%
 \pgfsetstrokecolor{currentstroke}%
 \pgfsetdash{}{0pt}%
-\pgfpathmoveto{\pgfqpoint{2.240658in}{0.112626in}}%
-\pgfpathlineto{\pgfqpoint{2.285797in}{0.112626in}}%
-\pgfpathlineto{\pgfqpoint{2.330936in}{0.112626in}}%
+\pgfpathmoveto{\pgfqpoint{2.040658in}{0.062626in}}%
+\pgfpathlineto{\pgfqpoint{2.085797in}{0.062626in}}%
+\pgfpathlineto{\pgfqpoint{2.130936in}{0.062626in}}%
 \pgfusepath{stroke}%
 \end{pgfscope}%
 \begin{pgfscope}%
 \definecolor{textcolor}{rgb}{0.000000,0.000000,0.000000}%
 \pgfsetstrokecolor{textcolor}%
 \pgfsetfillcolor{textcolor}%
-\pgftext[x=2.403158in,y=0.081028in,left,base]{\color{textcolor}{\sffamily\fontsize{6.500000}{7.800000}\selectfont\catcode`\^=\active\def^{\ifmmode\sp\else\^{}\fi}\catcode`\%=\active\def%{\%}All Barriers}}%
+\pgftext[x=2.203158in,y=0.025028in,left,base]{\color{textcolor}{\sffamily\fontsize{6.500000}{7.800000}\selectfont\catcode`\^=\active\def^{\ifmmode\sp\else\^{}\fi}\catcode`\%=\active\def%{\%}All Barriers}}%
 \end{pgfscope}%
 \begin{pgfscope}%
 \pgfsetrectcap%
@@ -5778,16 +5778,16 @@
 \definecolor{currentstroke}{rgb}{0.227451,0.529412,0.850980}%
 \pgfsetstrokecolor{currentstroke}%
 \pgfsetdash{}{0pt}%
-\pgfpathmoveto{\pgfqpoint{3.079007in}{0.112626in}}%
-\pgfpathlineto{\pgfqpoint{3.124146in}{0.112626in}}%
-\pgfpathlineto{\pgfqpoint{3.169285in}{0.112626in}}%
+\pgfpathmoveto{\pgfqpoint{2.779007in}{0.062626in}}%
+\pgfpathlineto{\pgfqpoint{2.824146in}{0.062626in}}%
+\pgfpathlineto{\pgfqpoint{2.869285in}{0.062626in}}%
 \pgfusepath{stroke}%
 \end{pgfscope}%
 \begin{pgfscope}%
 \definecolor{textcolor}{rgb}{0.000000,0.000000,0.000000}%
 \pgfsetstrokecolor{textcolor}%
 \pgfsetfillcolor{textcolor}%
-\pgftext[x=3.241507in,y=0.081028in,left,base]{\color{textcolor}{\sffamily\fontsize{6.500000}{7.800000}\selectfont\catcode`\^=\active\def^{\ifmmode\sp\else\^{}\fi}\catcode`\%=\active\def%{\%}No Barriers }}%
+\pgftext[x=2.941507in,y=0.025028in,left,base]{\color{textcolor}{\sffamily\fontsize{6.500000}{7.800000}\selectfont\catcode`\^=\active\def^{\ifmmode\sp\else\^{}\fi}\catcode`\%=\active\def%{\%}Optimised Barriers }}%
 \end{pgfscope}%
 \end{pgfpicture}%
 \makeatother%
