@@ -1409,8 +1409,6 @@ up, we carried out three experiments:
 \vspace{10pt}
 
 \noindent In this section we explain our methodology and our experimental results.
-Our experiment is fully repeatable and downloadable from
- \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 
 \subsection{Methodology}
@@ -1731,14 +1729,14 @@ footprint highlights this issue.
 The results for \Epremopt are shown in \cref{fig:premopt:summary}. We created
 three configurations of \ourgc. \emph{None} has no fences, and thus is unsound,
 but allows us to approximate (allowing for possible vagaries from running
-unsound code!) the best possible situation for fence removal. \emph{Naive}
+unsound code!) the best possible outcome. \emph{Naive}
 inserts all possible fences. \emph{Optimised} inserts only necessary fences.
 Once confidence intervals are taken into account, there are
-simply no statistically significant results for this experiment. Although
+no statistically significant results for this experiment. Although
 it is possible that benchmarking `noise' is hiding a meaningful result, our
 data suggests that any such differences are likely to be minimal. To make
 up for this disappointment, the fact that there is no difference between
-any of these suggests that on non-artificial benchmarks, premature finalizer
+any of these suggests that, on non-artificial benchmarks, premature finalizer
 prevention is not a noticeable cost.
 
 
@@ -1798,7 +1796,7 @@ the portion of time we spend in the allocator; or \boehm's adaptive heap
 sizing strategy). A generic, modern conservative GC, using the insights of
 recent non-GC allocators, would almost certainly give different -- though
 we suspect not profoundly different -- results.
-To the best of our knowledge there is not currently an alternative production-quality
+To the best of our knowledge there is currently no production-quality
 modern, generic conservative, GC we could use instead, though we are aware of
 at least one attempt to create such an alternative: it will be interesting to rerun our
 experiments if and when that arrives.
@@ -1807,8 +1805,8 @@ The RSS memory metric we collect is at Linux's whim: if it does not update as
 frequently as we expect, we will see artificially `smoothed' data that may
 miss out peaks and troughs. Similar, our interpolation of time-series data onto a normalised
 grid can also smooth data. We manually checked a large quantity of data to
-ensure this was not a significant effect, and the fact that we run benchmarks
-30 times means makes it more likely that peaks and troughs are caught at least
+ensure this was not a significant effect; by running benchmarks
+30 times means it is also less more likely that peaks and troughs are caught at least
 sometimes.
 
 
@@ -1955,6 +1953,11 @@ for GC in Rust -- reasonable people may, for example, disagree on whether the co
 conservative GC are worth the gains -- but it does
 show how much can be achieved if one is willing to adjust and extend the
 language's design and \rustc.
+
+\section*{Data availability statement}
+
+Our experiment is fully repeatable and downloadable from
+ \url{https://github.com/softdevteam/rustgc_paper_experiment/}.
 
 \begin{acks}
 This work was funded by an EPSRC PhD studentship and the Shopify / Royal
