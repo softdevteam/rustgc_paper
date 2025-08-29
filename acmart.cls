@@ -39,7 +39,7 @@
 
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{acmart}
-[2025/08/21 v2.15 Typesetting articles for the Association for Computing Machinery]
+[2025/05/30 v2.14 Typesetting articles for the Association for Computing Machinery]
 \def\@classname{acmart}
 \InputIfFileExists{acmart-preload-hook.tex}{%
   \ClassWarning{\@classname}{%
@@ -414,17 +414,17 @@
   }%
   \addto\captionsfrench{%
       \if@ACM@journal
-        \renewcommand\keywordsname{Mots Clés et Phrases Supplémentaires}%
+        \renewcommand\keywordsname{Mots ClÃ©s et Phrases SupplÃ©mentaires}%
       \else
-        \renewcommand\keywordsname{Mots clés}%
+        \renewcommand\keywordsname{Mots clÃ©s}%
       \fi
       \renewcommand\acksname{Remerciements}%
   }%
   \addto\captionsgerman{%
       \if@ACM@journal
-        \renewcommand\keywordsname{Zusätzliche Schlagwörter und Phrasen}%
+        \renewcommand\keywordsname{ZusÃ¤tzliche SchlagwÃ¶rter und Phrasen}%
       \else
-        \renewcommand\keywordsname{Schlagwörter}%
+        \renewcommand\keywordsname{SchlagwÃ¶rter}%
       \fi
       \renewcommand\acksname{Danksagungen}%
   }%
@@ -859,8 +859,11 @@
     have the newtxmath package installed.  Please upgrade your
     TeX}\@ACM@newfontsfalse}
 \if@ACM@newfonts
+  % Note that the order in which packages are loaded matters,
+  % and the correct order depends on the LaTeX engine used.
+  % See https://github.com/borisveytsman/acmart/issues/402
+  % and https://github.com/borisveytsman/acmart/issues/410
   \ifxetex
-    \RequirePackage{amssymb}
     \RequirePackage{unicode-math}
     \setmathfont[Scale=MatchUppercase]{LibertinusMath-Regular.otf}
     \setmathfont{latinmodern-math.otf}[range={cal}]
@@ -868,7 +871,6 @@
     \setmonofont[StylisticSet=3]{inconsolata}
   \else
     \ifluatex
-      \RequirePackage{amssymb}
       \RequirePackage{unicode-math}
       \setmathfont[Scale=MatchUppercase]{LibertinusMath-Regular.otf}
       \setmathfont{latinmodern-math.otf}[range={cal}]
@@ -1095,8 +1097,6 @@
 \@ACM@maketitle@typesetfalse
 \define@choicekey*+{ACM}{acmJournal}[\@journalCode\@journalCode@nr]{%
   ACMJCSS,%
-  ACMJDS,%
-  AILET,%
   CIE,%
   CSUR,%
   DGOV,%
@@ -1125,8 +1125,6 @@
   TAAS,%
   TACCESS,%
   TACO,%
-  TAIS,%
-  TAISAP,%
   TALG,%
   TALLIP,%
   TAP,%
@@ -1178,16 +1176,6 @@
   \def\@journalNameShort{ACM J. Comput. Sustain. Soc.}%
   \def\@permissionCodeOne{2834-5533}%
   \def\@permissionCodeTwo{2834-5533}%
-\relax % ACMJCDS
-  \def\@journalName{ACM Journal of Data Science}%
-  \def\@journalNameShort{ACM J. Data Sci.}%
-  \def\@permissionCodeOne{0000-0000}%
-  \def\@permissionCodeTwo{0000-0000}%
-\relax % AILET
-  \def\@journalName{ACM AI Letters}%
-  \def\@journalNameShort{ACM AI Lett.}%
-  \def\@permissionCodeOne{3068-8590}%
-  \def\@permissionCodeTwo{3068-8590}%
 \or % CIE
   \def\@journalName{ACM Computers in Entertainment}%
   \def\@journalNameShort{ACM Comput. Entertain.}%
@@ -1339,16 +1327,6 @@
   \def\@journalNameShort{ACM Trans. Arch. Code Optim.}%
   \def\@permissionCodeOne{1544-3566}%
   \def\@permissionCodeTwo{1544-3973}%
-\or % TAIS
-  \def\@journalName{ACM Transactions on AI for Science}%
-  \def\@journalNameShort{ACM Trans. AI Sci.}%
-  \def\@permissionCodeOne{3066-4438}%
-  \def\@permissionCodeTwo{3066-4438}%
-\or % TAISAP
-  \def\@journalName{ACM Transactions on AI Security and Privacy}%
-  \def\@journalNameShort{ACM Trans. AI Secur. Priv.}%
-  \def\@permissionCodeOne{3068-3564}%
-  \def\@permissionCodeTwo{3068-3564}%
 \or % TALG
   \def\@journalName{ACM Transactions on Algorithms}%
   \def\@journalNameShort{ACM Trans. Algor.}%
@@ -2115,7 +2093,7 @@
    affiliate of the national government of Canada. As such, the Crown
    in Right of Canada retains an equal interest in the
    copyright. Reprints must include clear attribution to ACM and the
-   author’s government agency affiliation. Permission to make digital
+   authorâ€™s government agency affiliation. Permission to make digital
    or hard copies for personal or classroom use is granted. Copies
    must bear this notice and the full citation on the first
    page. Copyrights for components of this work owned by others than
@@ -2892,10 +2870,8 @@
     addresses are mandatory for ACM journals}%
   \fi\fi\fi}
 \def\@setaddresses{}
-\def\@authornotemark{\g@addto@macro\@currentauthors{%
-    \advance\hfuzz by 5pt\relax\footnotemark\relax}}
-\def\@@authornotemark#1{\g@addto@macro\@currentauthors{%
-    \advance\hfuzz by 5pt\relax\footnotemark[#1]}}
+\def\@authornotemark{\g@addto@macro\@currentauthors{\footnotemark\relax}}
+\def\@@authornotemark#1{\g@addto@macro\@currentauthors{\footnotemark[#1]}}
 \def\@mkteasers{%
   \ifx\@teaserfigures\@empty\else
     \def\@teaser##1{\par\bigskip\bgroup
@@ -3653,3 +3629,4 @@
 \endinput
 %%
 %% End of file `acmart.cls'.
+
