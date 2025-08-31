@@ -68,13 +68,12 @@ ACM_FILES = acmart.cls \
 		  tables/mem_dist_raw.tex \
 		  tables/mem_dist_src.tex \
 		  main.pdf \
-		  rustgc_paper.pdf \
 		  appendices.pdf
 
 
 ACM_BASE = acm
 
-all: appendices.pdf main.pdf rustgc_paper.pdf
+all: main.pdf rustgc_paper.pdf
 
 rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) $(LATEX_FILES)
 	pdflatex  -shell-escape rustgc_paper.ltx
@@ -82,9 +81,8 @@ rustgc_paper.pdf: bib.bib ${PLOTS} $(PGFCACHE) $(FIGURES) $(TABLES) $(LATEX_FILE
 	pdflatex  -shell-escape rustgc_paper.ltx
 	pdflatex  -shell-escape rustgc_paper.ltx
 
-appendices.pdf main.pdf: rustgc_paper.pdf
+main.pdf: rustgc_paper.pdf
 	pdfjam -o main.pdf rustgc_paper.pdf 1-27
-	pdfjam -o appendices.pdf rustgc_paper.pdf 28-
 
 rustgc_paper_preamble.fmt: rustgc_paper_preamble.ltx experiment_stats.tex
 	set -e; \
@@ -128,7 +126,7 @@ ${ARXIV_BASE}: rustgc_paper.pdf
 	latexpand $@/rustgc_paper.tex > $${tmpltx} && cp $${tmpltx} $@/rustgc_paper.tex;
 	zip -r $@.zip ${ARXIV_BASE}
 
-$(ACM_BASE): appendices.pdf main.pdf rustgc_paper.pdf
+$(ACM_BASE): main.pdf rustgc_paper.pdf
 	rsync -Rav ${ACM_FILES} $@
 	zip -r $@.zip ${ACM_BASE}
 
