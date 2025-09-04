@@ -1037,7 +1037,7 @@ reference both a callee and a successor basic block.
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies drop method terminators which reference elidable finalizers, and turns them into `goto' terminators
-to the successor basic basic block. Algorithm 4 in the Appendix presents a
+to the successor basic basic block. \cref{alg:barrier_removal} in the Appendix presents a
 more formal version of this algorithm.
 
 
@@ -1501,7 +1501,7 @@ we reverted back to \lstinline{Rc<T>} for that portion of the port.
 We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
 eventual benchmark suite, we briefly report why those other programs have
-been excluded. All excluded benchmarks are shown in Table 4 in the Appendix.
+been excluded. All excluded benchmarks are shown in \cref{tab:app:exclusions} in the Appendix.
 
 Several programs (e.g.~numbat, mini-moka, and salsa), once ported, turned out
 to be uninteresting from a GC benchmarking perspective. Irrespective of the
@@ -1541,7 +1541,8 @@ different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \rc can use a modern allocator such as jemalloc.
 Much has changed in the performance of allocators since \boehm's 1980s
 roots: in \rc-only benchmarks, we observe an inherent overhead
-from \boehm of 2--26\% relative to jemalloc (see Table 6 in the Appendix), which is a significant, and variable, confounding factor.
+from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
+in the Appendix), which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
@@ -1568,7 +1569,7 @@ whether a different strategy and/or heap size would make a difference,
 we ran our benchmarks with three different fixed heap sizes. Doing so
 either has little effect or speeds benchmarks up; when it does so,
 the impact is generally under 10\% and is at most 28\% (the detailed results are presented in
-Table 9 in the Appendix). Broadly speaking, this
+\cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, this
 suggests that \boehm's default heap sizing approach, at least in our context,
 is not significantly distorting our view of performance.
 
@@ -1632,7 +1633,7 @@ is in absolute terms.
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgcproj. The time-series data in~\cref{fig:profiles} is
-particularly illuminating (for completeness, Table 5 in the Appendix has the
+particularly illuminating (for completeness, \cref{tab:gcvs:raw} in the Appendix has the
 raw timings). \ourgc is around 3.5$\times$ slower than \typedarena. The
 time-series data for the latter shows it going through distinct phases: a (relatively long) allocation
 phase, a (relatively moderate) `work' phase, and a (relatively short) deallocation phase.
@@ -1969,274 +1970,274 @@ Steve Klabnik and Andy Wingo for comments.
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
-%\clearpage
+\clearpage
 
-%\appendix
-%
-%\section*{Appendices}
-%
-%\begin{algorithm}[h]
-%\small
-%\caption{Removing elidable drops}
-%\begin{algorithmic}
-%\Function{RemoveElidableDrops}{$func$}
-%      \ForEach {$basic\_block \in func$}
-%            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-%                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-%                \If {\Call{IsGcType}{$ty$}}
-%                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
-%                        \State \Call{ReplaceTerminator}{$basic\_block$}
-%                    \EndIf
-%                \EndIf
-%            \EndIf
-%      \EndFor
-%\EndFunction
-%\Function{ReplaceTerminator}{$basic\_block$}
-%    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-%    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-%    \State $block.terminator \gets last\_block.terminator$
-%\EndFunction
-%\end{algorithmic}
-%    \caption{The \emph{Remove Elidable Drops} algorithm from \cref{sec:optimising_prem}}
-%  \label{alg:barrier_removal}
-%\end{algorithm}
-%
-%\clearpage
-%
-%\section*{Additional Experiment Data}
-%
-%In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
-%\\\\
-%
-%\textbf{Misc.}
-%\begin{itemize}
-%  \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
-%\end{itemize}
-%\textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
-%
-%\begin{itemize}
-%  \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
-%  \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
-%  \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
-%  \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
-%  \item \cref{tab:app:gcvs:fixed:heap}
-%      (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
-%default adaptive heap sizing and fixed size heap configurations.\end{itemize}
-%\textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
-%
-%\begin{itemize}
-%  \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
-%  \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
-%  \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
-%  \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
-%  \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
-%\end{itemize}
-%
-%\clearpage
-%
-%\begin{table}[t]
-%\centering
-%\caption{Rust programs excluded from our benchmark suite after attempted porting to \ourgc.}
-%\small
-%\begin{center}
-%\scalebox{0.8}{%
-%    \input{tables/exclusions}
-%}
-%\label{tab:app:exclusions}
-%\end{center}
-%\end{table}
-%
-%\begin{table}[h]
-%    \centering
-%    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
-%    different memory management strategies across our benchmark suites.}
-%    \input{tables/appendix_gcvs_raw}
-%    \label{tab:gcvs:raw}
-%\end{table}
-%
-%\begin{table}[h]
-%    \centering
-%    \caption{Wall-clock times (in seconds) comparing the jemalloc
-%    allocator and the \boehm allocator from the \boehm across our
-%    benchmark suite.}
-%    \label{tab:app:gcvs:alloc:cost}
-%\scalebox{0.9}{%
-%  \input{tables/appendix_alloc_comparison}
-%}
-%\end{table}
-%
-%\begin{table}[t]
-%    \centering
-%  \caption{Wall-clock execution times (in seconds) for each benchmark in the
-%    \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
-%    and include 99\% confidence intervals. Because \binarytrees and \regexredux
-%    are stand-alone benchmarks they are omitted here; their timings appear in
-%    \cref{tab:gcvs:raw}.}
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.7}{%
-%  \input{tables/appendix_gcvs_wallclock_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.7}{%
-%  \input{tables/appendix_gcvs_wallclock_2}
-%      }
-%  \end{subtable}
-%    \label{tab:app:gcvs:wallclock}
-%\end{table}
-%
-%\begin{table}[t]
-%    \centering
-%  \caption{User times (in seconds) for each benchmark in the \Egcrc experiment.
-%    Values show arithmetic means over \benchmarkpexecs runs and include 99\%
-%    confidence intervals.}
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.7}{%
-%  \input{tables/appendix_gcvs_user_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.7}{%
-%  \input{tables/appendix_gcvs_user_2}
-%      }
-%  \end{subtable}
-%    \label{tab:app:gcvs:user}
-%\end{table}
-%
-%\begin{table}[h]
-%  \caption{The effects of fixing the heap size (see~\cref{sec:running_the_experiment})
-%    on wall-clock time, reported as ratios relative to \boehm’s default
-%    adaptive RSS strategy. We chose per-benchmark heap sizes based on our
-%    observations of their memory usage, though some benchmarks fail at smaller
-%    values. Broadly speaking, these results show that the performance
-%    differences due to different heap sizes are relatively minor, and that \boehm's adaptive
-%    strategy has not unduly coloured our results.}
-%  \input{tables/fixed_heaps}
-%\label{tab:app:gcvs:fixed:heap}
-%\end{table}
-%
-%\clearpage
-%
-%\begin{table}[t]
-%    \centering
-%    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark.}
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_pct_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_pct_2}
-%      }
-%  \end{subtable}
-%    \label{tab:app:elision:pct}
-%\end{table}
-%
-%\clearpage
-%
-%\begin{figure}[htbp]
-%    \centering
-%    \begin{subfigure}{1\textwidth}
-%        \centering
-%        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_wallclock.pdf}
-%    \end{subfigure}%
-%    \hfill
-%    \begin{subfigure}{1\textwidth}
-%        \centering
-%        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_user.pdf}
-%    \end{subfigure}
-%    \caption{Wall-clock and user time performance comparison for finalizer
-%    elision on each benchmark. The bars show the relative performance of \ourgc
-%    after applying our elision optimization, normalized against the baseline
-%    (solid black line). The vertical blue line marks the overall geometric mean
-%    (with shaded area for CIs). User time often shows greater improvement than
-%    wall-clock time, as elision reduces the CPU overhead of the finalization
-%    thread.}
-%    \label{fig:app:elision:perf}
-%\end{figure}
-%
-%\clearpage
-%
-%\begin{table}[t]
-%    \centering
-%    \caption{Wall-clock execution times (seconds) for each benchmark in the
-%    \Eelision experiment, shown before and after applying \ourgc's
-%    finalizer elision optimisation. Values show arithmetic means over
-%    \benchmarkpexecs runs, with 99\% confidence intervals.}
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_wallclock_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_wallclock_2}
-%      }
-%  \end{subtable}
-%  \label{tab:app:elision:wallclock}
-%\end{table}
-%
-%\clearpage
-%
-%\begin{table}[t]
-%    \centering
-%    \caption{User times (seconds) for each benchmark in the \Eelision
-%    experiment, shown before and after applying \ourgc's finalizer elision
-%    optimisation. Values show arithmetic means over \benchmarkpexecs runs, with
-%    99\% confidence intervals.}
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_user_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.49\textwidth}
-%    \centering
-%\scalebox{0.8}{%
-%  \input{tables/appendix_elision_user_2}
-%      }
-%  \end{subtable}
-%    \label{tab:app:elision:user}
-%\end{table}
-%
-%\clearpage
-%
-%\begin{table}[t]
-%    \centering
-%    \caption{Average heap footprint (MiB) across benchmarks in the \Eelision
-%    experiment, measured before and after applying \ourgc’s finalizer elision
-%    optimisation. Values are arithmetic means over \benchmarkpexecs runs with
-%    resampled traces from heaptrack, with 99\% confidence intervals (see
-%    \cref{sec:datapres} for details).}
-%    \label{tab:app:elision:heap}
-%  \begin{subtable}{0.47\textwidth}
-%    \centering
-%\scalebox{0.81}{%
-%  \input{tables/appendix_elision_heap_1}
-%}
-%  \end{subtable}
-%  \hfill
-%  \begin{subtable}{0.47\textwidth}
-%    \centering
-%\scalebox{0.79}{%
-%  \input{tables/appendix_elision_heap_2}
-%      }
-%  \end{subtable}
-%\end{table}
+\appendix
+
+\section*{Appendices}
+
+\begin{algorithm}[h]
+\small
+\caption{Removing elidable drops}
+\begin{algorithmic}
+\Function{RemoveElidableDrops}{$func$}
+      \ForEach {$basic\_block \in func$}
+            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+                \If {\Call{IsGcType}{$ty$}}
+                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
+                        \State \Call{ReplaceTerminator}{$basic\_block$}
+                    \EndIf
+                \EndIf
+            \EndIf
+      \EndFor
+\EndFunction
+\Function{ReplaceTerminator}{$basic\_block$}
+    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+    \State $block.terminator \gets last\_block.terminator$
+\EndFunction
+\end{algorithmic}
+    \caption{The \emph{Remove Elidable Drops} algorithm from \cref{sec:optimising_prem}}
+  \label{alg:barrier_removal}
+\end{algorithm}
+
+\clearpage
+
+\section*{Additional Experiment Data}
+
+In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
+\\\\
+
+\textbf{Misc.}
+\begin{itemize}
+  \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
+\end{itemize}
+\textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
+
+\begin{itemize}
+  \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
+  \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
+  \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
+  \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
+  \item \cref{tab:app:gcvs:fixed:heap}
+      (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
+default adaptive heap sizing and fixed size heap configurations.\end{itemize}
+\textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
+
+\begin{itemize}
+  \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
+  \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
+  \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
+  \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
+  \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
+\end{itemize}
+
+\clearpage
+
+\begin{table}[t]
+\centering
+\caption{Rust programs excluded from our benchmark suite after attempted porting to \ourgc.}
+\small
+\begin{center}
+\scalebox{0.8}{%
+    \input{tables/exclusions}
+}
+\label{tab:app:exclusions}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
+    different memory management strategies across our benchmark suites.}
+    \input{tables/appendix_gcvs_raw}
+    \label{tab:gcvs:raw}
+\end{table}
+
+\begin{table}[h]
+    \centering
+    \caption{Wall-clock times (in seconds) comparing the jemalloc
+    allocator and the \boehm allocator from the \boehm across our
+    benchmark suite.}
+    \label{tab:app:gcvs:alloc:cost}
+\scalebox{0.9}{%
+  \input{tables/appendix_alloc_comparison}
+}
+\end{table}
+
+\begin{table}[t]
+    \centering
+  \caption{Wall-clock execution times (in seconds) for each benchmark in the
+    \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
+    and include 99\% confidence intervals. Because \binarytrees and \regexredux
+    are stand-alone benchmarks they are omitted here; their timings appear in
+    \cref{tab:gcvs:raw}.}
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.7}{%
+  \input{tables/appendix_gcvs_wallclock_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.7}{%
+  \input{tables/appendix_gcvs_wallclock_2}
+      }
+  \end{subtable}
+    \label{tab:app:gcvs:wallclock}
+\end{table}
+
+\begin{table}[t]
+    \centering
+  \caption{User times (in seconds) for each benchmark in the \Egcrc experiment.
+    Values show arithmetic means over \benchmarkpexecs runs and include 99\%
+    confidence intervals.}
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.7}{%
+  \input{tables/appendix_gcvs_user_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.7}{%
+  \input{tables/appendix_gcvs_user_2}
+      }
+  \end{subtable}
+    \label{tab:app:gcvs:user}
+\end{table}
+
+\begin{table}[h]
+  \caption{The effects of fixing the heap size (see~\cref{sec:running_the_experiment})
+    on wall-clock time, reported as ratios relative to \boehm’s default
+    adaptive RSS strategy. We chose per-benchmark heap sizes based on our
+    observations of their memory usage, though some benchmarks fail at smaller
+    values. Broadly speaking, these results show that the performance
+    differences due to different heap sizes are relatively minor, and that \boehm's adaptive
+    strategy has not unduly coloured our results.}
+  \input{tables/fixed_heaps}
+\label{tab:app:gcvs:fixed:heap}
+\end{table}
+
+\clearpage
+
+\begin{table}[t]
+    \centering
+    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark.}
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_pct_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_pct_2}
+      }
+  \end{subtable}
+    \label{tab:app:elision:pct}
+\end{table}
+
+\clearpage
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_wallclock.pdf}
+    \end{subfigure}%
+    \hfill
+    \begin{subfigure}{1\textwidth}
+        \centering
+        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_user.pdf}
+    \end{subfigure}
+    \caption{Wall-clock and user time performance comparison for finalizer
+    elision on each benchmark. The bars show the relative performance of \ourgc
+    after applying our elision optimization, normalized against the baseline
+    (solid black line). The vertical blue line marks the overall geometric mean
+    (with shaded area for CIs). User time often shows greater improvement than
+    wall-clock time, as elision reduces the CPU overhead of the finalization
+    thread.}
+    \label{fig:app:elision:perf}
+\end{figure}
+
+\clearpage
+
+\begin{table}[t]
+    \centering
+    \caption{Wall-clock execution times (seconds) for each benchmark in the
+    \Eelision experiment, shown before and after applying \ourgc's
+    finalizer elision optimisation. Values show arithmetic means over
+    \benchmarkpexecs runs, with 99\% confidence intervals.}
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_wallclock_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_wallclock_2}
+      }
+  \end{subtable}
+  \label{tab:app:elision:wallclock}
+\end{table}
+
+\clearpage
+
+\begin{table}[t]
+    \centering
+    \caption{User times (seconds) for each benchmark in the \Eelision
+    experiment, shown before and after applying \ourgc's finalizer elision
+    optimisation. Values show arithmetic means over \benchmarkpexecs runs, with
+    99\% confidence intervals.}
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_user_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.49\textwidth}
+    \centering
+\scalebox{0.8}{%
+  \input{tables/appendix_elision_user_2}
+      }
+  \end{subtable}
+    \label{tab:app:elision:user}
+\end{table}
+
+\clearpage
+
+\begin{table}[t]
+    \centering
+    \caption{Average heap footprint (MiB) across benchmarks in the \Eelision
+    experiment, measured before and after applying \ourgc’s finalizer elision
+    optimisation. Values are arithmetic means over \benchmarkpexecs runs with
+    resampled traces from heaptrack, with 99\% confidence intervals (see
+    \cref{sec:datapres} for details).}
+    \label{tab:app:elision:heap}
+  \begin{subtable}{0.47\textwidth}
+    \centering
+\scalebox{0.81}{%
+  \input{tables/appendix_elision_heap_1}
+}
+  \end{subtable}
+  \hfill
+  \begin{subtable}{0.47\textwidth}
+    \centering
+\scalebox{0.79}{%
+  \input{tables/appendix_elision_heap_2}
+      }
+  \end{subtable}
+\end{table}
 
 
 \end{document}
