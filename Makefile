@@ -5,72 +5,27 @@
 
 LATEX_FILES = rustgc_paper.ltx macros.tex experiment_stats.tex
 PLOTS = $(patsubst %.svg,%.pdf, $(shell find . -type f -name "*.svg"))
-FIGURES = $(shell find figures/ -type f -name "*.pgf")
+FIGURES = $(shell find figures/ -type f -name "*.pgf") \
+		  figures/appendix_elision_wallclock.pdf \
+		  figures/appendix_elision_user.pdf
 PGFCACHE = _pgfcache
 TABLES = $(shell find tables/ -type f -name "*.tex")
 
-ARXIV_FILES = softdev.sty \
-		listings-rust.sty \
-		bib.bib \
-		rustgc_paper.bbl \
-		experiment_stats.tex \
-		ripgrep_subset.pdf \
-		listings/dangling_reference.rs \
-		listings/finalization_cycle.rs \
-		listings/finalizer_deadlock.rs \
-		listings/finalization_cycle.stderr \
-		listings/first_example.rs \
-		listings/rc_example.rs \
-		listings/thread_unsafety.rs
+AUX_FILES = ACM-Reference-Format.bst acmart.cls listings-rust.sty bib.bib \
+			rustgc_paper.bbl
 
+LISTINGS = listings-rust.sty \
+		   listings/dangling_reference.rs \
+		   listings/finalization_cycle.rs \
+		   listings/finalizer_deadlock.rs \
+		   listings/finalization_cycle.stderr \
+		   listings/first_example.rs \
+		   listings/rc_example.rs \
+		   listings/thread_unsafety.rs
+
+ARXIV_FILES = $(LATEX_FILES) $(AUX_FILES) $(LISTINGS) $(TABLES) $(FIGURES)
 ARXIV_BASE=arxiv
-
-ACM_FILES = acmart.cls \
-		  ACM-Reference-Format.bst \
-		  bib.bib \
-		  rustgc_paper.bbl \
-		  rustgc_paper.ltx \
-		  experiment_stats.tex \
-		  macros.tex \
-		  listings-rust.sty \
-		  listings/dangling_reference.rs \
-		  listings/finalization_cycle.rs \
-		  listings/finalizer_deadlock.rs \
-		  listings/finalization_cycle.stderr \
-		  listings/first_example.rs \
-		  listings/rc_example.rs \
-		  listings/thread_unsafety.rs \
-		  figures/profiles.pgf \
-		  figures/gcvs_perf.pgf \
-		  figures/elision_perf.pgf \
-		  figures/premopt_perf.pgf \
-		  figures/appendix_elision_wallclock.pdf \
-		  figures/appendix_elision_user.pdf \
-		  tables/appendix_alloc_comparison.tex \
-		  tables/appendix_elision_heap_1.tex \
-		  tables/appendix_elision_heap_2.tex \
-		  tables/appendix_elision_pct_1.tex \
-		  tables/appendix_elision_pct_2.tex \
-		  tables/appendix_elision_user_1.tex \
-		  tables/appendix_elision_user_2.tex \
-		  tables/appendix_elision_wallclock_1.tex \
-		  tables/appendix_elision_wallclock_2.tex \
-		  tables/appendix_gcvs_raw.tex \
-		  tables/appendix_gcvs_user_1.tex \
-		  tables/appendix_gcvs_user_2.tex \
-		  tables/appendix_gcvs_wallclock_1.tex \
-		  tables/appendix_gcvs_wallclock_2.tex \
-		  tables/benchmarks.tex \
-		  tables/exclusions.tex \
-		  tables/fixed_heaps.tex \
-		  tables/gcvs_perf_individual.tex \
-		  tables/mem_dist_pct.tex \
-		  tables/mem_dist_raw.tex \
-		  tables/mem_dist_src.tex \
-		  main.pdf \
-		  appendices.pdf
-
-
+ACM_FILES = main.pdf appendices.pdf $(ARXIV_FILES)
 ACM_BASE = acm
 
 all: main.pdf rustgc_paper.pdf
@@ -118,12 +73,6 @@ softdevbib/softdev.bib:
 ${ARXIV_BASE}: rustgc_paper.pdf
 	mkdir $@
 	rsync -Rav ${ARXIV_FILES} $@
-	echo "\input{rustgc_paper_preamble.ltx}" > $@/rustgc_paper.tex
-	cat rustgc_paper.ltx | grep -v "%&rustgc_paper_preamble" | grep -v "\\endofdump" >> $@/rustgc_paper.tex
-	sed -i'.bk' '/\\endofdump/d' $@/rustgc_paper.tex
-	rm -f $@/rustgc_paper.tex.bk
-	tmpltx=`mktemp`; \
-	latexpand $@/rustgc_paper.tex > $${tmpltx} && cp $${tmpltx} $@/rustgc_paper.tex;
 	zip -r $@.zip ${ARXIV_BASE}
 
 $(ACM_BASE): main.pdf rustgc_paper.pdf
