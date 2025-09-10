@@ -1,15 +1,13 @@
 \documentclass[acmsmall]{acmart}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-
-\usepackage{algorithm}
+\usepackage[ruled, vlined, linesnumbered]{algorithm2e}
 \usepackage{adjustbox}
-\usepackage[noend]{algpseudocode}
 \usepackage{booktabs}
-\usepackage{courier}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{overpic}
+\usepackage{xcolor}
 \usepackage{listings}
 \usepackage{listings-rust}
 \usepackage{microtype}
@@ -23,78 +21,16 @@
 \usepackage{xspace}
 \usepackage{ifthen}
 \usepackage{geometry}
-\usepackage{xcolor}
-
 
 % Must be loaded last
 \usepackage[capitalise]{cleveref}
 \def\mathdefault#1{#1}
 
-%\setpgfpreamble{
-%    \usepackage[T1]{fontenc}
-%    \usepackage[utf8]{inputenc}
-%    \usepackage{listings}
-%    \lstset{basicstyle=\ttfamily}
-%    \usepackage{libertine}
-%    \usepackage[inconsolata]{zi4}
-%    \usepackage{newtxmath}
-%    \usepackage{xspace}
-%    \include{macros}
-%}
-
 \lstset{
     language=Rust,
-    style=colouredRust,
-    xleftmargin=0pt,
-    numbersep=.8em,
-    numberstyle=\scriptsize\tiny\color{gray},
-    basicstyle=\ttfamily,
-    lineskip=-2pt,
-    captionpos=b,
-    escapeinside={{<!}{!>}},
-    numbers=left,
-    xleftmargin=15pt,
-    keywordstyle={},
-    commentstyle={},
-    stringstyle={},
-    keywordstyle=[2]{},
-    keywordstyle=[3]{},
-    keywordstyle=[4]{},
-    keywordstyle=[5]{},
-    emph={}
+    basicstyle=\selectfont\tt\color{black},
+    keywordstyle={}
 }
-
-\lstnewenvironment{lstrustsmall}[1][]
-  {
-      \lstset{
-          language=Rust,
-          style=colouredRust,
-          xleftmargin=0pt,
-          numbersep=.8em,
-          numberstyle=\scriptsize\tiny,
-          basicstyle=\ttfamily\small,
-          captionpos=b,
-          escapeinside={{<!}{!>}},
-          numbers=left,
-          xleftmargin=15pt,
-          }
-}{}
-
-\lstnewenvironment{lstrustsmallnonums}[1][]
-  {
-      \lstset{
-          language=Rust,
-          style=colouredRust,
-          xleftmargin=0pt,
-          numbersep=.8em,
-          numberstyle=\scriptsize\tiny,
-          basicstyle=\ttfamily\small,
-          captionpos=b,
-          escapeinside={{<!}{!>}},
-          numbers=none,
-          xleftmargin=15pt,
-          }
-}{}
 
 % from https://tex.stackexchange.com/questions/264361/skipping-line-numbers-in-lstlisting#264373
 \let\origthelstnumber\thelstnumber
@@ -105,17 +41,20 @@
      \advance\c@lstnumber-\@ne\relax%
     }%
 }
-\newtheorem{definition}{Definition}
 
 % Algorithm macros
-\algnewcommand\algorithmicforeach{\textbf{for each}}
-\algdef{S}[FOR]{ForEach}[1]{\algorithmicforeach\ #1\ \algorithmicdo}
-\algnewcommand{\algorithmicand}{\textbf{and }}
-\algnewcommand{\algorithmicor}{\textbf{or }}
-\algnewcommand{\algorithmicnot}{\textbf{not }}
-\algnewcommand{\NOT}{\algorithmicnot}
-\algnewcommand{\OR}{\algorithmicor}
-\algnewcommand{\AND}{\algorithmicand}
+\SetAlFnt{\ttfamily\footnotesize}
+
+\SetKwIF{If}{ElseIf}{Else}{\texttt{\textbf{if}}}{\texttt{\textbf{then}}}{\texttt{\textbf{else if}}}{\texttt{\textbf{else}}}{\texttt{\textbf{endif}}}
+
+\SetKw{ForEach}{\texttt{\textbf{for each}}}
+\SetKwProg{Function}{\texttt{\textbf{function}}}{:}{}
+\SetKw{AND}{\texttt{\textbf{and}}}
+\SetKw{OR}{\texttt{\textbf{or}}}
+\SetKw{NOT}{\texttt{\textbf{not}}}
+\SetKw{Continue}{\texttt{\textbf{continue}}}
+\SetKw{Return}{\texttt{\textbf{return}}}
+\SetKwBlock{DoBlock}{\texttt{\textbf{do}}}{}
 
 \newcommand\boehm{\textsc{BDWGC}\xspace}
 \newcommand\rustbacon{\textsc{Bacon-Rajan-CC}\xspace}
@@ -129,10 +68,6 @@
 \newcommand\gcarena{\textsc{gc-arena}\xspace}
 \newcommand\bor{borrow-or-finalize rule\xspace}
 
-
-\newcommand\somrsastbarriersnone{\textsc{som-rs-ast$_{\textrm{BarriersNone}}$}\xspace}
-\newcommand\somrsastbarriersnaive{\textsc{som-rs-ast$_{\textrm{BarriersNaive}}$}\xspace}
-\newcommand\somrsastbarriersopt{\textsc{som-rs-ast$_{\textrm{BarriersOpt}}$}\xspace}
 
 \newcommand\somrsrc{\textsc{rc$_{\textrm{jemalloc}}$}\xspace}
 \newcommand\somrsrcbdwgc{\textsc{rc$_{\textrm{bdwgcalloc}}$}\xspace}
@@ -157,6 +92,64 @@
 \newcommand\Epremopt{E$_\textrm{PremOpt}$\xspace}
 
 \newcommand\rustcversion{1.79.0\xspace}
+
+\lstdefinestyle{rustblock}{
+    language=Rust,
+    numbersep=5pt,
+    xleftmargin=10pt,
+    numberstyle=\fontsize{5}{8}\selectfont\tt\color{gray},
+    basicstyle=\fontsize{8}{9}\selectfont\tt\color{black},
+    keywordstyle=\bfseries, % reserved keywords
+    keywordstyle=[2]\color[rgb]{0.75, 0, 0},% traits
+    keywordstyle=[3]\color[rgb]{0, 0.5, 0},% primitive types
+    keywordstyle=[4]\color[rgb]{0, 0.5, 0},% type and value constructors
+    keywordstyle=[5]\color[rgb]{0, 0, 0.75},% macros
+    captionpos=b,
+    escapeinside={{<!}{!>}},
+    numbers=left,
+    tabsize=2,
+    breakatwhitespace=false,
+    breaklines=false,
+    showstringspaces=false,
+    showspaces=false,
+    columns=fullflexible,
+    language=Rust
+}
+
+\lstdefinelanguage{FsaError}{%
+  sensitive%
+, morecomment=[l]{//}%
+, morecomment=[s]{/*}{*/}%
+, morestring=[b]{"}%
+, alsodigit={}%
+, alsoother={}%
+, alsoletter={!}%
+, morekeywords={let, fn, self, mut}  % control flow keywords
+}%
+
+\definecolor{fsared}{rgb}{0.75,0,0}
+\definecolor{fsaorange}{rgb}{0.85,0.40,0}
+
+\lstdefinestyle{fsaerror}{
+    language=FsaError,
+    numbersep=5pt,
+    numberstyle=\fontsize{5}{8}\selectfont\tt\color{gray},
+    basicstyle=\fontsize{8}{9}\selectfont\tt\color{black},
+    keywordstyle=\bfseries, % reserved keywords
+    moredelim=**[is][\color{fsared}]{@}{@},
+    moredelim=**[is][\color{fsaorange}]{~}{~},
+    captionpos=b,
+    numbers=left,
+    commentstyle=\color{blue!66}\it,
+    tabsize=2,
+    breakatwhitespace=false,
+    breaklines=false,
+    showstringspaces=false,
+    showspaces=false,
+    columns=fullflexible,
+    keepspaces=true,
+}
+
 
 
 %%% The following is specific to OOPSLA2 '25 and the paper
@@ -241,9 +234,8 @@ ensures that finalizers are only run when it is provably safe to do so.
 
 \begin{figure}[t]
 \lstinputlisting[
-  language=Rust,
+  style=rustblock,
   firstline=6,
-  basicstyle=\footnotesize\ttfamily,
   caption={An \ourgc example, showing \lstinline{Gc<T>}
     and destructors as finalizers. We create a type \lstinline{GcNode} which
     models a graph: it stores an 8 bit integer value and a possibly-null
@@ -378,9 +370,8 @@ readers to skip material they are already comfortable with.
 
 \begin{figure}[t]
 \lstinputlisting[
-  language=Rust,
+  style=rustblock,
   firstline=5,
-  basicstyle=\footnotesize\ttfamily,
   caption={
     A version of~\cref{fig:first_example} using Rust's standard reference
     counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
@@ -389,11 +380,11 @@ readers to skip material they are already comfortable with.
     0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
     \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
     variables point to the same cyclic graph (line 10). Accessing a neighbour
-    node becomes a delicate dance requiring upgrading the weak reference (line 12).
+    node becomes a delicate dance requiring upgrading the weak reference (line 11).
     The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
     (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
     creates significant extra complexity relative to~\cref{fig:first_example}: compare
-    line 11 in \cref{fig:first_example} to lines 10-12 above.
+    line 11 in \cref{fig:first_example} to lines 10-11 above.
   },
   label={fig:rc_example}
 ]{listings/rc_example.rs}
@@ -744,7 +735,6 @@ for example, has deprecated, and intends eventually removing, per-type
 finalizers: instead it has introduced deliberately less flexible per-object `cleaners', whose API
 prevents problems such as object resurrection and per-class finalization~\cite{goetz21deprecated}.
 
-
 \subsection{The Challenge of Finalizers for \ourgc}
 
 At this point we hope to have convinced the reader that: a
@@ -781,7 +771,6 @@ Fortunately for us, Rust's unusual static guarantees, suitably expanded by
 \ourgc, allow us to address each problem in novel, satisfying, ways. In the following
 section, we tackle these problems in the order above, noting that we tackle problems
 \#1 and \#2 separately, and \#3 and \#4 together.
-
 
 \section{Finalizer Elision}
 \label{sec:elision}
@@ -828,27 +817,53 @@ we cannot elide a finalizer for a type such as
 As this shows, we must consider the complete destructor, and not just the top-level
 drop method, when deciding whether a corresponding finalizer can be elided.
 
-
-\subsection{Implementing finalizer elision}
-
-\begin{algorithm}[t]
+\begin{algorithm}[ht]
 \small
 \caption{Finalizer Elision}
 \label{alg:elision}
-\begin{algorithmic}
-\Function{RequiresFinalizer}{$T$}
-    \If {\Call{Impls}{$T$, $Drop$} \AND \NOT \Call{Impls}{$T$, \textit{DropMethodFinalizerElidable}}}
-        \State \Return{true}
-    \EndIf
-  \ForEach {\textit{field} $\in T$}
-    \If{\Call{RequiresFinalizer}{\textit{field}}}
-        \State \Return{true}
-    \EndIf
-\EndFor
-\State \Return{false}
-\EndFunction
-\end{algorithmic}
+\SetAlgoNoLine
+    \Function{\texttt{NeedsFinalizer(T)}}{
+        \uIf{\texttt{Impls(T, Drop) \AND \NOT Impls(T, DropMethodFinalizerElidable)}}{
+            \Return{\texttt{true}}\;
+  }
+  \SetAlgoVlined
+    \ForEach{field $\in$ T} {
+    \DoBlock{
+      \SetAlgoNoLine
+      \uIf{\texttt{NeedsFinalizer(field)}}{
+          \Return{\texttt{true}}\;
+      \SetAlgoVlined
+     }
+    }
+  }
+    \Return{\texttt{false}}\;
+}
 \end{algorithm}
+
+\begin{figure}
+  \begin{lstlisting}[
+    style=rustblock,
+    numbers=none,
+    label={listing:elision_in_rustc},
+    caption={
+      A simplified view of how finalizers are elided inside \ourgc. The new compiler intrinsic
+      \lstinline{needs_finalizer} returns true if a finalizer is required for a
+      type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
+      value is registered as requiring a finalizer. With optimisations turned on, this
+      seemingly dynamic, branching code will be turned into static, branchless code.
+    }]
+impl<T> Gc<T> {
+  pub fn new(value: T) -> Self {
+    if needs_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
+    else { Gc<T>::new_without_finalizer(value) }
+    ...
+  }
+}
+\end{lstlisting}
+\end{figure}
+
+\subsection{Implementing finalizer elision}
+
 
 \label{needs_finalizer_intrinsic}
 Finalizer elision statically determines which type's destructors do
@@ -891,55 +906,6 @@ not only are these types' drop methods compatible with \lstinline{DropMethodFina
 but they are extensively used in real Rust code: they enable significant numbers of
 finalizers to be elided.
 
-\begin{figure}[t]
-  \begin{lstlisting}[
-    language=Rust,
-    numbers=none,
-    basicstyle=\footnotesize\ttfamily,
-    label={listing:elision_in_rustc},
-    caption={
-      A simplified view of how finalizers are elided inside \ourgc. The new compiler intrinsic
-      \lstinline{needs_finalizer} returns true if a finalizer is required for a
-      type. The \lstinline{Gc<T>} type uses this intrinsic to ensure that the
-      value is registered as requiring a finalizer. With optimisations turned on, this
-      seemingly dynamic, branching code will be turned into static, branchless code.
-    }]
-impl<T> Gc<T> {
-  pub fn new(value: T) -> Self {
-    if needs_finalizer::<T>() { Gc<T>::new_with_finalizer(value) }
-    else { Gc<T>::new_without_finalizer(value) }
-    ...
-  }
-}
-\end{lstlisting}
-
-\begin{lstlisting}[
-  language=Rust,
-  basicstyle=\footnotesize\ttfamily,
-  caption={An example of possible premature
-    finalization. We create a new struct \lstinline{S}
-    (line 1) with a drop method that sets the wrapped integer to zero (line 2). In the
-    main method, we move an instance of the struct into a
-    \lstinline{Box<T>}, which we then move into a \lstinline{Gc<T>} (line 4). We
-    obtain a Rust reference to the inner integer (line 5), which at
-    run-time will be a pointer to the \lstinline{Box<T>}. At this
-    point, the compiler can determine that the \lstinline{Gc<T>} is no longer
-    used and overwrite \lstinline{root}'s pointer (which may be in a register). If
-    a collection then occurs, a finalizer can run \lstinline{S}'s drop method,
-    causing the program to print `0' instead of the expected `1' (line 7).},
-    label={fig:premature_finalization}]
-struct S { value: u8 }
-impl Drop for S { fn drop(&mut self) { self.value = 0; } }
-
-fn main()  {
-  let root = Gc::new(Box::new(S{ value: 1 }));
-  let inner: &u8 = &**root.value;
-  force_gc();
-  println!("{}", *inner);
-}
-\end{lstlisting}
-\end{figure}
-
 \cref{listing:elision_in_rustc} shows the new \texttt{const} compiler intrinsic
 \lstinline{needs_finalizer} we added to implement \cref{alg:elision}. The
 intrinsic is evaluated at compile-time: its result can be inlined into \lstinline{Gc::new},
@@ -967,6 +933,33 @@ Java~\cite{shipilev20local}). Second, compiler optimisations -- at least in LLVM
 are `GC unaware', so optimisations such as scalar
 replacement can change the point in a program when GCed values appear to be
 finalizable.
+
+\begin{figure}[t!]
+\begin{lstlisting}[
+    style=rustblock,
+  caption={An example of possible premature
+    finalization. We create a new struct \lstinline{S}
+    (line 1) with a drop method that sets the wrapped integer to zero (line 2). In the
+    main method, we move an instance of the struct into a
+    \lstinline{Box<T>}, which we then move into a \lstinline{Gc<T>} (line 4). We
+    obtain a Rust reference to the inner integer (line 5), which at
+    run-time will be a pointer to the \lstinline{Box<T>}. At this
+    point, the compiler can determine that the \lstinline{Gc<T>} is no longer
+    used and overwrite \lstinline{root}'s pointer (which may be in a register). If
+    a collection then occurs, a finalizer can run \lstinline{S}'s drop method,
+    causing the program to print `0' instead of the expected `1' (line 7).},
+    label={fig:premature_finalization}]
+struct S { value: u8 }
+impl Drop for S { fn drop(&mut self) { self.value = 0; } }
+
+fn main()  {
+  let root = Gc::new(Box::new(S{ value: 1 }));
+  let inner: &u8 = &**root.value;
+  force_gc();
+  println!("{}", *inner);
+}
+\end{lstlisting}
+\end{figure}
 
 In our context, it is natural to define premature finalization as a (dynamic) finalizer
 for a \lstinline{Gc<T>} value running before the (static) \lstinline{Gc<T>} owner
@@ -1100,14 +1093,9 @@ reference cannot outlast the drop method. We found that attempting to relax our
 rule further to deal with such cases rapidly complicates exposition and
 implementation.
 
-
-\subsection{Cycles and Finalization}
-\label{sec:cycles_and_finalization}
-
-\begin{figure}[tb]
+\begin{figure}[ht]
 \lstinputlisting[
-  language=Rust,
-  basicstyle=\footnotesize\ttfamily,
+  style=rustblock,
   firstline=5,
   caption={An example of the problems that come from mixing cycles
   and finalization. The salient difference from~\cref{fig:first_example} is that
@@ -1121,6 +1109,9 @@ implementation.
   label={fig:finalizer_cycle}
 ]{listings/finalization_cycle.rs}
 \end{figure}
+
+\subsection{Cycles and Finalization}
+\label{sec:cycles_and_finalization}
 
 One of the main motivations for GCs is that they solve problems with cyclic
 data structures. However, finalizers can be unsound if they access
@@ -1171,8 +1162,7 @@ check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
 \begin{figure}[t]
 \lstinputlisting[
-  language=Rust,
-  basicstyle=\footnotesize\ttfamily,
+  style=rustblock,
   firstline=10,
   caption={How destructors can cause deadlocks when used as
   finalizers. The mutator creates a reference-counted mutex (line 6),
@@ -1236,71 +1226,78 @@ finalization threads because \boehm's stop-the-world collection phase
 already synchronises all memory between threads.
 
 
-\subsection{Putting it all together}
+\subsection{Putting it all Together}
 
 \begin{algorithm}[t]
-  \small
-  \captionof{algorithm}{Finalizer safety analysis}
-  \label{alg:fsa}
-  \begin{algorithmic}[1]
-    \Function{FinalizerSafetyAnalysis}{\textit{func}}
-      \ForEach {\textit{basic\_block} $\in$ \textit{func}}
-            \State $t \gets$ \textit{basic\_block.terminator}
-            \If {\NOT \Call{IsGcConstructorCall}{$t$}}
-                \State \textbf{continue}
-            \EndIf
-            \State \textit{ty} $\gets$ \Call{GetTyOfGcValue}{$t$}
-            \If {\Call{isFinalizerUnchecked}{\textit{ty}} \OR \NOT \Call{RequiresFinalizer}{\textit{ty}}}
-              \State \textbf{continue}
-            \EndIf
-            \ForEach {$drop\_method \in$ \Call{GetDropGlue}{\textit{ty}}}
-              \If { \NOT \Call{IsMIRAvailable}{\textit{drop\_method}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-              \State \Call{CheckFunctionSafety}{\textit{drop\_method}}
-            \EndFor
-      \EndFor
-\EndFunction
-\State{}
-    \Function{CheckFunctionSafety}{\textit{drop}}
-      \ForEach {\textit{basic\_block} $\in$ \textit{drop}}
-        \ForEach {$\textit{statement} \in \textit{basic\_block}$}
-            \ForEach {$\textit{projection} \in \textit{statement}$}
-              \If{\NOT \Call{IsFinalizerSafe}{\textit{projection.element}}}
-                  \State \Call{EmitFinalizerUnsafeError}{}
-              \EndIf
-            \EndFor
-            \If{\Call{IsFunctionCall}{\textit{basic\_block.terminator}}}
-              \State \Call{CheckFunctionSafety}{\textit{basic\_block.terminator}}
-           \EndIf
-        \EndFor
-      \EndFor
+\ttfamily
+\footnotesize
+\caption{Finalizer Safety Analysis}
+\label{alg:fsa}
 
-\EndFunction
-\State{}
-  \Function{IsFinalizerSafe}{\textit{ty}}
-    \State \Return{\Call{Impls}{\textit{ty}, $Send$} \AND {\Call{Impls}{\textit{ty}, \textit{Sync}}} \AND {\Call{Impls}{\textit{ty}, \textit{FinalizerSafe}}}}
-\EndFunction
-\end{algorithmic}
+\SetAlgoNoLine
+    \Function{\texttt{FinalizerSafetyAnalysis(func)}}{
+  \SetAlgoVlined
+    \ForEach{\texttt{basic\_block} $\in$ \texttt{func}}{
+    \DoBlock{
+      t $\gets$ basic\_block.terminator\;
+      \SetAlgoNoLine
+      \uIf{\NOT \texttt{IsGcConstructorCall(t)}}{
+        \Continue\;
+      }
+      ty $\gets$ GetTyOfGcValue(t)\;
+      \uIf{\texttt{isFinalizerUnchecked(ty)} \OR \NOT \texttt{NeedsFinalizer(ty)}}{
+        \Continue\;
+      }
+      \SetAlgoVlined
+      \ForEach{\texttt{drop\_method} $\in$ \texttt{GetDropGlue(ty)}}{
+        \DoBlock{
+          \SetAlgoNoLine
+          \uIf{\NOT \texttt{IsMIRAvailable(drop\_method)}}{
+              \textit{EmitFinalizerUnsafeError()}\;
+          }
+          \SetAlgoVlined
+          \textit{CheckFunctionSafety(drop\_method)}\;
+        }
+      }
+    }
+  }
+}
+
+\SetAlgoNoLine
+    \Function{\texttt{CheckFunctionSafety(drop)}}{
+  \SetAlgoVlined
+    \ForEach{\texttt{basic\_block} $\in$ \texttt{drop}}{
+    \DoBlock{
+        \ForEach{\texttt{statement} $\in$ \texttt{basic\_block}}{
+        \DoBlock{
+          \ForEach{\texttt{projection} $\in$ \texttt{statement}}{
+            \DoBlock{
+            \SetAlgoNoLine
+              \uIf{\NOT \texttt{IsFinalizerSafe(projection.element)}}{
+                  \texttt{EmitFinalizerUnsafeError()}\;
+              }
+              \SetAlgoVlined
+            }
+          }
+        \SetAlgoNoLine
+          \uIf{\texttt{IsFunctionCall(basic\_block.terminator)}}{
+              \texttt{CheckFunctionSafety(basic\_block.terminator)}\;
+          }
+       \SetAlgoVlined
+        }
+      }
+    }
+  }
+}
+
+\SetAlgoNoLine
+\Function{\texttt{IsFinalizerSafe(ty)}}{
+    \Return{\texttt{Impls(ty, Send) \AND Impls(ty, Sync) \AND Impls(ty, FinalizerSafe)}}\;
+}
+\SetAlgoVlined
+
 \end{algorithm}
 
-\begin{figure}[tb]
-  \begin{center}
-\lstinputlisting[
-  language={},
-    basicstyle=\fontsize{7.6pt}{7pt}\ttfamily,
-    xleftmargin=6pt,
-    numbers=none,
-    abovecaptionskip=10pt,
-    caption={The compiler error produced by \ourgc for the example
-    in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
-    note that both the use of a type with a FSA-incompatible drop method (`has
-    a drop method') and the line in the drop method (`caused by the
-    expression') are highlighted to the user.},
-    label={fig:finalizer_cycle_err}
-]{listings/finalization_cycle.stderr}
-  \end{center}
-\end{figure}
 
 FSA integrates the seemingly separate components presented above into one. It
 iterates over every function in a Rust program analysing destructors of types
@@ -1338,6 +1335,19 @@ opaque function, etc.). \cref{fig:finalizer_cycle_err} shows an example of
 the errors reported by \ourgc: note that it pinpoints the line within a
 drop method that caused an FSA error.
 
+\begin{figure}[t!]
+      \lstinputlisting[
+    style=fsaerror,
+    xleftmargin=6pt,
+    numbers=none,
+    caption={The compiler error produced by \ourgc for the example
+    in \cref{fig:finalizer_cycle}. This extends \rustc's normal error messages:
+    note that both the use of a type with a FSA-incompatible drop method (`has
+    a drop method') and the line in the drop method (`caused by the
+    expression') are highlighted to the user.},
+    label={fig:finalizer_cycle_err}
+]{listings/finalization_cycle.stderr}
+\end{figure}
 
 \subsubsection{Awkward kinds of functions}
 
@@ -1969,274 +1979,274 @@ Steve Klabnik and Andy Wingo for comments.
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{bib}
 
-\clearpage
-
-\appendix
-
-\section*{Appendices}
-
-\begin{algorithm}[h]
-\small
-\caption{Removing elidable drops}
-\begin{algorithmic}
-\Function{RemoveElidableDrops}{$func$}
-      \ForEach {$basic\_block \in func$}
-            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
-                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
-                \If {\Call{IsGcType}{$ty$}}
-                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
-                        \State \Call{ReplaceTerminator}{$basic\_block$}
-                    \EndIf
-                \EndIf
-            \EndIf
-      \EndFor
-\EndFunction
-\Function{ReplaceTerminator}{$basic\_block$}
-    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
-    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
-    \State $block.terminator \gets last\_block.terminator$
-\EndFunction
-\end{algorithmic}
-    \caption{The \emph{Remove Elidable Drops} algorithm from \cref{sec:optimising_prem}}
-  \label{alg:barrier_removal}
-\end{algorithm}
-
-\clearpage
-
-\section*{Additional Experiment Data}
-
-In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
-\\\\
-
-\textbf{Misc.}
-\begin{itemize}
-  \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
-\end{itemize}
-\textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
-
-\begin{itemize}
-  \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
-  \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
-  \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
-  \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
-  \item \cref{tab:app:gcvs:fixed:heap}
-      (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
-default adaptive heap sizing and fixed size heap configurations.\end{itemize}
-\textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
-
-\begin{itemize}
-  \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
-  \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
-  \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
-  \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
-  \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
-\end{itemize}
-
-\clearpage
-
-\begin{table}[t]
-\centering
-\caption{Rust programs excluded from our benchmark suite after attempted porting to \ourgc.}
-\small
-\begin{center}
-\scalebox{0.8}{%
-    \input{tables/exclusions}
-}
-\label{tab:app:exclusions}
-\end{center}
-\end{table}
-
-\begin{table}[h]
-    \centering
-    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
-    different memory management strategies across our benchmark suites.}
-    \input{tables/appendix_gcvs_raw}
-    \label{tab:gcvs:raw}
-\end{table}
-
-\begin{table}[h]
-    \centering
-    \caption{Wall-clock times (in seconds) comparing the jemalloc
-    allocator and the \boehm allocator from the \boehm across our
-    benchmark suite.}
-    \label{tab:app:gcvs:alloc:cost}
-\scalebox{0.9}{%
-  \input{tables/appendix_alloc_comparison}
-}
-\end{table}
-
-\begin{table}[t]
-    \centering
-  \caption{Wall-clock execution times (in seconds) for each benchmark in the
-    \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
-    and include 99\% confidence intervals. Because \binarytrees and \regexredux
-    are stand-alone benchmarks they are omitted here; their timings appear in
-    \cref{tab:gcvs:raw}.}
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.7}{%
-  \input{tables/appendix_gcvs_wallclock_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.7}{%
-  \input{tables/appendix_gcvs_wallclock_2}
-      }
-  \end{subtable}
-    \label{tab:app:gcvs:wallclock}
-\end{table}
-
-\begin{table}[t]
-    \centering
-  \caption{User times (in seconds) for each benchmark in the \Egcrc experiment.
-    Values show arithmetic means over \benchmarkpexecs runs and include 99\%
-    confidence intervals.}
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.7}{%
-  \input{tables/appendix_gcvs_user_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.7}{%
-  \input{tables/appendix_gcvs_user_2}
-      }
-  \end{subtable}
-    \label{tab:app:gcvs:user}
-\end{table}
-
-\begin{table}[h]
-  \caption{The effects of fixing the heap size (see~\cref{sec:running_the_experiment})
-    on wall-clock time, reported as ratios relative to \boehm’s default
-    adaptive RSS strategy. We chose per-benchmark heap sizes based on our
-    observations of their memory usage, though some benchmarks fail at smaller
-    values. Broadly speaking, these results show that the performance
-    differences due to different heap sizes are relatively minor, and that \boehm's adaptive
-    strategy has not unduly coloured our results.}
-  \input{tables/fixed_heaps}
-\label{tab:app:gcvs:fixed:heap}
-\end{table}
-
-\clearpage
-
-\begin{table}[t]
-    \centering
-    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark.}
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_pct_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_pct_2}
-      }
-  \end{subtable}
-    \label{tab:app:elision:pct}
-\end{table}
-
-\clearpage
-
-\begin{figure}[htbp]
-    \centering
-    \begin{subfigure}{1\textwidth}
-        \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_wallclock.pdf}
-    \end{subfigure}%
-    \hfill
-    \begin{subfigure}{1\textwidth}
-        \centering
-        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_user.pdf}
-    \end{subfigure}
-    \caption{Wall-clock and user time performance comparison for finalizer
-    elision on each benchmark. The bars show the relative performance of \ourgc
-    after applying our elision optimization, normalized against the baseline
-    (solid black line). The vertical blue line marks the overall geometric mean
-    (with shaded area for CIs). User time often shows greater improvement than
-    wall-clock time, as elision reduces the CPU overhead of the finalization
-    thread.}
-    \label{fig:app:elision:perf}
-\end{figure}
-
-\clearpage
-
-\begin{table}[t]
-    \centering
-    \caption{Wall-clock execution times (seconds) for each benchmark in the
-    \Eelision experiment, shown before and after applying \ourgc's
-    finalizer elision optimisation. Values show arithmetic means over
-    \benchmarkpexecs runs, with 99\% confidence intervals.}
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_wallclock_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_wallclock_2}
-      }
-  \end{subtable}
-  \label{tab:app:elision:wallclock}
-\end{table}
-
-\clearpage
-
-\begin{table}[t]
-    \centering
-    \caption{User times (seconds) for each benchmark in the \Eelision
-    experiment, shown before and after applying \ourgc's finalizer elision
-    optimisation. Values show arithmetic means over \benchmarkpexecs runs, with
-    99\% confidence intervals.}
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_user_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.49\textwidth}
-    \centering
-\scalebox{0.8}{%
-  \input{tables/appendix_elision_user_2}
-      }
-  \end{subtable}
-    \label{tab:app:elision:user}
-\end{table}
-
-\clearpage
-
-\begin{table}[t]
-    \centering
-    \caption{Average heap footprint (MiB) across benchmarks in the \Eelision
-    experiment, measured before and after applying \ourgc’s finalizer elision
-    optimisation. Values are arithmetic means over \benchmarkpexecs runs with
-    resampled traces from heaptrack, with 99\% confidence intervals (see
-    \cref{sec:datapres} for details).}
-    \label{tab:app:elision:heap}
-  \begin{subtable}{0.47\textwidth}
-    \centering
-\scalebox{0.81}{%
-  \input{tables/appendix_elision_heap_1}
-}
-  \end{subtable}
-  \hfill
-  \begin{subtable}{0.47\textwidth}
-    \centering
-\scalebox{0.79}{%
-  \input{tables/appendix_elision_heap_2}
-      }
-  \end{subtable}
-\end{table}
+%\clearpage
+%
+%\appendix
+%
+%\section*{Appendices}
+%
+%\begin{algorithm}[h]
+%\small
+%\caption{Removing elidable drops}
+%\begin{algorithmic}
+%\Function{RemoveElidableDrops}{$func$}
+%      \ForEach {$basic\_block \in func$}
+%            \If {\Call{IsDropTerminator}{$basic\_block.terminator.kind$}}
+%                \State $ty \gets$ \Call{GetTypeOfDroppedValue}{$block.terminator$}
+%                \If {\Call{IsGcType}{$ty$}}
+%                    \If {\NOT \Call{RequiresFinalizer}{$ty$}}
+%                        \State \Call{ReplaceTerminator}{$basic\_block$}
+%                    \EndIf
+%                \EndIf
+%            \EndIf
+%      \EndFor
+%\EndFunction
+%\Function{ReplaceTerminator}{$basic\_block$}
+%    \State $drop\_func \gets$ \Call{GetDropFunc}{$basic\_block.terminator$}
+%    \State $last\_block \gets$ \Call{GetLastBasicBlock}{$drop\_func$}
+%    \State $block.terminator \gets last\_block.terminator$
+%\EndFunction
+%\end{algorithmic}
+%    \caption{The \emph{Remove Elidable Drops} algorithm from \cref{sec:optimising_prem}}
+%  \label{alg:barrier_removal}
+%\end{algorithm}
+%
+%\clearpage
+%
+%\section*{Additional Experiment Data}
+%
+%In this appendix, we provide supplementary plots for our performance evaluation. These are as follows:
+%\\\\
+%
+%\textbf{Misc.}
+%\begin{itemize}
+%  \item \cref{tab:app:exclusions} (page~\pageref{tab:app:exclusions}): Rust programs excluded from our benchmark suite.
+%\end{itemize}
+%\textbf{\Egcrc: a performance evaluation of \ourgc vs Reference Counting.}
+%
+%\begin{itemize}
+%  \item \cref{tab:gcvs:raw} (page~\pageref{tab:gcvs:raw}): Wall-clock times for the \Egcrc experiment.
+%  \item \cref{tab:app:gcvs:alloc:cost} (page~\pageref{tab:app:gcvs:alloc:cost}): A comparison of the allocation overhead of \boehm vs \texttt{jemalloc}.
+%  \item \cref{tab:app:gcvs:wallclock} (page~\pageref{tab:app:gcvs:wallclock}): Raw wall-clock time data for each benchmark.
+%  \item \cref{tab:app:gcvs:user} (page~\pageref{tab:app:gcvs:user}): Raw user time data.
+%  \item \cref{tab:app:gcvs:fixed:heap}
+%      (page~\pageref{tab:app:gcvs:fixed:heap}): Comparison between \boehm’s
+%default adaptive heap sizing and fixed size heap configurations.\end{itemize}
+%\textbf{\Eelision: a performance evaluation of \ourgc's finalizer elision.}
+%
+%\begin{itemize}
+%  \item \cref{tab:app:elision:pct} (page~\pageref{tab:app:elision:pct}): Percentage of finalizers \ourgc elided.
+%  \item \cref{fig:app:elision:perf} (page~\pageref{fig:app:elision:perf}): Wall-clock and user time comparison.
+%  \item \cref{tab:app:elision:wallclock} (page~\pageref{tab:app:elision:wallclock}): Raw wall-clock time data.
+%  \item \cref{tab:app:elision:user} (page~\pageref{tab:app:elision:user}): Raw user time data.
+%  \item \cref{tab:app:elision:heap} (page~\pageref{tab:app:elision:heap}): Raw average heap usage data.
+%\end{itemize}
+%
+%\clearpage
+%
+%\begin{table}[t]
+%\centering
+%\caption{Rust programs excluded from our benchmark suite after attempted porting to \ourgc.}
+%\small
+%\begin{center}
+%\scalebox{0.8}{%
+%    \input{tables/exclusions}
+%}
+%\label{tab:app:exclusions}
+%\end{center}
+%\end{table}
+%
+%\begin{table}[h]
+%    \centering
+%    \caption{Wall-clock times (in seconds) for the \Egcrc experiment, comparing
+%    different memory management strategies across our benchmark suites.}
+%    \input{tables/appendix_gcvs_raw}
+%    \label{tab:gcvs:raw}
+%\end{table}
+%
+%\begin{table}[h]
+%    \centering
+%    \caption{Wall-clock times (in seconds) comparing the jemalloc
+%    allocator and the \boehm allocator from the \boehm across our
+%    benchmark suite.}
+%    \label{tab:app:gcvs:alloc:cost}
+%\scalebox{0.9}{%
+%  \input{tables/appendix_alloc_comparison}
+%}
+%\end{table}
+%
+%\begin{table}[t]
+%    \centering
+%  \caption{Wall-clock execution times (in seconds) for each benchmark in the
+%    \Egcrc experiment. Values show arithmetic means over \benchmarkpexecs runs
+%    and include 99\% confidence intervals. Because \binarytrees and \regexredux
+%    are stand-alone benchmarks they are omitted here; their timings appear in
+%    \cref{tab:gcvs:raw}.}
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.7}{%
+%  \input{tables/appendix_gcvs_wallclock_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.7}{%
+%  \input{tables/appendix_gcvs_wallclock_2}
+%      }
+%  \end{subtable}
+%    \label{tab:app:gcvs:wallclock}
+%\end{table}
+%
+%\begin{table}[t]
+%    \centering
+%  \caption{User times (in seconds) for each benchmark in the \Egcrc experiment.
+%    Values show arithmetic means over \benchmarkpexecs runs and include 99\%
+%    confidence intervals.}
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.7}{%
+%  \input{tables/appendix_gcvs_user_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.7}{%
+%  \input{tables/appendix_gcvs_user_2}
+%      }
+%  \end{subtable}
+%    \label{tab:app:gcvs:user}
+%\end{table}
+%
+%\begin{table}[h]
+%  \caption{The effects of fixing the heap size (see~\cref{sec:running_the_experiment})
+%    on wall-clock time, reported as ratios relative to \boehm’s default
+%    adaptive RSS strategy. We chose per-benchmark heap sizes based on our
+%    observations of their memory usage, though some benchmarks fail at smaller
+%    values. Broadly speaking, these results show that the performance
+%    differences due to different heap sizes are relatively minor, and that \boehm's adaptive
+%    strategy has not unduly coloured our results.}
+%  \input{tables/fixed_heaps}
+%\label{tab:app:gcvs:fixed:heap}
+%\end{table}
+%
+%\clearpage
+%
+%\begin{table}[t]
+%    \centering
+%    \caption{Percentage of finalizers \ourgc was able to elide for each benchmark.}
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_pct_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_pct_2}
+%      }
+%  \end{subtable}
+%    \label{tab:app:elision:pct}
+%\end{table}
+%
+%\clearpage
+%
+%\begin{figure}[htbp]
+%    \centering
+%    \begin{subfigure}{1\textwidth}
+%        \centering
+%        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_wallclock.pdf}
+%    \end{subfigure}%
+%    \hfill
+%    \begin{subfigure}{1\textwidth}
+%        \centering
+%        \includegraphics[width=1\textwidth,keepaspectratio]{figures/appendix_elision_user.pdf}
+%    \end{subfigure}
+%    \caption{Wall-clock and user time performance comparison for finalizer
+%    elision on each benchmark. The bars show the relative performance of \ourgc
+%    after applying our elision optimization, normalized against the baseline
+%    (solid black line). The vertical blue line marks the overall geometric mean
+%    (with shaded area for CIs). User time often shows greater improvement than
+%    wall-clock time, as elision reduces the CPU overhead of the finalization
+%    thread.}
+%    \label{fig:app:elision:perf}
+%\end{figure}
+%
+%\clearpage
+%
+%\begin{table}[t]
+%    \centering
+%    \caption{Wall-clock execution times (seconds) for each benchmark in the
+%    \Eelision experiment, shown before and after applying \ourgc's
+%    finalizer elision optimisation. Values show arithmetic means over
+%    \benchmarkpexecs runs, with 99\% confidence intervals.}
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_wallclock_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_wallclock_2}
+%      }
+%  \end{subtable}
+%  \label{tab:app:elision:wallclock}
+%\end{table}
+%
+%\clearpage
+%
+%\begin{table}[t]
+%    \centering
+%    \caption{User times (seconds) for each benchmark in the \Eelision
+%    experiment, shown before and after applying \ourgc's finalizer elision
+%    optimisation. Values show arithmetic means over \benchmarkpexecs runs, with
+%    99\% confidence intervals.}
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_user_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.49\textwidth}
+%    \centering
+%\scalebox{0.8}{%
+%  \input{tables/appendix_elision_user_2}
+%      }
+%  \end{subtable}
+%    \label{tab:app:elision:user}
+%\end{table}
+%
+%\clearpage
+%
+%\begin{table}[t]
+%    \centering
+%    \caption{Average heap footprint (MiB) across benchmarks in the \Eelision
+%    experiment, measured before and after applying \ourgc’s finalizer elision
+%    optimisation. Values are arithmetic means over \benchmarkpexecs runs with
+%    resampled traces from heaptrack, with 99\% confidence intervals (see
+%    \cref{sec:datapres} for details).}
+%    \label{tab:app:elision:heap}
+%  \begin{subtable}{0.47\textwidth}
+%    \centering
+%\scalebox{0.81}{%
+%  \input{tables/appendix_elision_heap_1}
+%}
+%  \end{subtable}
+%  \hfill
+%  \begin{subtable}{0.47\textwidth}
+%    \centering
+%\scalebox{0.79}{%
+%  \input{tables/appendix_elision_heap_2}
+%      }
+%  \end{subtable}
+%\end{table}
 
 
 \end{document}

@@ -11,7 +11,6 @@ fn main() {
   let rc2 = Rc::new(RefCell::new(RcNode{value: 2, nbr: None}));
   rc2.borrow_mut().nbr = Some(Rc::downgrade(&rc2));
   rc1 = Rc::clone(&rc2);
-  println!("{} {}",
-    rc1.borrow().value,
-    rc1.borrow().nbr.as_ref().unwrap().upgrade().unwrap().borrow().value);
+  println!("{} {}", rc1.borrow().value,
+                      rc1.borrow().nbr.as_ref().unwrap().upgrade().unwrap().borrow().value);
 }
