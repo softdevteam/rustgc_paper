@@ -1073,8 +1073,7 @@ that only types that need a finalizer can possibly have problems with
 references, and to forbid such types from storing references in
 \lstinline{Gc<T>}. For example, if there is no drop method for
 \lstinline|struct S{x: &u8}| then its destructor is safe to use as a
-finalizer, since we know that the non-drop aspects of the destructor
-will not use the \lstinline{&u8} reference.
+finalizer, since its non-drop aspects will not use the \lstinline{&u8} reference.
 
 The eventual rule we alighted upon for FSA is that a destructor for a type
 \lstinline{T} can be used as a finalizer provided the destructor's drop methods
@@ -1108,7 +1107,6 @@ implementation.
   unsound: whichever finalizer runs second leads to undefined behaviour.},
   label={fig:finalizer_cycle}
 ]{listings/finalization_cycle.rs}
-  \vspace{-5pt}
 \end{figure}
 
 \subsection{Cycles and Finalization}
@@ -1172,13 +1170,14 @@ check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
   can release the lock a GC cycle occurs and the \lstinline{GcNode}'s
   finalizer run (line 9). If the finalizer is run on the same thread
   as the mutator, then it will fail to grab the lock (line 2) and cause
-  a deadlock as the mutator cannot continue and release the lock.},
+  a deadlock.},
   label={fig:finalizer_deadlock}
 ]{listings/finalizer_deadlock.rs}
 \end{figure}
 
 Running finalizers on the same thread as a mutator can cause problems when the
-finalizer accesses state shared with the mutator (see~\cref{sec:general_challenges}).
+finalizer accesses state shared with the mutator (see~\cref{sec:general_challenges}
+for a general description and \cref{fig:finalizer_deadlock} for a concrete example).
 The most general solution to this problem is to run finalizers on a separate
 \emph{finalizer thread} that never runs mutator code.
 
