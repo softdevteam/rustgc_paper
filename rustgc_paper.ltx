@@ -376,10 +376,10 @@ readers to skip material they are already comfortable with.
     A version of~\cref{fig:first_example} using Rust's standard reference
     counting type \lstinline{Rc<T>}. To avoid memory leaks we use \emph{weak}
     references between nodes (line 1). We again create two cyclic graphs (lines
-    6--9) using \lstinline{Rc::downgrade} to create weak references (lines 7 and
-    0). Since \lstinline{Rc<T>} is not copyable, we must use a manual
+    5--8) using \lstinline{Rc::downgrade} to create weak references (lines 6 and
+    8). Since \lstinline{Rc<T>} is not copyable, we must use a manual
     \lstinline{clone} call to have both the \lstinline{rc1} and \lstinline{rc2}
-    variables point to the same cyclic graph (line 10). Accessing a neighbour
+    variables point to the same cyclic graph (line 9). Accessing a neighbour
     node becomes a delicate dance requiring upgrading the weak reference (line 11).
     The need to downgrade \lstinline{Rc<T>} to \lstinline{Weak<T>} and upgrade
     (which may fail, hence the \lstinline{unwrap}) back to \lstinline{Rc<T>}
@@ -818,6 +818,7 @@ As this shows, we must consider the complete destructor, and not just the top-le
 drop method, when deciding whether a corresponding finalizer can be elided.
 
 \begin{algorithm}[ht]
+\begin{algorithm}[t]
 \small
 \caption{Finalizer Elision}
 \label{alg:elision}
