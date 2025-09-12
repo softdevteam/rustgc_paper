@@ -1029,7 +1029,7 @@ reference both a callee and a successor basic block.
 
 The \lstinline{remove_elidable_drops} pass iterates over a program's MIR,
 identifies drop method terminators which reference elidable finalizers, and turns them into `goto' terminators
-to the successor basic basic block. \cref{alg:barrier_removal} in the Appendix presents a
+to the successor basic basic block. Algorithm 4 in the Appendix presents a
 more formal version of this algorithm.
 
 
@@ -1510,7 +1510,7 @@ we reverted back to \lstinline{Rc<T>} for that portion of the port.
 We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
 eventual benchmark suite, we briefly report why those other programs have
-been excluded. All excluded benchmarks are shown in \cref{tab:app:exclusions} in the Appendix.
+been excluded. All excluded benchmarks are shown in Table 4 in the Appendix.
 
 Several programs (e.g.~numbat, mini-moka, and salsa), once ported, turned out
 to be uninteresting from a GC benchmarking perspective. Irrespective of the
@@ -1550,8 +1550,8 @@ different underlying allocators. In particular, \ourgc has to use \boehm, but,
 for example, \rc can use a modern allocator such as jemalloc.
 Much has changed in the performance of allocators since \boehm's 1980s
 roots: in \rc-only benchmarks, we observe an inherent overhead
-from \boehm of 2--26\% relative to jemalloc (see~\cref{tab:app:gcvs:alloc:cost}
-in the Appendix), which is a significant, and variable, confounding factor.
+from \boehm of 2--26\% relative to jemalloc (see Table 6 in the Appendix),
+which is a significant, and variable, confounding factor.
 Fortunately, \boehm can
 be used as a `traditional' allocator that allocates and frees on demand
 (i.e.~no conservative GC occurs): in the main experiment, we thus use \boehm as
@@ -1578,7 +1578,7 @@ whether a different strategy and/or heap size would make a difference,
 we ran our benchmarks with three different fixed heap sizes. Doing so
 either has little effect or speeds benchmarks up; when it does so,
 the impact is generally under 10\% and is at most 28\% (the detailed results are presented in
-\cref{tab:app:gcvs:fixed:heap} in the Appendix). Broadly speaking, this
+Table 9 in the Appendix). Broadly speaking, this
 suggests that \boehm's default heap sizing approach, at least in our context,
 is not significantly distorting our view of performance.
 
@@ -1642,7 +1642,7 @@ is in absolute terms.
 
 \binarytrees is sufficiently simple that we also used it to compare against
 \typedarena and \rustgcproj. The time-series data in~\cref{fig:profiles} is
-particularly illuminating (for completeness, \cref{tab:gcvs:raw} in the Appendix has the
+particularly illuminating (for completeness, Table 5 in the Appendix has the
 raw timings). \ourgc is around 3.5$\times$ slower than \typedarena. The
 time-series data for the latter shows it going through distinct phases: a (relatively long) allocation
 phase, a (relatively moderate) `work' phase, and a (relatively short) deallocation phase.
