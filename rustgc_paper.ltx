@@ -366,7 +366,7 @@ readers to skip material they are already comfortable with.
 \section{Background}
 \label{sec:background}
 
-\subsection{The challenges of shared ownership in Rust}
+\subsection{The Challenges of Shared Ownership in Rust}
 
 \begin{figure}[t]
 \lstinputlisting[
@@ -448,7 +448,7 @@ variety of workarounds already present in Rust code, and the difficultly
 of creating new ones, suggests that there is a subset that would benefit from GC.
 
 
-\subsection{GC terminology}
+\subsection{GC Terminology}
 
 GC is a venerable field and has accumulated terminology that can seem
 unfamiliar or unintuitive. We mostly use the same terminology
@@ -862,7 +862,7 @@ impl<T> Gc<T> {
 \end{lstlisting}
 \end{figure}
 
-\subsection{Implementing finalizer elision}
+\subsection{Implementing Finalizer Elision}
 
 
 \label{needs_finalizer_intrinsic}
@@ -999,7 +999,7 @@ due to the effect on inlining heuristics.} into \lstinline{Gc<T>}'s
 drop method, which achieves the effect we require.
 
 
-\subsection{Optimising premature finalizer prevention}
+\subsection{Optimising Premature Finalizer Prevention}
 \label{sec:optimising_prem}
 
 The drop method we add to \lstinline{Gc<T>} fully prevents premature
@@ -1051,7 +1051,7 @@ already finalized objects), and thread safe. We present the three main
 components of FSA individually before bringing them together.
 
 
-\subsection{Rust references}
+\subsection{Rust References}
 \label{sec:fsa_rust_references}
 
 \lstinline{Gc<T>} can store, directly or indirectly, normal Rust
@@ -1156,7 +1156,7 @@ This naturally handles transitively reachable code, allowing FSA itself to only
 check that a destructor's direct field accesses are \lstinline{FinalizerSafe}.
 
 
-\subsection{Destructors need to be runnable on a finalizer thread}
+\subsection{Destructors Need to be Runnable on a Finalizer Thread}
 \label{sec:fsa_finalizer_thread}
 
 \begin{figure}[t]
@@ -1349,7 +1349,7 @@ drop method that caused an FSA error.
 ]{listings/finalization_cycle.stderr}
 \end{figure}
 
-\subsubsection{Awkward kinds of functions}
+\subsubsection{Awkward Kinds of Functions}
 
 FSA can encounter two kinds of `awkward' functions.
 
@@ -1420,7 +1420,7 @@ up, we carried out three experiments:
 
 \subsection{Methodology}
 
-\subsubsection{The benchmark suite}
+\subsubsection{The Benchmark Suite}
 
 There is no existing benchmark suite for GCs for Rust. Even if such a suite did exist, it
 may not have been suitable for our purposes because in experiment \Egcrc we
@@ -1505,7 +1505,7 @@ we reverted back to \lstinline{Rc<T>} for that portion of the port.
 \end{table}
 
 
-\subsubsection{What we couldn't include in the benchmark suite}
+\subsubsection{What We Couldn't Include in the Benchmark Suite}
 
 We tried porting 10 other programs that are not included in our
 benchmark suite. To avoid readers wondering if we have `cherry-picked' our
@@ -1534,7 +1534,7 @@ would be a misleading comparison, as our port of RustPython would be doing less
 work.
 
 
-\subsubsection{Running the experiment}
+\subsubsection{Running the Experiment}
 \label{sec:running_the_experiment}
 
 Our experiment can be seen as a comparison of \ourgc against `normal' Rust.
@@ -1591,7 +1591,7 @@ running \benchmarkos. We turned off turbo boost and hyper-threading,
 as both can colour results.
 
 
-\subsubsection{Data presentation}
+\subsubsection{Data Presentation}
 \label{sec:datapres}
 
 Except where otherwise stated, we report means and 99\% confidence intervals
@@ -1747,7 +1747,7 @@ any of these suggests that, on non-artificial benchmarks, premature finalizer
 prevention is not a noticeable cost.
 
 
-\section{Threats to validity}
+\section{Threats to Validity}
 
 We cannot state with certainty that the solutions we have presented are
 complete or correct. We have tried to mitigate this by relatively extensive
@@ -1817,7 +1817,7 @@ ensure this was not a significant effect; by running benchmarks
 sometimes.
 
 
-\section{Related work}
+\section{Related Work}
 \label{sec:related_work}
 
 In this paper we hope to have given sufficient background on GC and the use
@@ -1961,7 +1961,7 @@ conservative GC are worth the gains -- but it does
 show what can be achieved if one is willing to alter the
 language's design and \rustc.
 
-\section*{Data availability statement}
+\section*{Data Availability Statement}
 
 The accompanying artefact~\cite{hughes25garbageartefact} contains: the source
 code necessary to run this paper's experiment (including generating figures
