@@ -817,7 +817,6 @@ we cannot elide a finalizer for a type such as
 As this shows, we must consider the complete destructor, and not just the top-level
 drop method, when deciding whether a corresponding finalizer can be elided.
 
-\begin{algorithm}[ht]
 \begin{algorithm}[t]
 \small
 \caption{Finalizer Elision}
@@ -1044,12 +1043,12 @@ finalizers must be run on a separate thread -- but we must ensure that doing so
 is sound. We therefore consider this a specific instance of the latter problem,
 treating both equally in this section.
 
-In this section we introduce Finalizer Safety Analysis (FSA), which prevents
+We therefore introduce Finalizer Safety Analysis (FSA), which prevents
 unsafe (in the sense of `not safe Rust') destructors being used as finalizers.
 As a first approximation, FSA
 guarantees that finalizers are memory safe, cycle safe (i.e.~do not access
-already finalized objects), and thread safe. In this section, we introduce the three main
-components of FSA individually before bringing them together into one.
+already finalized objects), and thread safe. We present the three main
+components of FSA individually before bringing them together.
 
 
 \subsection{Rust references}
@@ -1109,6 +1108,7 @@ implementation.
   unsound: whichever finalizer runs second leads to undefined behaviour.},
   label={fig:finalizer_cycle}
 ]{listings/finalization_cycle.rs}
+  \vspace{-5pt}
 \end{figure}
 
 \subsection{Cycles and Finalization}
@@ -1779,7 +1779,7 @@ models which, in a sense, modern GC is a superset of.
     \import{figures}{premopt_perf.pgf}
     \caption{The effect of premature finalization optimisation,
     normalised to \emph{None}
-    (i.e.~an unsound configuration with no fences). Grey
+    (i.e.~no fences). Grey
     bars represent the ratio for \emph{naive} (all possible fences)
     and blue bars \emph{optimised} (obviously unnecessary fences
     removed). Unfortunately, this attempted optimisation has no statistically
